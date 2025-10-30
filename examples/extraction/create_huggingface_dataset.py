@@ -15,18 +15,17 @@
 # ---
 
 # %%
-"""Script to create a HuggingFace dataset for property extraction
+"""Script to create a HuggingFace dataset for the property extraction task
 
 The model will be provided the following information:
-- Paper path
-- Chemical formula
-- Property to extract
-
-There will be a column for the answer.
+- Refno (string): the reference number of the paper
+- Paper (PDF object): the PDF object of the paper
+- property_name (string): the name of the property
+- property_value (string): the value of the property
 
 Example usage:
 ```bash
-python create_huggingface_dataset.py
+python create_huggingface_dataset.py --repo_name REPO_NAME
 ```
 """
 
