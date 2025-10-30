@@ -17,9 +17,9 @@
 # %%
 """Script to create a HuggingFace dataset for the property extraction task
 
-The model will be provided the following information:
+Each row contains the following information:
 - Refno (string): the reference number of the paper
-- Paper (PDF object): the PDF object of the paper
+- paper (PDFplumber object): the PDF file of the paper.
 - property_name (string): the name of the property
 - property_value (string): the value of the property
 
