@@ -15,13 +15,17 @@
 # ---
 
 # %%
-"""Script to create a HuggingFace dataset for the property extraction task
+"""Script to create a HuggingFace dataset from the SuperCon dataset.
+
+NOTE: we deduplicates rows that have the same material, property_name, property_value, and property_unit.
 
 Each row contains the following information:
-- Refno (string): the reference number of the paper
-- paper (PDFplumber object): the PDF file of the paper.
+- paper (PDFplumber object): the PDF file of the paper (or path to the PDF file).
+- material (string): the chemical formula of the material
 - property_name (string): the name of the property
 - property_value (string): the value of the property
+- property_unit (string): the unit of the property
+- definition (string): the definition of the property
 
 Example usage:
 ```bash

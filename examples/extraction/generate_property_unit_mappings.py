@@ -1,3 +1,19 @@
+"""Script to generate a CSV file of property-unit mappings from the properties-oxide-metal-glossary.csv file.
+
+NOTE: the unit property is usually found before the property it is associated with.
+
+This script will generate a CSV file with the following columns:
+- property: the property db
+- unit: the unit db
+- property_label: the label of the property
+- unit_label: the label of the unit
+
+Example usage:
+```bash
+python generate_property_unit_mappings.py
+```
+"""
+
 import csv
 import re
 
@@ -38,8 +54,8 @@ def is_related_property(unit_row, property_row, property_name_from_unit):
     return False
 
 # Read the CSV file
-input_file = '/Users/ag2435/sci_llm/src/sci-llm/examples/extraction/data/properties-oxide-metal-glossary.csv'
-output_file = '/Users/ag2435/sci_llm/src/sci-llm/examples/extraction/property_unit_mappings.csv'
+input_file = 'properties-oxide-metal-glossary.csv'
+output_file = 'property_unit_mappings.csv'
 
 mappings = []
 
