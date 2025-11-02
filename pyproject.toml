@@ -19,7 +19,8 @@ dependencies = [
     "phantom-wiki[eval]",
     "huggingface_hub[cli]",
     "datasets",
-    "pdfplumber"
+    "pdfplumber",
+    "langchain"
 ]
 
 [project.urls]
