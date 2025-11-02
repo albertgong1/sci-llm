@@ -34,29 +34,47 @@ import pandas as pd
 from pathlib import Path
 from datasets import Dataset, Pdf, load_from_disk
 from argparse import ArgumentParser
+import logging
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # %%
 parser = ArgumentParser()
-parser.add_argument("--data_dir", type=str, default="data")
-parser.add_argument("--repo_name", type=str, default=None)
+parser.add_argument("--paper_dir", type=str, default="Paper_DB", help="Directory containing the papers")
+parser.add_argument("--properties_dir", type=str, default="data", help="Directory containing the properties")
+parser.add_argument("--repo_name", type=str, default=None, help="Name of the HuggingFace repository to push to")
+parser.add_argument("--output_dir", type=str, default="out", help="Directory to save the dataset csv file")
 args = parser.parse_args()
 
-data_dir = args.data_dir
+paper_dir = args.paper_dir
+properties_dir = args.properties_dir
 repo_name = args.repo_name
+output_dir = args.output_dir
+os.makedirs(output_dir, exist_ok=True)
 
-# TODO: get the list of all properties
-# properties_path = Path(data_dir) / "properties-oxide-metal.csv"
-# df_properties = pd.read_csv(properties_path, index_col=0)
+# Load the glossary of properties
+glossary_path = Path(properties_dir) / "properties-oxide-metal-glossary.csv"
+df_glossary = pd.read_csv(glossary_path, index_col=0)
+# construct a dictionary of property name -> definition
+definitions = {}
+for index, row in df_glossary.iterrows():
+    if row['label'] in definitions:
+        logger.warning(f"Warning: property name {row['label']} already exists in the definitions")
+        logger.warning(f"The old definition is: {definitions[row['label']]}")
+        logger.warning(f"The new definition is: {row['definition']}")
+    definitions[row['label']] = row['definition']
 
 # %%
-answer_path = Path(data_dir) / "curated_filtered_properties.csv"
+answer_path = Path(properties_dir) / "curated_filtered_properties.csv"
 # Read Properties as Python objects (avoid needing eval later)
 df_answer = pd.read_csv(answer_path, converters={"Properties": eval})
 # each row contains multiple properties
 # explode the rows into multiple rows
 df_answer = df_answer.explode('Properties')
 # df_answer['num_properties'] = df_answer['Properties'].apply(len)
-df_answer['Paper'] = df_answer['Paper'].apply(lambda x: Path(data_dir) / "Paper_DB" / f"{x}.pdf")
+df_answer['paper'] = df_answer['Paper'].apply(lambda x: Path(paper_dir) / f"{x}.pdf")
 
 # the Properties column contains a dictionary of property name -> property value pairs
 # we want a separate row for each property name -> property value pair
@@ -64,24 +82,36 @@ df_answer['Paper'] = df_answer['Paper'].apply(lambda x: Path(data_dir) / "Paper_
 # After exploding the list of dictionaries, explode each dictionary into separate rows
 # Convert each dictionary to a Series with items(), then explode
 df_answer = df_answer.apply(lambda row: pd.Series({
-    'Paper': row['Paper'],
-    'Refno': row['Refno'],
+    'paper': row['paper'],
+    'material': row['Properties']["common formula of materials"],
     'property_name': list(row['Properties'].keys()),
     'property_value': list(row['Properties'].values())
 }), axis=1).explode(['property_name', 'property_value'])
+df_answer = df_answer[df_answer['property_name'] != 'common formula of materials']
+# Convert Paper Path objects to strings for HuggingFace
+df_answer['paper'] = df_answer['paper'].astype(str)
+# Convert property_value to string to handle mixed types (float, str, etc.)
+df_answer['property_value'] = df_answer['property_value'].astype(str)
+
+# Fix unicode character issues in property names
+unicode_fixes = {
+    'Å€': '⊥',  # Fix perpendicular symbol
+    'Ã—': '×',  # Fix multiplication sign if needed
+    'Î"': 'Δ',  # Fix delta if needed
+}
+for bad_char, good_char in unicode_fixes.items():
+    df_answer['property_name'] = df_answer['property_name'].str.replace(bad_char, good_char, regex=False)
+
+# Add the definition of the property to the dataframe
+df_answer['definition'] = df_answer['property_name'].map(definitions)
+df_answer = df_answer.reset_index(drop=True)
 
 # %%
 print(df_answer)
-
-# %%
-# Convert Paper Path objects to strings for HuggingFace
-df_answer['paper'] = df_answer['Paper'].astype(str)
-
-# Drop the Path object column
-df_answer = df_answer.drop(columns=['Paper'])
-
-# Convert property_value to string to handle mixed types (float, str, etc.)
-df_answer['property_value'] = df_answer['property_value'].astype(str)
+import pdb; pdb.set_trace()
+save_path = Path(output_dir) / "dataset.csv"
+df_answer.to_csv(save_path, index=False)
+print(f"Dataset saved to {save_path}")
 
 # %%
 # Create HuggingFace dataset with proper PDF feature type
@@ -109,10 +139,10 @@ print("✓ Dataset loaded successfully!")
 print(f"Number of examples: {len(loaded_dataset)}")
 print(f"Features: {loaded_dataset.features}")
 print("\nFirst example:")
-print(f"  Refno: {loaded_dataset[0]['Refno']}")
-print(f"  Property name: {loaded_dataset[0]['property_name']}")
-print(f"  Property value: {loaded_dataset[0]['property_value']}")
-print(f"  Paper: {loaded_dataset[0]['paper']}")
+print(f"  material: {loaded_dataset[0]['material']}")
+print(f"  property_name: {loaded_dataset[0]['property_name']}")
+print(f"  property_value: {loaded_dataset[0]['property_value']}")
+print(f"  paper: {loaded_dataset[0]['paper']}")
 
 # %%
 # Test that PDF loading works
@@ -129,4 +159,5 @@ if repo_name is not None:
     dataset.push_to_hub(
         repo_name,
         private=False,  # Set to True if you want a private dataset
+        split="test",
     )
