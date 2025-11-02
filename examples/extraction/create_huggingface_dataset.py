@@ -45,7 +45,7 @@ parser = ArgumentParser()
 parser.add_argument("--paper_dir", type=str, default="Paper_DB", help="Directory containing the papers")
 parser.add_argument("--properties_dir", type=str, default="data", help="Directory containing the properties")
 parser.add_argument("--repo_name", type=str, default=None, help="Name of the HuggingFace repository to push to")
-parser.add_argument("--output_dir", type=str, default="out", help="Directory to save the dataset csv file")
+parser.add_argument("--output_dir", "-od", type=str, default="out", help="Directory to save the dataset csv file")
 args = parser.parse_args()
 
 paper_dir = args.paper_dir
@@ -56,66 +56,101 @@ os.makedirs(output_dir, exist_ok=True)
 
 # Load the glossary of properties
 glossary_path = Path(properties_dir) / "properties-oxide-metal-glossary.csv"
-df_glossary = pd.read_csv(glossary_path, index_col=0)
-# construct a dictionary of property name -> definition
-definitions = {}
-for index, row in df_glossary.iterrows():
-    if row['label'] in definitions:
-        logger.warning(f"Warning: property name {row['label']} already exists in the definitions")
-        logger.warning(f"The old definition is: {definitions[row['label']]}")
-        logger.warning(f"The new definition is: {row['definition']}")
-    definitions[row['label']] = row['definition']
+df_glossary = pd.read_csv(
+    glossary_path,
+    index_col=0,
+)
+# set index to db and rename index to "order"
+df_glossary = df_glossary.reset_index(names="order").set_index("db")
+# import pdb; pdb.set_trace()
+# load units
+units_path = Path(properties_dir) / "property_unit_mappings.csv"
+df_units = pd.read_csv(units_path, index_col=0)
+# import pdb; pdb.set_trace()
 
 # %%
-answer_path = Path(properties_dir) / "curated_filtered_properties.csv"
-# Read Properties as Python objects (avoid needing eval later)
-df_answer = pd.read_csv(answer_path, converters={"Properties": eval})
-# each row contains multiple properties
-# explode the rows into multiple rows
-df_answer = df_answer.explode('Properties')
-# df_answer['num_properties'] = df_answer['Properties'].apply(len)
-df_answer['paper'] = df_answer['Paper'].apply(lambda x: Path(paper_dir) / f"{x}.pdf")
+data_path = Path(properties_dir) / "SuperCon.csv"
+# Use the second row as the header
+df = pd.read_csv(data_path, header=2, dtype=str)
+# drop "year.1" as it's duplicates of "year"
+df = df.drop(columns=["year.1"])
 
-# the Properties column contains a dictionary of property name -> property value pairs
-# we want a separate row for each property name -> property value pair
-# note that we need a new column for the property value
-# After exploding the list of dictionaries, explode each dictionary into separate rows
-# Convert each dictionary to a Series with items(), then explode
-df_answer = df_answer.apply(lambda row: pd.Series({
-    'paper': row['paper'],
-    'material': row['Properties']["common formula of materials"],
-    'property_name': list(row['Properties'].keys()),
-    'property_value': list(row['Properties'].values())
-}), axis=1).explode(['property_name', 'property_value'])
-df_answer = df_answer[df_answer['property_name'] != 'common formula of materials']
-# Convert Paper Path objects to strings for HuggingFace
-df_answer['paper'] = df_answer['paper'].astype(str)
-# Convert property_value to string to handle mixed types (float, str, etc.)
-df_answer['property_value'] = df_answer['property_value'].astype(str)
+def process_row(row):
+    # element corresponds to the label "chemical formula"
+    keys = []
+    values = []
+    units = []
+    for col in df.columns:
+        if col in ['refno', 'element']:
+            continue
+        if col in df_units['unit'].values:
+            # Skip properties that are units
+            continue
+        keys.append(col)
+        values.append(row[col])
+        # get the unit for the property
+        if col in df_units.index:
+            unit_key = df_units.loc[col, 'unit']
+            unit_value = row[unit_key]
+            units.append(unit_value)
+        else:
+            units.append(None)
+    return pd.Series({
+        'refno': row["refno"],
+        'material': row["element"],
+        'property_name': keys,
+        'property_value': values,
+        'property_unit': units
+    })
 
-# Fix unicode character issues in property names
-unicode_fixes = {
-    'Å€': '⊥',  # Fix perpendicular symbol
-    'Ã—': '×',  # Fix multiplication sign if needed
-    'Î"': 'Δ',  # Fix delta if needed
-}
-for bad_char, good_char in unicode_fixes.items():
-    df_answer['property_name'] = df_answer['property_name'].str.replace(bad_char, good_char, regex=False)
+df = df.apply(process_row, axis=1)
+# explode the property_name and property_value columns
+df = df.explode(['property_name', 'property_value', 'property_unit'])
+# drop rows where property_value is None
+df = df[df['property_value'].notna()]
+# join the property_name and property_value columns with the glossary of properties
+df = df.merge(df_glossary, left_on='property_name', right_on='db', how='left', sort=False)
+# drop the rows that are not physically relevant
+df = df[df['Physically_Relevant']]
 
-# Add the definition of the property to the dataframe
-df_answer['definition'] = df_answer['property_name'].map(definitions)
-df_answer = df_answer.reset_index(drop=True)
+# Drop duplicate (material, property_name, property_value) combinations
+# This removes duplicates when the same material appears in multiple SuperCon rows
+df = df.drop_duplicates(subset=['material', 'property_name', 'property_value', 'property_unit'], keep='first')
+
+# Filter to only include papers that have PDFs (from curated_filtered_properties.csv)
+curated_path = Path(properties_dir) / "curated_filtered_properties.csv"
+df_curated = pd.read_csv(curated_path)
+# Create mapping from Refno to Paper name
+refno_to_paper = dict(zip(df_curated['Refno'], df_curated['Paper']))
+# Filter df to only include refnos that have PDFs
+df = df[df['refno'].isin(refno_to_paper.keys())]
+
+# Add paper column with path to PDF
+df['paper'] = df['refno'].map(refno_to_paper).apply(lambda x: Path(paper_dir) / f"{x}.pdf")
+# Convert Path objects to strings for HuggingFace
+df['paper'] = df['paper'].astype(str)
+# sort the dataframe by paper, but keep the order within each paper
+df = df.sort_values(['paper', 'material', 'order'], kind='stable')
+
+df = df.reset_index(drop=True)
 
 # %%
-print(df_answer)
-import pdb; pdb.set_trace()
+if True:
+    # import pdb; pdb.set_trace()
+    # drop refno, Physically_Relevant
+    df = df.drop(columns=["property_name"])
+    # rename label to property_name
+    df = df.rename(columns={"label": "property_name"})
+    # only keep columns paper, material, property_name, property_value, property_unit, definition
+    df = df[["paper", "material", "property_name", "property_value", "property_unit", "definition"]]
+print(df)
 save_path = Path(output_dir) / "dataset.csv"
-df_answer.to_csv(save_path, index=False)
+df.to_csv(save_path, index=False)
 print(f"Dataset saved to {save_path}")
 
 # %%
 # Create HuggingFace dataset with proper PDF feature type
-dataset = Dataset.from_pandas(df_answer)
+dataset = Dataset.from_pandas(df)
 
 # Cast the paper column to use the Pdf feature type
 # decode=True will allow the dataset to load PDFs as pdfplumber objects
