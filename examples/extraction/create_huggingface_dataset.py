@@ -121,45 +121,46 @@ df = df[df['Physically_Relevant']]
 # This removes duplicates when the same material appears in multiple SuperCon rows
 df = df.drop_duplicates(subset=['material', 'property_name', 'property_value', 'property_unit'], keep='first')
 
-# Filter to only include papers that have PDFs (from curated_filtered_properties.csv)
-curated_path = Path(properties_dir) / "curated_filtered_properties.csv"
-df_curated = pd.read_csv(curated_path)
-# Create mapping from Refno to Paper name
-refno_to_paper = dict(zip(df_curated['Refno'], df_curated['Paper']))
-# Filter df to only include refnos that have PDFs
-df = df[df['refno'].isin(refno_to_paper.keys())]
-
-# Add paper column with path to PDF
-df['paper'] = df['refno'].map(refno_to_paper).apply(lambda x: Path(paper_dir) / f"{x}.pdf")
-# Convert Path objects to strings for HuggingFace
-df['paper'] = df['paper'].astype(str)
-# sort the dataframe by paper, but keep the order within each paper
-df = df.sort_values(['paper', 'material', 'order'], kind='stable')
-
-df = df.reset_index(drop=True)
-
-# %%
 if True:
+    df_copy = df.copy()
+    # Filter to only include papers that have PDFs (from curated_filtered_properties.csv)
+    curated_path = Path(properties_dir) / "curated_filtered_properties.csv"
+    df_curated = pd.read_csv(curated_path)
+    # Create mapping from Refno to Paper name
+    refno_to_paper = dict(zip(df_curated['Refno'], df_curated['Paper']))
+    # Filter df to only include refnos that have PDFs
+    df_copy = df_copy[df_copy['refno'].isin(refno_to_paper.keys())]
+
+    # Add paper column with path to PDF
+    df_copy['paper'] = df_copy['refno'].map(refno_to_paper).apply(lambda x: Path(paper_dir) / f"{x}.pdf")
+    # Convert Path objects to strings for HuggingFace
+    df_copy['paper'] = df_copy['paper'].astype(str)
+    # sort the dataframe by paper, but keep the order within each paper
+    df_copy = df_copy.sort_values(['paper', 'material', 'order'], kind='stable')
+    df_copy = df_copy.reset_index(drop=True)
+
     # import pdb; pdb.set_trace()
     # drop refno, Physically_Relevant
-    df = df.drop(columns=["property_name"])
+    df_copy = df_copy.drop(columns=["property_name"])
     # rename label to property_name
-    df = df.rename(columns={"label": "property_name"})
+    df_copy = df_copy.rename(columns={"label": "property_name"})
     # only keep columns paper, material, property_name, property_value, property_unit, definition
-    df = df[["paper", "material", "property_name", "property_value", "property_unit", "definition"]]
-print(df)
-save_path = Path(output_dir) / "dataset.csv"
-df.to_csv(save_path, index=False)
-print(f"Dataset saved to {save_path}")
+    df_copy = df_copy[["paper", "material", "property_name", "property_value", "property_unit", "definition"]]
+
+    print(df_copy)
+    save_path = Path(output_dir) / "dataset.csv"
+    df_copy.to_csv(save_path, index=False)
+    print(f"Dataset saved to {save_path}")
 
 # %%
 # Create HuggingFace dataset with proper PDF feature type
-dataset = Dataset.from_pandas(df)
+COLUMNS = ["refno", "material", "property_name", "property_value", "property_unit", "label", "definition", "category", "data_type"]
+dataset = Dataset.from_pandas(df[COLUMNS], preserve_index=False)
 
 # Cast the paper column to use the Pdf feature type
 # decode=True will allow the dataset to load PDFs as pdfplumber objects
 # decode=False will keep them as {"path": ..., "bytes": ...} dictionaries
-dataset = dataset.cast_column("paper", Pdf(decode=True))
+# dataset = dataset.cast_column("paper", Pdf(decode=True))
 
 # %%
 print(dataset)
@@ -168,11 +169,12 @@ print(f"Number of examples: {len(dataset)}")
 
 # %%
 # Save the dataset locally
-dataset.save_to_disk("property_extraction_dataset")
+dataset_path = Path(output_dir) / "property_extraction_dataset"
+dataset.save_to_disk(dataset_path)
 
 # %%
 # Load the dataset back to verify it works
-loaded_dataset = load_from_disk("property_extraction_dataset")
+loaded_dataset = load_from_disk(dataset_path)
 
 print("✓ Dataset loaded successfully!")
 print(f"Number of examples: {len(loaded_dataset)}")
@@ -181,14 +183,15 @@ print("\nFirst example:")
 print(f"  material: {loaded_dataset[0]['material']}")
 print(f"  property_name: {loaded_dataset[0]['property_name']}")
 print(f"  property_value: {loaded_dataset[0]['property_value']}")
-print(f"  paper: {loaded_dataset[0]['paper']}")
+# print(f"  paper: {loaded_dataset[0]['paper']}")
+print(f"  refno: {loaded_dataset[0]['refno']}")
 
 # %%
 # Test that PDF loading works
-print("\n✓ Testing PDF loading...")
-pdf_obj = loaded_dataset[0]['paper']
-print(f"PDF object type: {type(pdf_obj)}")
-print(f"PDF has {len(pdf_obj.pages)} pages")
+# print("\n✓ Testing PDF loading...")
+# pdf_obj = loaded_dataset[0]['paper']
+# print(f"PDF object type: {type(pdf_obj)}")
+# print(f"PDF has {len(pdf_obj.pages)} pages")
 
 # %%
 # Push to HuggingFace Hub (requires authentication)
