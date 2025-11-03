@@ -97,7 +97,7 @@ def process_paper(paper_path: Path, df_paper: pd.DataFrame, client: genai.Client
     pdf_file = upload_pdf_to_gemini(paper_path, client)
     if pdf_file is None:
         raise Exception(f"Failed to upload PDF to Gemini: {paper_path}")
-    time.sleep(2) # wait for file to be processed
+    time.sleep(1) # wait for file to be processed
 
     # Initialize result columns
     df_paper[f'{args.model_name}'] = ""
@@ -146,7 +146,7 @@ def process_paper(paper_path: Path, df_paper: pd.DataFrame, client: genai.Client
             df_paper.at[idx, f'{args.model_name}-pred-unit'] = f"ERROR: {str(e)}"
 
         # Rate limiting - add delay between requests
-        time.sleep(1)
+        time.sleep(0.5)
 
     # Remove the file from the client
     client.files.delete(name=pdf_file.name) # type: ignore
