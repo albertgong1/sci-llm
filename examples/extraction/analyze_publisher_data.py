@@ -62,10 +62,10 @@ if num_missing > 0:
     missing_df = merged_df[missing_publisher]
     missing_journals = missing_df["output_journal"].unique()  # type: ignore
     print(f"Number of unique journals: {len(missing_journals)}")
-    print("\nTop 10 missing journals:")
-    missing_journal_counts = missing_df["output_journal"].value_counts().head(10)  # type: ignore
+    print("\nMissing journals:")
+    missing_journal_counts = missing_df["output_journal"].value_counts()  # type: ignore
     for journal, count in missing_journal_counts.items():
-        print(f"  - {journal}: {count} occurrences")
+        print(f"{journal} => {count}")
 
 # Save the merged data
 print(f"\nSaving merged data to {output_file}...")
