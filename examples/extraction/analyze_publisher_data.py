@@ -26,6 +26,35 @@ print("\nFiltering for rows where llm_verdict is True...")
 filtered_df = supercon_df[supercon_df["llm_verdict"]]
 print(f"Rows with llm_verdict=True: {len(filtered_df)}")
 
+# Apply aliases to output_journal column to improve matching
+print("\nApplying journal name aliases...")
+journal_aliases = {
+    "Physica C: Superconductivity and its Applications": "Physica C: Superconductivity",
+    "Physica B: Condensed Matter": "Physica B",
+    "EPL (Europhysics Letters)": "Europhysics Letters (EPL)",
+    "physica status solidi (b)": "Physica Status Solidi (b)",
+    "Zeitschrift f�r Physik": "Zeitschrift fur Physik",
+    "Zeitschrift f�r Physik B Condensed Matter": "Zeitschrift fur Physik",
+    "Reviews of Modern Physics": "Review of Modern Physics",
+    "Journal of Materials Science Letters": "Journal of Materials Science",
+    "Zeitschrift für Physik A Hadrons and nuclei": "Zeitschrift fur Physik",
+    "Zeitschrift für Physik": "Zeitschrift fur Physik",
+    "Physics Letters": "Physics Letters A",
+    "Materials Science and Engineering: B": "Materials Science and Engineering",
+    "Applied Physics A": "Applied Physics",
+    "Zeitschrift f�r Physik B Condensed Matter and Quanta": "Zeitschrift fur Physik",
+    "Materials Science and Engineering: A": "Materials Science and Engineering",
+    "physica status solidi c": "Physica Status Solidi (c)",
+}
+filtered_df = filtered_df.copy()
+filtered_df["output_journal"] = filtered_df["output_journal"].replace(journal_aliases)  # type: ignore
+journals_aliased = sum(
+    supercon_df[supercon_df["llm_verdict"]]["output_journal"].isin(
+        list(journal_aliases.keys())
+    )  # type: ignore
+)
+print(f"Applied aliases to {journals_aliased} journal entries")
+
 # Read the publishers file
 print("\nReading journal_publishers_consolidated.csv...")
 publishers_df = pd.read_csv(publishers_file)
@@ -62,10 +91,10 @@ if num_missing > 0:
     missing_df = merged_df[missing_publisher]
     missing_journals = missing_df["output_journal"].unique()  # type: ignore
     print(f"Number of unique journals: {len(missing_journals)}")
-    print("\nMissing journals:")
+    print("\nAll missing journals:")
     missing_journal_counts = missing_df["output_journal"].value_counts()  # type: ignore
     for journal, count in missing_journal_counts.items():
-        print(f"{journal} => {count}")
+        print(f"  - {journal}: {count} occurrences")
 
 # Save the merged data
 print(f"\nSaving merged data to {output_file}...")
