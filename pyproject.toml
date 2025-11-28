@@ -20,7 +20,10 @@ dependencies = [
     "huggingface_hub[cli]",
     "datasets",
     "pdfplumber",
-    "langchain"
+    "langchain",
+    "edison-client",
+    "pandas",
+    "tqdm"
 ]
 
 [project.urls]
