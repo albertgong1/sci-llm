@@ -21,19 +21,16 @@ export EDISON_API_KEY="your_api_key_here"
 
 ### Usage
 
-**Run full batch (all ~1200 materials):**
+The script processes materials in batches to handle large datasets efficiently.
+
+**Process all materials (default batch size: 10):**
 ```bash
 python query_materials_with_edison.py
 ```
 
-**Test with first 10 materials:**
+**Process a specific batch only:**
 ```bash
-python query_materials_with_edison.py --limit 10
-```
-
-**Dry run to preview queries without submitting:**
-```bash
-python query_materials_with_edison.py --dry-run --limit 5
+python query_materials_with_edison.py --batch-number 3
 ```
 
 **Save to custom output directory:**
@@ -43,17 +40,30 @@ python query_materials_with_edison.py --output-dir my_results
 
 **Verbose mode for debugging:**
 ```bash
-python query_materials_with_edison.py --verbose --limit 3
+python query_materials_with_edison.py --verbose --batch-size 10 --batch-number 1
 ```
+
+### Batch Processing
+
+The script divides materials into batches and processes each batch sequentially:
+- Default batch size: 100 materials
+- Batches are numbered starting from 1
+- Each batch creates separate output files
+- Already processed batches are automatically skipped (delete output files to reprocess)
+
+This approach allows for:
+- Resuming interrupted processing
+- Parallel processing across multiple machines (by specifying different batch numbers)
+- Managing API rate limits effectively
 
 ### Output
 
-Results are saved to the `out/` directory (or custom directory specified with `--output-dir`) with two files:
+Results are saved to the `out/` directory (or custom directory specified with `--output-dir`) with separate files for each batch:
 
-1. **CSV file**: `edison_precedent_results_YYYYMMDD_HHMMSS.csv`
+1. **CSV file**: `edison_precedent_batch=N__bs=SIZE__ts=TIMESTAMP.csv`
    - Columns: `icsd_id`, `reduced_formula`, `query`, `task_id`, `answer`, `formatted_answer`, `has_successful_answer`, `status`, `error`
 
-2. **JSON file**: `edison_precedent_results_YYYYMMDD_HHMMSS.json`
+2. **JSON file**: `edison_precedent_batch=N__bs=SIZE__ts=TIMESTAMP.json`
    - Contains full detailed responses from the API
 
 ### Query Format

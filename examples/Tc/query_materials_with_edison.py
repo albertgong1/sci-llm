@@ -8,6 +8,7 @@ to determine if materials are known superconductors and their reported Tc values
 import argparse
 import asyncio
 import json
+import math
 import os
 import sys
 from datetime import datetime
@@ -46,7 +47,6 @@ async def submit_batch_queries(
     client: EdisonClient,
     materials_df: pd.DataFrame,
     verbose: bool = False,
-    dry_run: bool = False,
 ) -> List[Dict[str, Any]]:
     """Submit batch queries to Edison Platform API.
 
@@ -54,7 +54,6 @@ async def submit_batch_queries(
         client: EdisonClient instance
         materials_df: DataFrame with materials data
         verbose: Enable verbose output
-        dry_run: If True, only print queries without submitting
 
     Returns:
         List of result dictionaries
@@ -78,15 +77,6 @@ async def submit_batch_queries(
                 "query": query,
             }
         )
-
-    if dry_run:
-        print("\n=== DRY RUN MODE ===")
-        print(f"Would submit {len(tasks_data)} queries:")
-        for i, task_data in enumerate(tasks_data[:5], 1):  # Show first 5
-            print(f"{i}. {task_data['query']}")
-        if len(tasks_data) > 5:
-            print(f"... and {len(tasks_data) - 5} more")
-        return []
 
     # Submit all tasks as a batch
     print(f"\nSubmitting {len(tasks_data)} tasks to Edison Platform API...")
@@ -146,104 +136,16 @@ async def submit_batch_queries(
         return results
 
 
-def save_results(
-    results: List[Dict[str, Any]], output_dir: Path, timestamp: str
-) -> tuple[Path, Path]:
-    """Save results to CSV and JSON files.
+async def main(args: argparse.Namespace) -> None:
+    """Main function to run the script.
 
     Args:
-        results: List of result dictionaries
-        output_dir: Directory to save output files
-        timestamp: Timestamp string for filename
-
-    Returns:
-        Tuple of (csv_path, json_path)
+        args: ArgumentParser namespace
 
     """
-    # Create output directory if it doesn't exist
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Prepare CSV data (exclude full response object)
-    csv_data = []
-    for result in results:
-        csv_row = {k: v for k, v in result.items() if k != "_full_response"}
-        csv_data.append(csv_row)
-
-    # Save to CSV
-    csv_path = output_dir / f"edison_precedent_results_{timestamp}.csv"
-    df = pd.DataFrame(csv_data)
-    df.to_csv(csv_path, index=False)
-    print(f"\n✓ Saved CSV results to: {csv_path}")
-
-    # Prepare JSON data (convert response objects to dict)
-    json_data = []
-    for result in results:
-        json_result = {k: v for k, v in result.items() if k != "_full_response"}
-
-        # Try to serialize the full response if available
-        if "_full_response" in result and result["_full_response"] is not None:
-            try:
-                response_obj = result["_full_response"]
-                # Convert response object to dict by extracting attributes
-                json_result["full_response"] = {
-                    attr: getattr(response_obj, attr, None)
-                    for attr in dir(response_obj)
-                    if not attr.startswith("_")
-                }
-            except Exception as e:
-                json_result["full_response_error"] = str(e)
-
-        json_data.append(json_result)
-
-    # Save to JSON
-    json_path = output_dir / f"edison_precedent_results_{timestamp}.json"
-    with open(json_path, "w") as f:
-        json.dump(json_data, f, indent=2, default=str)
-    print(f"✓ Saved JSON results to: {json_path}")
-
-    return csv_path, json_path
-
-
-async def main() -> None:
-    """Main function to run the script."""
-    parser = argparse.ArgumentParser(
-        description="Query materials using Edison Platform API"
-    )
-
-    parser.add_argument(
-        "--input",
-        type=Path,
-        default=Path(__file__).parent / "data" / "filtered_dataset.csv",
-        help="Input CSV file with materials (default: data/filtered_dataset.csv)",
-    )
-
-    parser.add_argument(
-        "--output-dir",
-        "-od",
-        type=Path,
-        default=Path(__file__).parent / "out",
-        help="Output directory for results (default: out)",
-    )
-
-    parser.add_argument(
-        "--limit", type=int, help="Limit number of materials to query (for testing)"
-    )
-
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview queries without submitting to API",
-    )
-
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose output from Edison API"
-    )
-
-    args = parser.parse_args()
-
-    # Check for API key (not needed for dry-run)
+    # Check for API key
     api_key = os.environ.get("EDISON_API_KEY")
-    if not api_key and not args.dry_run:
+    if not api_key:
         print("Error: EDISON_API_KEY environment variable not set")
         print("\nTo set the API key:")
         print("  conda env config vars set EDISON_API_KEY=your_api_key_here")
@@ -254,7 +156,7 @@ async def main() -> None:
 
     # Load materials
     try:
-        materials_df = load_materials(args.input, args.limit)
+        materials_df = load_materials(args.input, limit=None)
     except FileNotFoundError:
         print(f"Error: Input file not found: {args.input}")
         sys.exit(1)
@@ -263,44 +165,119 @@ async def main() -> None:
         sys.exit(1)
 
     # Initialize Edison client
-    client = None
-    if not args.dry_run:
-        try:
-            client = EdisonClient(api_key=api_key)
-            print("✓ Edison client initialized successfully")
-        except Exception as e:
-            print(f"Error initializing Edison client: {e}")
-            sys.exit(1)
+    try:
+        client = EdisonClient(api_key=api_key)
+        print("✓ Edison client initialized successfully")
+    except Exception as e:
+        print(f"Error initializing Edison client: {e}")
+        sys.exit(1)
 
     try:
-        # Submit queries
-        try:
-            results = await submit_batch_queries(
-                client, materials_df, verbose=args.verbose, dry_run=args.dry_run
+        # Process materials in batches
+        num_materials = len(materials_df)
+        batch_size = args.batch_size
+        num_batches = math.ceil(num_materials / batch_size)
+
+        print(f"\nTotal materials: {num_materials}")
+        print(f"Batch size: {batch_size}")
+        print(f"Total batches: {num_batches}")
+
+        for batch_number in range(1, num_batches + 1):
+            # Skip if specific batch number is requested and this isn't it
+            if args.batch_number is not None and batch_number != args.batch_number:
+                continue
+
+            # Calculate batch indices
+            batch_start_idx = (batch_number - 1) * batch_size
+            batch_end_idx = min(batch_start_idx + batch_size, num_materials)
+
+            print(f"\n{'=' * 60}")
+            print(f"Processing batch {batch_number}/{num_batches}")
+            print(
+                f"Materials [{batch_start_idx}, {batch_end_idx}) out of {num_materials}"
             )
-        except Exception as e:
-            print(f"Error during query submission: {e}")
-            import traceback
+            print(f"{'=' * 60}")
 
-            traceback.print_exc()
-            sys.exit(1)
+            # Get batch data
+            batch_df = materials_df.iloc[batch_start_idx:batch_end_idx]
 
-        # Save results (skip if dry run)
-        if not args.dry_run and results:
+            # Create filename with batch info
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            run_name = f"batch={batch_number}__bs={batch_size}__ts={timestamp}"
+
+            # Check if output already exists
+            output_csv = args.output_dir / f"edison_precedent_{run_name}.csv"
+            if output_csv.exists():
+                print(f"⚠ Output file already exists: {output_csv}")
+                print("Skipping this batch. Delete the file to reprocess.")
+                continue
+
+            # Submit queries for this batch
             try:
-                csv_path, json_path = save_results(results, args.output_dir, timestamp)
-                print(f"\n{'=' * 60}")
-                print("Processing complete!")
-                print(f"{'=' * 60}")
-                print(f"Total materials processed: {len(results)}")
-                print(f"Output directory: {args.output_dir}")
+                results = await submit_batch_queries(
+                    client, batch_df, verbose=args.verbose
+                )
             except Exception as e:
-                print(f"Error saving results: {e}")
+                print(f"Error during query submission: {e}")
                 import traceback
 
                 traceback.print_exc()
-                sys.exit(1)
+                continue
+
+            # Save results
+            if results:
+                try:
+                    # Create custom save with batch info
+                    args.output_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Save CSV
+                    # csv_data = [
+                    #     {k: v for k, v in r.items() if k != "_full_response"}
+                    #     for r in results
+                    # ]
+                    # df_results = pd.DataFrame(csv_data)
+                    # df_results.to_csv(output_csv, index=False)
+                    # print(f"\n✓ Saved CSV results to: {output_csv}")
+
+                    # Save JSON
+                    output_json = args.output_dir / f"edison_precedent_{run_name}.json"
+                    json_data = []
+                    for result in results:
+                        json_result = {
+                            k: v for k, v in result.items() if k != "_full_response"
+                        }
+                        if (
+                            "_full_response" in result
+                            and result["_full_response"] is not None
+                        ):
+                            try:
+                                response_obj = result["_full_response"]
+                                json_result["full_response"] = {
+                                    attr: getattr(response_obj, attr, None)
+                                    for attr in dir(response_obj)
+                                    if not attr.startswith("_")
+                                }
+                            except Exception:
+                                pass
+                        json_data.append(json_result)
+
+                    with open(output_json, "w") as f:
+                        json.dump(json_data, f, indent=2, default=str)
+                    print(f"✓ Saved JSON results to: {output_json}")
+
+                    print(
+                        f"\n✓ Batch {batch_number} complete: {len(results)} materials processed"
+                    )
+                except Exception as e:
+                    print(f"Error saving results: {e}")
+                    import traceback
+
+                    traceback.print_exc()
+
+        print(f"\n{'=' * 60}")
+        print("All batches complete!")
+        print(f"{'=' * 60}")
+
     finally:
         # Clean up client resources to prevent "Unclosed client session" warnings
         if client is not None:
@@ -324,5 +301,50 @@ async def main() -> None:
                 pass
 
 
+def get_parser() -> argparse.ArgumentParser:
+    """Get argument parser for query materials with Edison Platform API."""
+    parser = argparse.ArgumentParser(
+        description="Query materials using Edison Platform API"
+    )
+
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=Path(__file__).parent / "data" / "filtered_dataset.csv",
+        help="Input CSV file with materials (default: data/filtered_dataset.csv)",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        "-od",
+        type=Path,
+        default="out",
+        help="Output directory for results (default: out)",
+    )
+
+    parser.add_argument(
+        "--batch-size",
+        "-bs",
+        type=int,
+        default=10,
+        help="Number of materials to process in each batch (default: 100)",
+    )
+
+    parser.add_argument(
+        "--batch-number",
+        "-bn",
+        type=int,
+        default=None,
+        help="Specific batch number to process (1-indexed). If not set, processes all batches",
+    )
+
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable verbose output from Edison API"
+    )
+    return parser
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = get_parser()
+    args = parser.parse_args()
+    asyncio.run(main(args))
