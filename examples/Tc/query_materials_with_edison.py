@@ -202,13 +202,13 @@ async def main(args: argparse.Namespace) -> None:
             batch_df = materials_df.iloc[batch_start_idx:batch_end_idx]
 
             # Create filename with batch info
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            run_name = f"batch={batch_number}__bs={batch_size}__ts={timestamp}"
+            run_name = f"batch={batch_number}__bs={batch_size}"
 
             # Check if output already exists
-            output_csv = args.output_dir / f"edison_precedent_{run_name}.csv"
-            if output_csv.exists():
-                print(f"⚠ Output file already exists: {output_csv}")
+            output_json = args.output_dir / f"edison_precedent_{run_name}.json"
+            # import pdb; pdb.set_trace()
+            if output_json.exists():
+                print(f"⚠ Output file already exists: {output_json}")
                 print("Skipping this batch. Delete the file to reprocess.")
                 continue
 
@@ -240,7 +240,6 @@ async def main(args: argparse.Namespace) -> None:
                     # print(f"\n✓ Saved CSV results to: {output_csv}")
 
                     # Save JSON
-                    output_json = args.output_dir / f"edison_precedent_{run_name}.json"
                     json_data = []
                     for result in results:
                         json_result = {
