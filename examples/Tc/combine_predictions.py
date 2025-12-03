@@ -189,6 +189,21 @@ def main(args: argparse.Namespace) -> None:
         traceback.print_exc()
         return
     
+    # Save error rows to separate file if requested
+    if args.save_errors:
+        error_rows = None
+        if 'error' in df.columns:
+            error_rows = df[df['error'].notna() & (df['error'] != '') & (df['error'] != 'null')]
+        elif 'status' in df.columns:
+            error_rows = df[df['status'] == 'error']
+        
+        if error_rows is not None and len(error_rows) > 0:
+            error_output = args.output.parent / f"{args.output.stem}_errors.csv"
+            error_rows.to_csv(error_output, index=False)
+            print(f"✓ Saved {len(error_rows)} error rows to: {error_output}")
+        else:
+            print("✓ No errors to save")
+    
     # Print summary statistics
     print("\n" + "=" * 60)
     print("Summary Statistics")
@@ -204,6 +219,33 @@ def main(args: argparse.Namespace) -> None:
     
     if 'reduced_formula' in df.columns:
         print(f"\nUnique materials: {df['reduced_formula'].nunique()}")
+    
+    # Show rows with errors
+    print("\n" + "=" * 60)
+    print("Rows with Errors")
+    print("=" * 60)
+    
+    # Find rows with errors
+    error_rows = None
+    if 'error' in df.columns:
+        error_rows = df[df['error'].notna() & (df['error'] != '') & (df['error'] != 'null')]
+    elif 'status' in df.columns:
+        error_rows = df[df['status'] == 'error']
+    
+    if error_rows is not None and len(error_rows) > 0:
+        print(f"\nFound {len(error_rows)} rows with errors:")
+        
+        # Display key columns for error rows
+        error_display_cols = ['icsd_id', 'reduced_formula', 'batch_number', 'error']
+        error_display_cols = [col for col in error_display_cols if col in error_rows.columns]
+        
+        if error_display_cols:
+            error_subset = error_rows[error_display_cols]
+            print(error_subset.to_string(index=False))
+        else:
+            print(error_rows.to_string(index=False))
+    else:
+        print("\n✓ No errors found!")
     
     # Show sample of data
     print("\n" + "=" * 60)
@@ -252,6 +294,12 @@ def get_parser() -> argparse.ArgumentParser:
         "--keep-nested",
         action="store_true",
         help="Keep the nested full_response field (makes CSV very large)",
+    )
+    
+    parser.add_argument(
+        "--save-errors",
+        action="store_true",
+        help="Save rows with errors to a separate CSV file (e.g., output_errors.csv)",
     )
     
     return parser
