@@ -22,7 +22,8 @@ dependencies = [
     "langchain",
     "edison-client",
     "pandas",
-    "tqdm"
+    "tqdm",
+    "google-genai"
 ]
 
 [project.urls]
