@@ -23,7 +23,7 @@ except ImportError:
     from .gemini_utils import GeminiChat, InferenceGenerationConfig, LLMChatResponse
 
 
-PROMPT_TEMPLATE = """\
+RELATED_MATERIALS_PROMPT_TEMPLATE = """\
 You are a careful condensed-matter physicist.
 Your task is to analyze the provided MATERIAL DESCRIPTION and extract highly specific, factual information *only if it explicitly appears in the description itself*.
 Do NOT infer, guess, or use any external knowledge.
@@ -93,8 +93,24 @@ If no items exist for a category, return an empty list for that category.
 6. *DO NOT add explanations outside the JSON.*
 """
 
+NOT_SUPERCONDUCTOR_PROMPT_TEMPLATE = """\
+You are a careful condensed-matter physicist.
+Your task is to answer the provided QUESTION using the DESCRIPTION.
+Do NOT infer, guess, or use any external knowledge.
+Think step by step.
+-------------------------------------
+### EXAMPLE
+QUESTION: What is the lowest temperature that the material NdPb3 has been tested for superconductivity? If mentioned, please put your answer in \\boxed{}.
+DESCRIPTION: We investigated the rare-earth lead intermetallic NdPb3 (AuCu3-type, L12) within the RPb3 family. Across magnetization, transport, and de Haas–van Alphen (dHvA) studies, NdPb3 is consistently reported as an antiferromagnet with Néel temperature around 2.7 K, and no superconducting transition has been observed down to the experimental floors of these measurements (~0.4 K).
+ANSWER: \\boxed{0.4 K}
+-------------------------------------
+### TASK
+QUESTION: What is the lowest temperature that the material {{reduced_formula}} has been tested for superconductivity? If mentioned, please put your answer in \\boxed{}.
+DESCRIPTION: {{formatted_answer}}
+ANSWER:
+"""
 
-if True:
+if False:
     def create_prompt(reduced_formula: str, formatted_answer: str) -> str:
         """Create prompt for querying about related superconductors."""
         # return (
@@ -104,15 +120,12 @@ if True:
         #     f"Description: {formatted_answer}"
         # )
         # Use replace() instead of format() to avoid issues with curly braces in formatted_answer
-        return PROMPT_TEMPLATE.replace("{{formatted_answer}}", formatted_answer)
+        return RELATED_MATERIALS_PROMPT_TEMPLATE.replace("{{formatted_answer}}", formatted_answer)
 else:
     # for doping insulators, can you find out which ones are magnetic/antiferromagnetic? I think what you want to dope are Mott insulators. Can you check which ones are reported to be insulators but calculated to be metallic for example?
     def create_prompt(reduced_formula: str, formatted_answer: str) -> str:
         """Create prompt for querying about insulating superconductors."""
-        return (
-            f"Based on the provided description, is material {reduced_formula} an insulator? "
-            f"Description: {formatted_answer}"
-        )
+        return NOT_SUPERCONDUCTOR_PROMPT_TEMPLATE.replace("{{reduced_formula}}", reduced_formula).replace("{{formatted_answer}}", formatted_answer)
 
 # Based on the provided description, is material {reduced_formula} magnetic/antiferromagnetic?
 # Description: {formatted_answer}
