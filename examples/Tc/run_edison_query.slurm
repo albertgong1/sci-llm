@@ -51,7 +51,7 @@ echo "Starting Edison query..."
 echo "Command: python query_materials_with_edison.py -od $OUTPUT_DIR"
 echo ""
 
-python query_materials_with_edison.py -od $OUTPUT_DIR
+python query_materials_with_edison.py -bs 10 -od $OUTPUT_DIR --input data/cleaned_stoic_filtered_downfolded_dataset.csv --verbose
 
 # Check exit status
 EXIT_CODE=$?
