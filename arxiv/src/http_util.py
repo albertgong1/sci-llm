@@ -1,4 +1,3 @@
-from typing import Optional
 import asyncio
 from aiohttp import ClientSession
 
@@ -7,9 +6,9 @@ async def _fetch(
     url: str,
     session: ClientSession,
     allow_redirects: bool,
-    param: Optional[dict[str, str]],
-    header: Optional[dict[str, str]],
-    cookie: Optional[dict[str, str]],
+    param: dict[str, str] | None,
+    header: dict[str, str] | None,
+    cookie: dict[str, str] | None,
 ) -> str:
     args = {"allow_redirects": allow_redirects}
 
@@ -30,9 +29,9 @@ async def _bound_fetch(
     url: str,
     session: ClientSession,
     allow_redirects: bool,
-    param: Optional[dict[str, str]],
-    header: Optional[dict[str, str]],
-    cookie: Optional[dict[str, str]],
+    param: dict[str, str] | None,
+    header: dict[str, str] | None,
+    cookie: dict[str, str] | None,
 ) -> str:
     async with sem:
         return await _fetch(url, session, allow_redirects, param, header, cookie)
@@ -57,13 +56,28 @@ async def _run(
 
 def get_responses(
     urls: list[str],
-    params: Optional[list[dict[str, str]]] = None,
-    headers: Optional[list[dict[str, str]]] = None,
-    cookies: Optional[list[dict[str, str]]] = None,
+    params: list[dict[str, str]] | None = None,
+    headers: list[dict[str, str]] | None = None,
+    cookies: list[dict[str, str]] | None = None,
     # connection options
     max_concurrent_coro: int = 2_000,
     allow_redirects: bool = True,
 ) -> list[str]:
+    """Make several async requests at once.
+
+    The (urls, params, headers, cookies) objects must be aligned and the same length if provided.
+
+    Only supports GET requests.
+
+    :param urls: URLs to use
+    :param params: optional URL params for each url
+    :param headers: optional headers for request
+    :param cookies: optional cookies for request.
+    :param max_concurrent_coro: Maximum number of concurrent coroutines that can be in event
+        loop at once.
+    :param allow_redirects: Whether to follow redirects on http 30X
+    :return: text of the http response
+    """
     params = params or ([None] * len(urls))
     headers = headers or ([None] * len(urls))
     cookies = cookies or ([None] * len(urls))

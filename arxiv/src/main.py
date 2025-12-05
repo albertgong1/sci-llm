@@ -1,49 +1,14 @@
 import csv
-import re
 from pathlib import Path
 
 import pandas as pd
 
-from src.config import DATASET_ROOT
-from src.http_util import get_responses
 from src.arxiv import get_arxiv_search_results_by_dois
+from src.config import ARTIFACTS_ROOT
+from src.doi import get_proper_doi_from_doi_urls
 
 
-def get_proper_doi_from_doi_url_resp(orig_doi_url: str, doi_url_resp: str) -> str:
-    # test: https://regex101.com
-    # link.aps.org style
-    pat = r"<a href=\"https:\/\/(.*?)doi\/(.*)\""
-    x = re.search(pat, doi_url_resp)
-    if x:
-        return x.group(2)
-
-    # iopscience style
-    pat = r"a href=\"https://iopscience(.*?)/article/(.*)?\""
-    x = re.search(pat, doi_url_resp)
-    if x:
-        return x.group(2)
-
-    b = orig_doi_url.split("doi.org/")[-1].strip()
-    return b
-
-
-def get_proper_doi_from_doi_urls(doi_urls: list[str]) -> list[str]:
-    chunk_size = 1_000
-    collection = []
-    for i in range(0, len(doi_urls), chunk_size):
-        doi_url_group = doi_urls[i : i + chunk_size]
-        responses = get_responses(
-            doi_url_group, max_concurrent_coro=chunk_size, allow_redirects=False
-        )
-        parsed_dois = [
-            get_proper_doi_from_doi_url_resp(in_url, x)
-            for x, in_url in zip(responses, doi_urls)
-        ]
-        collection += parsed_dois
-    return collection
-
-
-def get_super_con_papers(csv_path: Path = DATASET_ROOT / "SuperConDOI.csv"):
+def get_super_con_papers(csv_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv"):
     parsed = []
     with open(csv_path, newline="\n", encoding="utf-8") as f:
         reader = csv.reader(f)
@@ -98,11 +63,11 @@ def get_super_con_arxiv_info(testing_limit: int | None):
             normed.append(to_save)
 
     df = pd.json_normalize(normed)
-    df.to_csv(DATASET_ROOT / "supercon_augmented_search_results.csv", index=False)
+    df.to_csv(ARTIFACTS_ROOT / "supercon_augmented_search_results.csv", index=False)
 
 
 def get_charge_density_wave_papers(
-    csv_path: Path = DATASET_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
+    csv_path: Path = ARTIFACTS_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
 ) -> list[dict[str, str]]:
     parsed = []
     with open(csv_path, newline="\n", encoding="utf-8") as f:
@@ -147,6 +112,6 @@ if __name__ == "__main__":
 
     df = pd.json_normalize(normed)
     df.to_csv(
-        DATASET_ROOT / "charge_density_wave_paper_list_sheet_1_augmented.csv",
+        ARTIFACTS_ROOT / "charge_density_wave_paper_list_sheet_1_augmented.csv",
         index=False,
     )
