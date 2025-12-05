@@ -18,6 +18,15 @@ uv sync
 
 This will create a virtual environment with all Python dependencies.
 
+### Captcha
+
+We need Docker to automate requests. Run the following to pull a specific container:
+```bash
+docker pull lwthiker/curl-impersonate:0.6-chrome
+```
+
+Then ensure the Docker daemon is running. 
+
 ### Code Editing
 
 #### Run Code Formatting
