@@ -6,6 +6,7 @@ import pandas as pd
 from src.arxiv import get_arxiv_search_results_by_dois
 from src.config import ARTIFACTS_ROOT
 from src.doi import get_proper_doi_from_doi_urls
+from src.http_util import get_responses
 
 
 def get_super_con_papers(csv_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv"):
@@ -86,15 +87,13 @@ def get_charge_density_wave_papers(
     return parsed
 
 
-if __name__ == "__main__":
-    # get_super_con_arxiv_info()
+def get_charge_density_wave_arxiv_info(testing_limit: int | None = None):
     papers = get_charge_density_wave_papers()
     parsed = get_real_doi_from_base_doi(papers)
 
-    TESTING_LIMIT = None
     ordered_papers = list(
         sorted(parsed, key=lambda x: x["published_year"], reverse=True)
-    )[:TESTING_LIMIT]
+    )[:testing_limit]
 
     # using the true dois, search for them
     returned_results = get_arxiv_search_results_by_dois(
@@ -115,3 +114,35 @@ if __name__ == "__main__":
         ARTIFACTS_ROOT / "charge_density_wave_paper_list_sheet_1_augmented.csv",
         index=False,
     )
+
+
+def get_super_con_arxiv_info_downloads(
+    saved_csv_path: Path = ARTIFACTS_ROOT / "supercon_augmented_search_results.csv",
+):
+    df = pd.read_csv(saved_csv_path)
+    pdf_links = [
+        x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
+    ]
+    save_to = saved_csv_path.parent / saved_csv_path.stem
+    save_to.mkdir(exist_ok=True, parents=False)
+    get_responses(pdf_links, download_to_folder=save_to)
+
+
+def get_charge_density_wave_arxiv_downloads(
+    saved_csv_path: Path = ARTIFACTS_ROOT
+    / "charge_density_wave_paper_list_sheet_1_augmented.csv",
+):
+    df = pd.read_csv(saved_csv_path)
+    pdf_links = [
+        x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
+    ]
+    save_to = saved_csv_path.parent / saved_csv_path.stem
+    save_to.mkdir(exist_ok=True, parents=False)
+    get_responses(pdf_links, download_to_folder=save_to)
+
+
+if __name__ == "__main__":
+    # get_super_con_arxiv_info()
+    # get_charge_density_wave_arxiv_info()
+    # get_super_con_arxiv_info_downloads()
+    get_charge_density_wave_arxiv_downloads()
