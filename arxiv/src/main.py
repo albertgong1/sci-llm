@@ -166,6 +166,9 @@ def get_charge_density_wave_arxiv_downloads(
     save_to.mkdir(exist_ok=True, parents=False)
     get_responses(pdf_links, download_to_folder=save_to)
 
+def get_enriched_pdf_with_arxiv_details() -> None:
+    pass
+
 
 if __name__ == "__main__":
     # sentinel
