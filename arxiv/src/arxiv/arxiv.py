@@ -172,6 +172,13 @@ def _parse_arxiv_detail_to_json(abs_link: str, arxiv_html: str) -> dict[str, str
 
     return {
         "arxiv_url_abstract": abs_link,
+        # this can contain information on what the PDF contains. Sometimes it is blank.
+        # simple string matching to determine if content is or is not present will not work.
+        # some examples of what might be written here are:
+        # - "15 pages, 4 figures, Supplementary materials"
+        # - "5 + epsilon pages, 7 figures, Supplemental Material on demand; v2 includes ..."
+        # - "5 pages, 3 figures. The Supplementary Information file is available upon request"
+        # - "11 pages, 4 figures, supplementary information is not uploaded"
         "arxiv_comments": comments,
         "arxiv_journal_reference": journal_reference,
         "arxiv_related_doi": related_doi,
