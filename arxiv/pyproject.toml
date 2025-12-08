@@ -1,13 +1,14 @@
 [project]
-name = "aime-arxiv"
+name = "aimi-arxiv"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tools for interacting with the arxiv website."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp[speedups]>=3.13.2",
     "lxml>=6.0.2",
     "pandas>=2.3.3",
+    "pymupdf>=1.26.6",
     "requests>=2.32.5",
     "tqdm>=4.67.1",
 ]
@@ -16,4 +17,12 @@ dependencies = [
 dev = [
     "pytest>=9.0.1",
     "ruff>=0.14.8",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # a dependency of PyMuPDF says these
+    "ignore:.*SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:.*SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:.*swigvarlink has no __module__ attribute:DeprecationWarning",
 ]

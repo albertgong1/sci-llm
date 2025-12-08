@@ -3,7 +3,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.arxiv import get_arxiv_search_results_by_dois
+from src.arxiv import (
+    get_arxiv_search_results_by_dois,
+    get_arxiv_paper_detail_result_by_abs_links,
+)
 from src.config import ARTIFACTS_ROOT
 from src.doi import get_proper_doi_from_doi_urls
 from src.http_util import get_responses
@@ -166,8 +169,32 @@ def get_charge_density_wave_arxiv_downloads(
     save_to.mkdir(exist_ok=True, parents=False)
     get_responses(pdf_links, download_to_folder=save_to)
 
-def get_enriched_pdf_with_arxiv_details() -> None:
-    pass
+
+def get_path_with_suffix(orig_path: Path, suffix: str) -> Path:
+    par = orig_path.parent
+    ext = orig_path.suffix
+    f_name = orig_path.stem
+    return par / f"{f_name}_{suffix}{ext}"
+
+
+def get_enriched_pdf_with_arxiv_details(saved_csv_path: Path) -> None:
+    df = pd.read_csv(saved_csv_path)
+    abs_links = list(
+        set(
+            [
+                x
+                for x in df["arxiv_url_abstract"].tolist()
+                if isinstance(x, str) and bool(x)
+            ]
+        )
+    )
+    paper_details = get_arxiv_paper_detail_result_by_abs_links(abs_links)
+    df_paper_details = pd.json_normalize(paper_details)
+    df = df.merge(df_paper_details, on="arxiv_url_abstract", how="left")
+
+    new_path = get_path_with_suffix(saved_csv_path, "enriched")
+    df.to_csv(new_path)
+    print(f"Saved to: {new_path}")
 
 
 if __name__ == "__main__":
@@ -175,4 +202,8 @@ if __name__ == "__main__":
     # get_super_con_arxiv_info()
     # get_charge_density_wave_arxiv_info()
     # get_super_con_arxiv_info_downloads()
-    get_charge_density_wave_arxiv_downloads()
+    # get_charge_density_wave_arxiv_downloads()
+
+    get_enriched_pdf_with_arxiv_details(
+        ARTIFACTS_ROOT / "supercon_augmented_search_results.csv",
+    )

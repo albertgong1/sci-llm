@@ -1,6 +1,10 @@
+import os
 from textwrap import dedent
+from pathlib import Path
 
 import pytest
+
+from src.config import REPO_ROOT
 
 
 @pytest.fixture
@@ -26,3 +30,13 @@ def example_doi_response_html() -> str:
 @pytest.fixture
 def example_arxiv_pdf_link() -> str:
     return "https://arxiv.org/pdf/1903.05679"
+
+
+@pytest.fixture(scope="session")
+def google_recaptcha_key() -> str:
+    return os.getenv("GOOGLE_RECAPTCHA_KEY") or ""
+
+
+@pytest.fixture(scope="session")
+def test_data_path() -> Path:
+    return (REPO_ROOT / "tests") / "test_data"

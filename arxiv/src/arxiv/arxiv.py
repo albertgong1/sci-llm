@@ -1,44 +1,33 @@
+"""
+Functions for working with the website, arxiv.org
+"""
+
 from textwrap import dedent
 import urllib.parse
 
-from pandas import read_csv
 from tqdm import tqdm
-
-
 from lxml import html
 
 from src.scraping.curl_impersonate import get_webpage, CurlResponse
-from src.http_util import get_responses
-
-_SPOOF_DETAIL_DEFAULT_HEADER = {
-    "accept": "text/html,application/xhtml+xml,application/xml;",
-    "accept-language": "en-US,en;q=0.9",
-    "cache-control": "max-age=0",
-    "priority": "u=0, i",
-    "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": '"macOS"',
-    "sec-fetch-dest": "document",
-    "sec-fetch-mode": "navigate",
-    "sec-fetch-site": "none",
-    "sec-fetch-user": "?1",
-    "upgrade-insecure-requests": "1",
-    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-}
 
 
 class ReCaptchaExpiredException(Exception):
     pass
 
 
-def _parse_arxiv_search_results(my_html: str) -> list[dict[str, str]]:
-    r = html.fromstring(my_html)
-
-    e_title = r.xpath("//title")
+def _check_arxiv_recaptcha_page(p_html) -> None:
+    e_title = p_html.xpath("//title")
     if e_title:
         title = e_title[0].text
         if title == "arXiv reCAPTCHA":
             raise ReCaptchaExpiredException("arXiv reCAPTCHA requests a refresh.")
+    return
+
+
+def _parse_arxiv_search_results(my_html: str) -> list[dict[str, str]]:
+    r = html.fromstring(my_html)
+
+    _check_arxiv_recaptcha_page(r)
 
     # get the container of search results
     e_list_container = r.xpath('//ol[@class="breathe-horizontal"]')
@@ -125,15 +114,16 @@ def _get_arxiv_search_results_by_doi(captcha_auth: str, true_doi: str):
 
 def get_arxiv_search_results_by_dois(
     true_dois: list[str],
+    captcha_auth: str = "",
 ) -> list[list[dict[str, str]]]:
     results = []
     # captcha only required if you make a large volume of requests
-    captcha_auth = ""
+    _captcha_auth = captcha_auth
     success = 0
     for doi in tqdm(true_dois):
         while True:
             try:
-                parsed = _get_arxiv_search_results_by_doi(captcha_auth, doi)
+                parsed = _get_arxiv_search_results_by_doi(_captcha_auth, doi)
                 if len(parsed):
                     success += 1
                     print(success)
@@ -143,7 +133,7 @@ def get_arxiv_search_results_by_dois(
             except ReCaptchaExpiredException:
                 # captcha expires every ~1,000 entries or so
                 print(f"Go to: https://arxiv.org/")
-                captcha_auth = input("Recaptcha expired, enter value: ").strip()
+                _captcha_auth = input("Recaptcha expired, enter value: ").strip()
     return results
 
 
@@ -156,6 +146,8 @@ def get_arxiv_abs_link_from_pdf_link(arxiv_pdf_link: str) -> str:
 
 def _parse_arxiv_detail_to_json(abs_link: str, arxiv_html: str) -> dict[str, str]:
     r = html.fromstring(arxiv_html)
+    _check_arxiv_recaptcha_page(r)
+
     e_metatable = r.xpath('//div[@class="metatable"]')
     assert e_metatable and len(e_metatable) == 1
     metatable = e_metatable[0]
@@ -179,20 +171,60 @@ def _parse_arxiv_detail_to_json(abs_link: str, arxiv_html: str) -> dict[str, str
         related_doi = e_related_doi[0].xpath(".//a")[0].text
 
     return {
-        "url": abs_link,
-        "comments": comments,
-        "journal_reference": journal_reference,
-        "related_doi": related_doi,
+        "arxiv_url_abstract": abs_link,
+        "arxiv_comments": comments,
+        "arxiv_journal_reference": journal_reference,
+        "arxiv_related_doi": related_doi,
     }
 
 
+def _get_curl_for_detail(abs_url: str, captcha_auth: str) -> str:
+    # curl impersonate command
+    curl_base = f"""
+    '{abs_url}' \\
+    -X 'GET' \
+    -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+    -H 'Sec-Fetch-Site: none' \
+    -H 'Cookie: captchaAuth={captcha_auth}; arxiv_labs={{%22sameSite%22:%22strict%22%2C%22expires%22:365%2C%22last_tab%22:%22tabone%22}}; arxiv-search-parameters="{{\\"order\\": \\"-announced_date_first\\"\\054 \\"size\\": \\"50\\"\\054 \\"abstracts\\": \\"show\\"\\054 \\"date-date_type\\": \\"submitted_date\\"}}"; browser=73.186.99.152.1730915620264849' \\
+    -H 'Referer: https://arxiv.org/abs/1903.05679' \
+    -H 'Sec-Fetch-Mode: navigate' \
+    -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15' \
+    -H 'Accept-Language: en-US,en;q=0.9' \
+    -H 'Sec-Fetch-Dest: document' \
+    -H 'Accept-Encoding: gzip, deflate, br' \
+    -H 'Priority: u=0, i'
+    """.strip()
+
+    # user agent here uses Safari, so it technically will be a mismatch between
+    # curl impersonate and reported UA. This is fine for now though.
+    return dedent(curl_base)
+
+
+def _get_arxiv_detail_by_abs_url(captcha_auth: str, abs_url: str) -> dict[str, str]:
+    curl_cmd = _get_curl_for_detail(abs_url, captcha_auth)
+    result: CurlResponse = get_webpage(curl_cmd)
+    parsed: dict[str, str] = _parse_arxiv_detail_to_json(abs_url, result.text)
+    assert parsed is not None
+    return parsed
+
+
 def get_arxiv_paper_detail_result_by_abs_links(
-    abs_links: list[str],
+    abs_urls: list[str],
+    captcha_auth: str = "",
 ) -> list[dict[str, str]]:
-    headers = [_SPOOF_DETAIL_DEFAULT_HEADER] * len(abs_links)
-    resps = get_responses(urls=abs_links, headers=headers)
-    parsed_resps = [
-        _parse_arxiv_detail_to_json(abs_link, x)
-        for abs_link, x in zip(abs_links, resps)
-    ]
-    return parsed_resps
+    results = []
+    # captcha only required if you make a large volume of requests
+    _captcha_auth = captcha_auth
+    for abs_url in tqdm(abs_urls):
+        while True:
+            try:
+                # expect that, with fresh captcha ALL these requests should succeed
+                parsed = _get_arxiv_detail_by_abs_url(_captcha_auth, abs_url)
+                assert parsed
+                results.append(parsed)
+                break
+            except ReCaptchaExpiredException:
+                # captcha expires every ~1,000 entries or so
+                print(f"Go to: https://arxiv.org/")
+                _captcha_auth = input("Recaptcha expired, enter value: ").strip()
+    return results
