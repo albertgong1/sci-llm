@@ -20,7 +20,8 @@ dependencies = [
     "huggingface_hub[cli]",
     "datasets",
     "pdfplumber",
-    "langchain"
+    "langchain",
+    "pymatgen",
 ]
 
 [project.urls]
