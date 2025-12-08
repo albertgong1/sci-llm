@@ -4,7 +4,6 @@ Example usage:
     python score.py preds__gemini-2.5-flash.csv
     python score.py preds__gemini-2.5-flash.csv --output my_scores.csv
     python score.py preds__gemini-2.5-flash.csv --rubric data/rubric.csv
-    python score.py preds__gemini-2.5-flash.csv --analyze
 """
 
 import argparse
