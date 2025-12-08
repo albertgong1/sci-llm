@@ -79,6 +79,25 @@ def test_get_arxiv_paper_detail_result_by_abs_links(
     }
 
 
+def test_get_arxiv_paper_detail_result_by_abs_links_with_nested_contents(
+    example_arxiv_pdf_link: str, google_recaptcha_key: str
+) -> None:
+    if not google_recaptcha_key:
+        pytest.skip("environment variable GOOGLE_RECAPTCHA_KEY is unset, skipping.")
+
+    parsed_detail = get_arxiv_paper_detail_result_by_abs_links(
+        ["https://arxiv.org/abs/0808.3254"], captcha_auth=google_recaptcha_key
+    )
+    assert len(parsed_detail) == 1
+    paper_detail = parsed_detail[0]
+    assert paper_detail == {
+        "arxiv_comments": "5 pages, 5 figures; data added and text revised. A combined version (this paper and arXiv:0807.1304) published in PRB",
+        "arxiv_journal_reference": "Phys. Rev. B 79, 054521 (2009)",
+        "arxiv_related_doi": "https://doi.org/10.1103/PhysRevB.79.054521",
+        "arxiv_url_abstract": "https://arxiv.org/abs/0808.3254",
+    }
+
+
 def test_check_if_pdf_has_supplement(
     arxiv_pdf_path_has_supp_false: Path, arxiv_pdf_path_has_supp_true: Path
 ) -> None:

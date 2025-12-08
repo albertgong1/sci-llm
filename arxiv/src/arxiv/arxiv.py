@@ -156,19 +156,19 @@ def _parse_arxiv_detail_to_json(abs_link: str, arxiv_html: str) -> dict[str, str
     comments = ""
     e_comments = metatable.xpath('.//td[contains(@class, "tablecell comments")]')
     if e_comments:
-        comments = e_comments[0].text
+        comments = e_comments[0].text_content()
 
     # Journal Reference
     journal_reference = ""
     e_journal_reference = metatable.xpath('.//td[contains(@class, "tablecell jref")]')
     if e_journal_reference:
-        journal_reference = e_journal_reference[0].text
+        journal_reference = e_journal_reference[0].text_content()
 
     # Related DOI
     related_doi = ""
     e_related_doi = metatable.xpath('.//td[contains(@class, "tablecell doi")]')
     if e_related_doi:
-        related_doi = e_related_doi[0].xpath(".//a")[0].text
+        related_doi = e_related_doi[0].xpath(".//a")[0].text_content()
 
     return {
         "arxiv_url_abstract": abs_link,
