@@ -211,8 +211,8 @@ def plot_scores(df: pd.DataFrame, output_dir: Path) -> None:
     # Filter out rows with None scores
     df_valid = df.dropna(subset=["score"])
     
-    # Plot mean scores by material
-    material_stats = df_valid.groupby("material")["score"].agg(["mean", "sem"])
+    # Plot mean scores by material (sorted by score descending)
+    material_stats = df_valid.groupby("material")["score"].agg(["mean", "sem"]).sort_values("mean", ascending=False)
     plt.figure(figsize=(10, 6))
     plt.bar(material_stats.index, material_stats["mean"], yerr=material_stats["sem"], capsize=3)
     plt.xlabel("Material")
@@ -226,8 +226,8 @@ def plot_scores(df: pd.DataFrame, output_dir: Path) -> None:
     plt.savefig(material_plot_path)
     plt.close()
 
-    # Plot mean scores by property
-    property_stats = df_valid.groupby("property_name")["score"].agg(["mean", "sem"])
+    # Plot mean scores by property (sorted by score descending)
+    property_stats = df_valid.groupby("property_name")["score"].agg(["mean", "sem"]).sort_values("mean", ascending=False)
     plt.figure(figsize=(12, 6))
     plt.bar(property_stats.index, property_stats["mean"], yerr=property_stats["sem"], capsize=3)
     plt.xlabel("Property")
