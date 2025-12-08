@@ -9,7 +9,9 @@ from src.doi import get_proper_doi_from_doi_urls
 from src.http_util import get_responses
 
 
-def get_super_con_papers(csv_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv"):
+def get_super_con_papers(
+    csv_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv",
+) -> list[dict[str, str]]:
     parsed = []
     with open(csv_path, newline="\n", encoding="utf-8") as f:
         reader = csv.reader(f)
@@ -30,7 +32,31 @@ def get_super_con_papers(csv_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv"):
     return parsed
 
 
-def get_real_doi_from_base_doi(parsed_objects: list[dict[str, str]]):
+def get_real_doi_from_base_doi(
+    parsed_objects: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Fix the DOI case insensitivity issue.
+
+    The DOIs given by the CSV seem to have case information removed, e.g.
+
+        `10.1103/physrevb.102.165125` instead of
+        `10.1103/PhysRevB.102.165125`.
+
+    This matters because the arXiv advanced search is case-sensitive; writing
+    the DOI with incorrect casing yields no results. Bad false negative. To
+    resolve this, we can follow the DOI link to the DOI website itself (NOT
+    the ultimate resolution URL), and it returns the DOI with proper casing.
+
+    This is fast because there are no rate limits or throttling on the DOI
+    website, so >1,000 conns can be open at once.
+
+    :param parsed_objects: List of objects that contain a key named
+        `doi_link`, which contains a DOI url formatted like:
+        `https://doi.org/X` where X is the DOI.
+    :return: return a reference to the original list of dictionaries.
+        Technically this mutates the input by reference so output isn't
+        necessary to assign but whtever
+    """
     all_doi_urls = [x["doi_link"] for x in parsed_objects]
     true_doi_values = get_proper_doi_from_doi_urls(all_doi_urls)
     assert len(parsed_objects) == len(true_doi_values)
@@ -42,7 +68,7 @@ def get_real_doi_from_base_doi(parsed_objects: list[dict[str, str]]):
     return parsed_objects
 
 
-def get_super_con_arxiv_info(testing_limit: int | None):
+def get_super_con_arxiv_info(testing_limit: int | None) -> None:
     super_con_papers = get_super_con_papers()
     parsed = get_real_doi_from_base_doi(super_con_papers)
     ordered_papers = list(
@@ -87,7 +113,7 @@ def get_charge_density_wave_papers(
     return parsed
 
 
-def get_charge_density_wave_arxiv_info(testing_limit: int | None = None):
+def get_charge_density_wave_arxiv_info(testing_limit: int | None = None) -> None:
     papers = get_charge_density_wave_papers()
     parsed = get_real_doi_from_base_doi(papers)
 
@@ -118,7 +144,7 @@ def get_charge_density_wave_arxiv_info(testing_limit: int | None = None):
 
 def get_super_con_arxiv_info_downloads(
     saved_csv_path: Path = ARTIFACTS_ROOT / "supercon_augmented_search_results.csv",
-):
+) -> None:
     df = pd.read_csv(saved_csv_path)
     pdf_links = [
         x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
@@ -131,7 +157,7 @@ def get_super_con_arxiv_info_downloads(
 def get_charge_density_wave_arxiv_downloads(
     saved_csv_path: Path = ARTIFACTS_ROOT
     / "charge_density_wave_paper_list_sheet_1_augmented.csv",
-):
+) -> None:
     df = pd.read_csv(saved_csv_path)
     pdf_links = [
         x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
