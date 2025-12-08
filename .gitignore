@@ -217,8 +217,10 @@ __marimo__/
 
 *.DS_Store
 *data/
+!arxiv/tests/test_data/
 
 *out*/
 
 .idea
 arxiv/artifacts
+*.swp
