@@ -208,8 +208,10 @@ def _get_curl_for_detail(abs_url: str, captcha_auth: str) -> str:
 
 
 def _get_arxiv_detail_by_abs_url(captcha_auth: str, abs_url: str) -> dict[str, str]:
+    assert isinstance(abs_url, str)
+    assert abs_url
     curl_cmd = _get_curl_for_detail(abs_url, captcha_auth)
-    result: CurlResponse = get_webpage(curl_cmd)
+    result: CurlResponse = get_webpage(curl_cmd, browser_name="chrome")
     parsed: dict[str, str] = _parse_arxiv_detail_to_json(abs_url, result.text)
     assert parsed is not None
     return parsed

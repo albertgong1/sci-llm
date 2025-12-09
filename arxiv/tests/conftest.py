@@ -34,6 +34,7 @@ def example_arxiv_pdf_link() -> str:
 
 @pytest.fixture(scope="session")
 def google_recaptcha_key() -> str:
+    # can set this manually if getting blocked often
     return os.getenv("GOOGLE_RECAPTCHA_KEY") or ""
 
 

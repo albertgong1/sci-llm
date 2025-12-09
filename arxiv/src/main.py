@@ -6,6 +6,7 @@ import pandas as pd
 from src.arxiv import (
     get_arxiv_search_results_by_dois,
     get_arxiv_paper_detail_result_by_abs_links,
+    get_has_supplement_from_arxiv_comment,
 )
 from src.config import ARTIFACTS_ROOT
 from src.doi import get_proper_doi_from_doi_urls
@@ -32,6 +33,26 @@ def get_super_con_papers(
                 }
             )
 
+    return parsed
+
+
+def get_charge_density_wave_papers(
+    csv_path: Path = ARTIFACTS_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
+) -> list[dict[str, str]]:
+    parsed = []
+    with open(csv_path, newline="\n", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        # skip header
+        _ = next(reader)
+        for row in reader:
+            paper_title, doi_link, published_year = row
+            parsed.append(
+                {
+                    "paper_title": paper_title,
+                    "doi_link": doi_link,
+                    "published_year": int(published_year),
+                }
+            )
     return parsed
 
 
@@ -71,7 +92,7 @@ def get_real_doi_from_base_doi(
     return parsed_objects
 
 
-def get_super_con_arxiv_info(testing_limit: int | None) -> None:
+def get_super_con_arxiv_info(testing_limit: int | None = None) -> None:
     super_con_papers = get_super_con_papers()
     parsed = get_real_doi_from_base_doi(super_con_papers)
     ordered_papers = list(
@@ -86,34 +107,33 @@ def get_super_con_arxiv_info(testing_limit: int | None) -> None:
     normed = []
     for paper_info, arxiv_search_results in zip(ordered_papers, returned_results):
         for arxiv_search_result in arxiv_search_results:
-            to_save = {
+            to_save: dict[str, str] = {
                 **paper_info,
                 **arxiv_search_result,
             }
             normed.append(to_save)
 
+    # save just in case something goes wrong in the next step
+    df_intermediate = pd.json_normalize(normed)
+    df_intermediate.to_csv(
+        ARTIFACTS_ROOT / "supercon_augmented_search_results.csv", index=False
+    )
+
+    for i, paper_result in enumerate(normed):
+        paper_details = get_arxiv_paper_detail_result_by_abs_links(
+            [paper_result["arxiv_url_abstract"]]
+        )[0]
+        normed[i] = {
+            **paper_result,
+            **paper_details,
+            "arxiv_comment_suggests_has_supplement": get_has_supplement_from_arxiv_comment(
+                paper_details["arxiv_comments"]
+            ),
+        }
+
+    # will overwrite the intermediate df
     df = pd.json_normalize(normed)
     df.to_csv(ARTIFACTS_ROOT / "supercon_augmented_search_results.csv", index=False)
-
-
-def get_charge_density_wave_papers(
-    csv_path: Path = ARTIFACTS_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
-) -> list[dict[str, str]]:
-    parsed = []
-    with open(csv_path, newline="\n", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        # skip header
-        _ = next(reader)
-        for row in reader:
-            paper_title, doi_link, published_year = row
-            parsed.append(
-                {
-                    "paper_title": paper_title,
-                    "doi_link": doi_link,
-                    "published_year": int(published_year),
-                }
-            )
-    return parsed
 
 
 def get_charge_density_wave_arxiv_info(testing_limit: int | None = None) -> None:
@@ -177,33 +197,9 @@ def get_path_with_suffix(orig_path: Path, suffix: str) -> Path:
     return par / f"{f_name}_{suffix}{ext}"
 
 
-def get_enriched_pdf_with_arxiv_details(saved_csv_path: Path) -> None:
-    df = pd.read_csv(saved_csv_path)
-    abs_links = list(
-        set(
-            [
-                x
-                for x in df["arxiv_url_abstract"].tolist()
-                if isinstance(x, str) and bool(x)
-            ]
-        )
-    )
-    paper_details = get_arxiv_paper_detail_result_by_abs_links(abs_links)
-    df_paper_details = pd.json_normalize(paper_details)
-    df = df.merge(df_paper_details, on="arxiv_url_abstract", how="left")
-
-    new_path = get_path_with_suffix(saved_csv_path, "enriched")
-    df.to_csv(new_path)
-    print(f"Saved to: {new_path}")
-
-
 if __name__ == "__main__":
     # sentinel
-    # get_super_con_arxiv_info()
+    get_super_con_arxiv_info()
     # get_charge_density_wave_arxiv_info()
     # get_super_con_arxiv_info_downloads()
     # get_charge_density_wave_arxiv_downloads()
-
-    get_enriched_pdf_with_arxiv_details(
-        ARTIFACTS_ROOT / "supercon_augmented_search_results.csv",
-    )
