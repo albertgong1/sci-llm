@@ -224,3 +224,5 @@ __marimo__/
 .idea
 arxiv/artifacts
 *.swp
+arxiv/credentials.json
+arxiv/token.json
