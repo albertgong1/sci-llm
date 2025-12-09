@@ -38,13 +38,9 @@ def _normalize(text: str) -> str:
 
 
 def _split_clauses(text: str) -> list[str]:
-    # Split on punctuation and some conjunctions
+    # split by conj and punctuation
     clauses = re.split(r"[.;]|,(?!\d)|\bbut\b|\bhowever\b", text)
     return [c.strip() for c in clauses if c.strip()]
-
-
-def _has_any_word(text: str, words: set[str]) -> bool:
-    return any(re.search(rf"\b{re.escape(w)}\b", text) for w in words)
 
 
 def _has_negative(text: str) -> bool:
@@ -55,13 +51,10 @@ def _has_supp_pattern(text: str) -> bool:
     return any(p in text for p in SUPP_PATTERNS)
 
 
-def _has_positive(text: str) -> bool:
-    return _has_any_word(text, POSITIVE_WORDS)
-
-
 def get_has_supplement_from_arxiv_comment(comment_text: str) -> bool:
+    # see tests/test_arxiv.py::test_paper_comment_has_supplement for examples of
+    # positive TRUE, negative FALSE cases from real inputs. Some are tricky.
     t = _normalize(comment_text)
-
     clauses = _split_clauses(t)
 
     any_positive_spec = False
@@ -73,7 +66,6 @@ def get_has_supplement_from_arxiv_comment(comment_text: str) -> bool:
             continue
 
         neg = _has_negative(c)
-
         if neg:
             any_negative_spec = True
         else:
