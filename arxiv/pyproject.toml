@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp[speedups]>=3.13.2",
+    "google-api-python-client>=2.187.0",
+    "google-auth>=2.41.1",
+    "google-auth-httplib2>=0.2.1",
+    "google-auth-oauthlib>=1.2.3",
     "lxml>=6.0.2",
     "pandas>=2.3.3",
     "pymupdf>=1.26.6",

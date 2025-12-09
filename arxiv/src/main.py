@@ -1,16 +1,23 @@
 import csv
 from pathlib import Path
 
+from tqdm import tqdm
 import pandas as pd
 
 from src.arxiv import (
     get_arxiv_search_results_by_dois,
     get_arxiv_paper_detail_result_by_abs_links,
     get_has_supplement_from_arxiv_comment,
+    get_arxiv_pdf_likely_has_supplement,
 )
-from src.config import ARTIFACTS_ROOT
+from src.config import ARTIFACTS_ROOT, REPO_ROOT
 from src.doi import get_proper_doi_from_doi_urls
 from src.http_util import get_responses
+from src.google_util.sheets import (
+    GoogleSheetWithGoogleDriveLinks,
+    GoogleSheetFileLinkConfig,
+)
+from src.util import get_path_with_suffix
 
 
 def get_super_con_papers(
@@ -92,6 +99,42 @@ def get_real_doi_from_base_doi(
     return parsed_objects
 
 
+def get_df_with_filenames_and_supplement_heuristic(
+    all_pdfs_path: Path, orig_df: pd.DataFrame
+) -> pd.DataFrame:
+    lookup_by_id = {}
+    for pdf_path in all_pdfs_path.glob("*.pdf"):
+        pdf_prefix: str = pdf_path.stem
+        lookup_by_id[pdf_prefix] = pdf_path
+
+    base_df = orig_df
+    result_list_of_dicts = base_df.to_dict(orient="records")
+    for e in tqdm(result_list_of_dicts):
+        pdf_url = e["arxiv_url_pdf"]
+
+        # defaults
+        e["arxiv_pdf_suggests_has_supplement"] = False
+        e["arxiv_id"] = ""
+        e["file_path"] = ""
+
+        if not isinstance(pdf_url, str):
+            # is NaN
+            continue
+
+        arxiv_id: str = pdf_url.split("/")[-1].strip()
+        pdf_path_on_disk = lookup_by_id.get(arxiv_id, None)
+        if pdf_path_on_disk and isinstance(pdf_path_on_disk, Path):
+            pdf_has_supp = get_arxiv_pdf_likely_has_supplement(pdf_path_on_disk)
+        else:
+            pdf_has_supp = False
+
+        e["arxiv_pdf_suggests_has_supplement"] = pdf_has_supp
+        e["arxiv_id"] = arxiv_id
+        e["file_path"] = pdf_path_on_disk
+
+    return pd.json_normalize(result_list_of_dicts)
+
+
 def get_super_con_arxiv_info(testing_limit: int | None = None) -> None:
     super_con_papers = get_super_con_papers()
     parsed = get_real_doi_from_base_doi(super_con_papers)
@@ -167,7 +210,9 @@ def get_charge_density_wave_arxiv_info(testing_limit: int | None = None) -> None
 
 def get_super_con_arxiv_info_downloads(
     saved_csv_path: Path = ARTIFACTS_ROOT / "supercon_augmented_search_results.csv",
-) -> None:
+    orig_df_path: Path = ARTIFACTS_ROOT / "SuperConDOI.csv",
+) -> Path:
+    # for all the PDF urls, download them
     df = pd.read_csv(saved_csv_path)
     pdf_links = [
         x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
@@ -175,6 +220,20 @@ def get_super_con_arxiv_info_downloads(
     save_to = saved_csv_path.parent / saved_csv_path.stem
     save_to.mkdir(exist_ok=True, parents=False)
     get_responses(pdf_links, download_to_folder=save_to)
+
+    # now that they are on disk, inspect their contents to determine if
+    # they contain supplemental info
+    df = get_df_with_filenames_and_supplement_heuristic(save_to, df)
+
+    # load original corpus
+    orig_df = pd.read_csv(orig_df_path)
+    orig_df.columns = [x.lower() for x in orig_df.columns]
+
+    # join with orig corpus and save search results with new columns as file
+    save_to = get_path_with_suffix(saved_csv_path, "google_sheets")
+    df = orig_df.merge(df, how="left", on="paper_id")
+    df.to_csv(save_to, index=False)
+    return save_to
 
 
 def get_charge_density_wave_arxiv_downloads(
@@ -190,16 +249,36 @@ def get_charge_density_wave_arxiv_downloads(
     get_responses(pdf_links, download_to_folder=save_to)
 
 
-def get_path_with_suffix(orig_path: Path, suffix: str) -> Path:
-    par = orig_path.parent
-    ext = orig_path.suffix
-    f_name = orig_path.stem
-    return par / f"{f_name}_{suffix}{ext}"
+def upload_super_con_to_google_sheets(saved_csv_path: Path) -> None:
+    df = pd.read_csv(saved_csv_path)
+    sheet = GoogleSheetWithGoogleDriveLinks(
+        # https://developers.google.com/workspace/sheets/api/quickstart/python?authuser=3#authorize_credentials_for_a_desktop_application
+        # obtain the credentials file from google developer console
+        credentials_json_file_path=REPO_ROOT / "credentials.json",
+        # token.json does not need to exist, but it can
+        token_json_file_path=REPO_ROOT / "token.json",
+    )
+    folder_id = sheet.create_folder_in_google_drive("SuperCon Arxiv Papers")
+    spreadsheet_id = sheet.create_google_sheet_from_pandas_df(
+        df,
+        "SuperCon Arxiv",
+        folder_id,
+        GoogleSheetFileLinkConfig(
+            col_name_of_readable_name="paper_id", col_name_of_local_filepath="file_path"
+        ),
+    )
+    print(f"Drive folder ID: {folder_id}")
+    print(f"Sheet URL: https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
 
 
 if __name__ == "__main__":
-    # sentinel
-    get_super_con_arxiv_info()
+    pass
+    # --- supercon ---
+    # get_super_con_arxiv_info()
+    # g_search_results = get_super_con_arxiv_info_downloads()
+    # upload_super_con_to_google_sheets(g_search_results)
+
+    # --- charge density ---
     # get_charge_density_wave_arxiv_info()
     # get_super_con_arxiv_info_downloads()
     # get_charge_density_wave_arxiv_downloads()

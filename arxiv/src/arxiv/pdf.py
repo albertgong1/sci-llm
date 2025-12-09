@@ -2,10 +2,11 @@
 Functions for working with PDFs obtained from arxiv
 """
 
+import re
 from pathlib import Path
 
+import fitz
 import pymupdf
-import re
 
 # catches possible variations
 # "Supplementary Materials"
@@ -14,12 +15,20 @@ import re
 _R_HAS_SUPP_MATCH = r"(?i)supplement"
 
 
-def get_arxiv_pdf_likely_has_supplement(arxiv_pdf_path: Path) -> bool:
+def get_arxiv_pdf_likely_has_supplement(
+    arxiv_pdf_path: Path, suppress_error_msg: bool = True
+) -> bool:
     """This uses heuristics to determine if a given PDF path has Supplemental material within it.
 
     :param arxiv_pdf_path: Path to the PDF obtained from arxiv
+    :param suppress_error_msg: Whether to silence error messages on malformed PDFs,
+        true by default.
     :return: True if it likely has a Supplement Section, False otherwise.
     """
+    if suppress_error_msg:
+        # https://github.com/pymupdf/PyMuPDF/issues/606
+        fitz.TOOLS.mupdf_display_errors(on=False)
+
     assert isinstance(arxiv_pdf_path, Path)
     assert arxiv_pdf_path.exists() and arxiv_pdf_path.is_file()
     assert arxiv_pdf_path.suffix == ".pdf"
@@ -49,6 +58,9 @@ def get_arxiv_pdf_likely_has_supplement(arxiv_pdf_path: Path) -> bool:
             r[page_num] = x
         page_num += 1
 
+    # turn errors back on
+    fitz.TOOLS.mupdf_display_errors(on=True)
+
     if not r:
         # never found something that seemed to reference a supplemental section
         return False
@@ -61,3 +73,6 @@ def get_arxiv_pdf_likely_has_supplement(arxiv_pdf_path: Path) -> bool:
     for page_start in r.keys():
         if total_pages > page_start > main_content_ends_at_page:
             return True
+
+    # none of our heuristics would indicate that this has a supplement in the pdf
+    return False

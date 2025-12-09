@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 class Printer:
     _COLOR_END = "\033[0m"
     _RED = "\033[0;31m"
@@ -20,3 +23,10 @@ class Printer:
     @staticmethod
     def yellow(my_statement: str) -> None:
         Printer._print_col(my_statement, Printer._YELLOW)
+
+
+def get_path_with_suffix(orig_path: Path, suffix: str) -> Path:
+    par = orig_path.parent
+    ext = orig_path.suffix
+    f_name = orig_path.stem
+    return par / f"{f_name}_{suffix}{ext}"
