@@ -47,6 +47,7 @@ def get_charge_density_wave_papers(
     csv_path: Path = ARTIFACTS_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
 ) -> list[dict[str, str]]:
     parsed = []
+    row_num = 0
     with open(csv_path, newline="\n", encoding="utf-8") as f:
         reader = csv.reader(f)
         # skip header
@@ -58,8 +59,12 @@ def get_charge_density_wave_papers(
                     "paper_title": paper_title,
                     "doi_link": doi_link,
                     "published_year": int(published_year),
+                    # there is no paper ID, so we add this
+                    "paper_id": row_num,
                 }
             )
+            row_num += 1
+
     return parsed
 
 
@@ -195,12 +200,32 @@ def get_charge_density_wave_arxiv_info(testing_limit: int | None = None) -> None
     normed = []
     for paper_info, arxiv_search_results in zip(ordered_papers, returned_results):
         for arxiv_search_result in arxiv_search_results:
-            to_save = {
+            to_save: dict[str, str] = {
                 **paper_info,
                 **arxiv_search_result,
             }
             normed.append(to_save)
 
+    # save just in case something goes wrong in the next step
+    df = pd.json_normalize(normed)
+    df.to_csv(
+        ARTIFACTS_ROOT / "charge_density_wave_paper_list_sheet_1_augmented.csv",
+        index=False,
+    )
+
+    for i, paper_result in enumerate(normed):
+        paper_details = get_arxiv_paper_detail_result_by_abs_links(
+            [paper_result["arxiv_url_abstract"]]
+        )[0]
+        normed[i] = {
+            **paper_result,
+            **paper_details,
+            "arxiv_comment_suggests_has_supplement": get_has_supplement_from_arxiv_comment(
+                paper_details["arxiv_comments"]
+            ),
+        }
+
+    # will overwrite the intermediate df
     df = pd.json_normalize(normed)
     df.to_csv(
         ARTIFACTS_ROOT / "charge_density_wave_paper_list_sheet_1_augmented.csv",
@@ -239,7 +264,9 @@ def get_super_con_arxiv_info_downloads(
 def get_charge_density_wave_arxiv_downloads(
     saved_csv_path: Path = ARTIFACTS_ROOT
     / "charge_density_wave_paper_list_sheet_1_augmented.csv",
-) -> None:
+    orig_df_path: Path = ARTIFACTS_ROOT / "Charge_Density_Wave_Paper_list_Sheet1.csv",
+) -> Path:
+    # for all the PDF urls, download them
     df = pd.read_csv(saved_csv_path)
     pdf_links = [
         x for x in df["arxiv_url_pdf"].tolist() if isinstance(x, str) and bool(x)
@@ -248,9 +275,29 @@ def get_charge_density_wave_arxiv_downloads(
     save_to.mkdir(exist_ok=True, parents=False)
     get_responses(pdf_links, download_to_folder=save_to)
 
+    # now that they are on disk, inspect their contents to determine if
+    # they contain supplemental info
+    df = get_df_with_filenames_and_supplement_heuristic(save_to, df)
 
-def upload_super_con_to_google_sheets(saved_csv_path: Path) -> None:
+    # load original corpus
+    orig_df = pd.json_normalize(get_charge_density_wave_papers(orig_df_path))
+    orig_df.columns = [x.lower() for x in orig_df.columns]
+
+    # join with orig corpus and save search results with new columns as file
+    save_to = get_path_with_suffix(saved_csv_path, "google_sheets")
+    df = orig_df.merge(df, how="left", on="paper_id")
+    df.to_csv(save_to, index=False)
+    return save_to
+
+
+def upload_to_google_sheets(
+    saved_csv_path: Path, save_pdfs_to_google_drive_folder_name: str, sheet_title: str
+) -> None:
     df = pd.read_csv(saved_csv_path)
+    csv_cols = df.columns.tolist()
+    assert "paper_id" in csv_cols
+    assert "file_path" in csv_cols
+
     sheet = GoogleSheetWithGoogleDriveLinks(
         # https://developers.google.com/workspace/sheets/api/quickstart/python?authuser=3#authorize_credentials_for_a_desktop_application
         # obtain the credentials file from google developer console
@@ -258,10 +305,12 @@ def upload_super_con_to_google_sheets(saved_csv_path: Path) -> None:
         # token.json does not need to exist, but it can
         token_json_file_path=REPO_ROOT / "token.json",
     )
-    folder_id = sheet.create_folder_in_google_drive("SuperCon Arxiv Papers")
+    folder_id = sheet.create_folder_in_google_drive(
+        save_pdfs_to_google_drive_folder_name
+    )
     spreadsheet_id = sheet.create_google_sheet_from_pandas_df(
         df,
-        "SuperCon Arxiv",
+        sheet_title,
         folder_id,
         GoogleSheetFileLinkConfig(
             col_name_of_readable_name="paper_id", col_name_of_local_filepath="file_path"
@@ -272,13 +321,14 @@ def upload_super_con_to_google_sheets(saved_csv_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    pass
     # --- supercon ---
     # get_super_con_arxiv_info()
     # g_search_results = get_super_con_arxiv_info_downloads()
-    # upload_super_con_to_google_sheets(g_search_results)
+    # upload_super_con_to_google_sheets(g_search_results, "SuperCon Arxiv Papers", "SuperCon Arxiv")
 
     # --- charge density ---
-    # get_charge_density_wave_arxiv_info()
-    # get_super_con_arxiv_info_downloads()
-    # get_charge_density_wave_arxiv_downloads()
+    get_charge_density_wave_arxiv_info()
+    g_drive_file = get_charge_density_wave_arxiv_downloads()
+    upload_to_google_sheets(
+        g_drive_file, "Charge Density Wave PDFs", "Charge Density Wave Arxiv"
+    )
