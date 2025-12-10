@@ -27,6 +27,16 @@ docker pull lwthiker/curl-impersonate:0.6-chrome
 
 Then ensure the Docker daemon is running. 
 
+### Google Sheets Integration
+
+To automate saving `csv` files that have links to files on disk, follow the instructions here: ["Google Sheets API Python Quickstart"](https://developers.google.com/workspace/sheets/api/quickstart/python?authuser=3#set-up-environment).
+
+You will need to place the `credentials.json` file obtained by following the guide at the root of this sub-repo:
+```bash
+sci-llm/arxiv/credentials.json
+```
+
+
 ### Code Editing
 
 #### Run Code Formatting

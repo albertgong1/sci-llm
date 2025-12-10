@@ -22,16 +22,11 @@ def _get_proper_doi_from_doi_url_resp(orig_doi_url: str, doi_url_resp: str) -> s
 
 
 def get_proper_doi_from_doi_urls(doi_urls: list[str]) -> list[str]:
-    chunk_size = 1_000
-    collection = []
-    for i in range(0, len(doi_urls), chunk_size):
-        doi_url_group = doi_urls[i : i + chunk_size]
-        responses = _get_responses(
-            doi_url_group, max_concurrent_coro=chunk_size, allow_redirects=False
-        )
-        parsed_dois = [
-            _get_proper_doi_from_doi_url_resp(in_url, x)
-            for x, in_url in zip(responses, doi_urls)
-        ]
-        collection += parsed_dois
-    return collection
+    responses = _get_responses(
+        doi_urls, max_concurrent_coro=1_000, allow_redirects=False
+    )
+    parsed_dois = [
+        _get_proper_doi_from_doi_url_resp(in_url, x)
+        for x, in_url in zip(responses, doi_urls)
+    ]
+    return parsed_dois
