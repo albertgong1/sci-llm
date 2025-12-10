@@ -24,6 +24,11 @@ dependencies = [
     "pymatgen",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+]
+
 [project.urls]
 
 [tool.ruff]
