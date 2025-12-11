@@ -1,5 +1,8 @@
 # SuperCon Property Extraction
 
+> \[!NOTE\]
+> Currently, only Gemini is supported.
+
 ## Setup Instructions
 
 1. Follow the instructions at [README.md](../../README.md#setup-instructions)
@@ -36,17 +39,13 @@ python create_huggingface_dataset.py --repo_name kilian-group/supercon-mini
 
 ## Experiments
 
-1. To extract properties from a paper, please run the following command:
-
-We use the papers and properties listed in `assets/dataset.csv`.
-With the following command, we can extract listed properties from the papers in `Paper_DB/` with Gemini-2.5-Flash.
-The resulting CSV is stored at `results/preds__gemini-2.5-flash.csv`.
+1. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task:
 
 ```bash
-python extract_supercon_properties_w_gemini.py --save_results_csv_dir results --model_name gemini-2.5-flash
+python pred_gemini.py --task tc --output_dir out-MMDD
 ```
 
-2. Evaluate the accuracy of the extracted information, use the following command:
+2. Compute the accuracy of the extracted information using the following command:
 
 ```bash
 python score.py preds__gemini-2.5-flash.csv
