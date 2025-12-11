@@ -19,11 +19,11 @@ conda env config vars set GOOGLE_API_KEY="your-api-key-here"
 >\[!IMPORTANT\]
 > To push to huggingface, you need to authenticate using `hf auth login`. When creating a new token, set the permission level to "write".
 
-1. Download the collection of (15) papers from https://drive.google.com/file/d/1kJz-zlOdRF5_9gtt3oeoKN2-29GPBLNQ/view?usp=share_link to the current directory and unzip to `data/`:
+1. Download [PaperDB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/`:
 
 ```bash
 # Assumes Paper_DB.zip is in the current directory
-tar -xvf Paper_DB.zip -C data/
+mkdir data && tar -xvf Paper_DB.tar -C data
 ```
 
 2. Run the following script to generate a HF dataset and push to `kilian-group/supercon-mini`:
