@@ -34,8 +34,10 @@ repos:
       # Run the linter.
       - id: ruff
         args: [ --fix ]
+        exclude: ^examples/harbor/hello-world/
       # Run the formatter.
       - id: ruff-format
+        exclude: ^examples/harbor/hello-world/
 
   # - repo: https://github.com/RobertCraigie/pyright-python
   #   rev: v1.1.394
