@@ -6,6 +6,9 @@
 
 2. Install additional dependencies:
 
+> \[!TIP\]
+> Docker needs to be installed and running for harbor to work. Mac installation instructions: https://docs.docker.com/desktop/setup/install/mac-install/
+
 ```bash
 conda activate sci-llm
 uv tool install harbor
