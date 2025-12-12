@@ -48,5 +48,5 @@ python pred_gemini.py --task tc --output_dir out-MMDD
 2. Compute the accuracy of the extracted information using the following command:
 
 ```bash
-python score.py preds__gemini-2.5-flash.csv
+python score_task.py --task tc --output_dir out-MMDD --model gemini-2.5-flash
 ```
