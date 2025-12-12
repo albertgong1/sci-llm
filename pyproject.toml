@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "huggingface_hub[cli]",
+    "huggingface_hub",
     "datasets",
     "pdfplumber",
     "langchain",
