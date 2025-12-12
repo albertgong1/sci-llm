@@ -16,7 +16,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "phantom-wiki[eval]",
     "huggingface_hub[cli]",
     "datasets",
     "pdfplumber",
@@ -30,6 +29,12 @@ dev = [
 ]
 
 [project.urls]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 
