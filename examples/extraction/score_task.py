@@ -10,7 +10,7 @@ according to property-specific rubrics, and generates analysis outputs:
 
 Example usage:
     python score_task.py -od out --task tc --model gemini-2.5-flash
-    python score_task.py -od out --task tc --model gemini-2.5-flash --rubric data/rubric.csv
+    python score_task.py -od out --task tc --model gemini-2.5-flash --rubric rubric.csv
 """
 
 import argparse
@@ -401,8 +401,8 @@ def main() -> None:
     parser.add_argument(
         "--rubric",
         type=Path,
-        default=Path(__file__).parent / "data" / "rubric.csv",
-        help="Path to the rubric CSV file (default: data/rubric.csv)",
+        default=Path(__file__).parent / "rubric.csv",
+        help="Path to the rubric CSV file (default: rubric.csv)",
     )
     parser.add_argument(
         "--output_dir",
