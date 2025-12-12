@@ -23,6 +23,14 @@ dependencies = [
     "langchain"
 ]
 
+[project.optional-dependencies]
+validator = [
+    "streamlit",
+    "pandas",
+    "pymupdf",
+    "google-genai"
+]
+
 [project.urls]
 
 [tool.ruff]
