@@ -17,6 +17,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
 import time
 from typing import List, Dict
+from pathlib import Path
 
 
 def fetch_all_chi_data(headless: bool = True, wait_time: int = 20) -> list:
@@ -239,7 +240,7 @@ def parse_chi_data_from_elements(row_elements: list) -> List[Dict]:
 
 
 def export_to_csv(
-    data: List[Dict], output_file: str = "pppdb_chi_complete.csv"
+    data: List[Dict], output_file: str = "data/pppdb_chi_complete.csv"
 ) -> None:
     """Export all data to CSV.
 
@@ -248,6 +249,10 @@ def export_to_csv(
         output_file: Output filename
 
     """
+    # Create output directory if it doesn't exist
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     df = pd.DataFrame(data)
 
     # Reorder columns
@@ -328,7 +333,7 @@ def main(headless: bool = True) -> None:
 
         print(f"\n{'=' * 70}")
         print("✓ Scraping completed successfully!")
-        print("✓ All 263 entries exported to pppdb_chi_complete.csv")
+        print("✓ All 263 entries exported to data/pppdb_chi_complete.csv")
         print(f"{'=' * 70}")
 
     except Exception as e:

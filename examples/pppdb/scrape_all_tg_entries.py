@@ -17,6 +17,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
 import time
 from typing import List, Dict
+from pathlib import Path
 
 
 def fetch_all_tg_data(headless: bool = True, wait_time: int = 20) -> list:
@@ -223,7 +224,9 @@ def parse_tg_data_from_elements(row_elements: list) -> List[Dict]:
     return data_rows
 
 
-def export_to_csv(data: List[Dict], output_file: str = "pppdb_tg_complete.csv") -> None:
+def export_to_csv(
+    data: List[Dict], output_file: str = "data/pppdb_tg_complete.csv"
+) -> None:
     """Export all data to CSV.
 
     Args:
@@ -231,6 +234,10 @@ def export_to_csv(data: List[Dict], output_file: str = "pppdb_tg_complete.csv") 
         output_file: Output filename
 
     """
+    # Create output directory if it doesn't exist
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     df = pd.DataFrame(data)
 
     # Reorder columns
@@ -290,7 +297,7 @@ def main(headless: bool = True) -> None:
 
         print(f"\n{'=' * 70}")
         print("✓ Scraping completed successfully!")
-        print("✓ All entries exported to pppdb_tg_complete.csv")
+        print("✓ All entries exported to data/pppdb_tg_complete.csv")
         print(f"{'=' * 70}")
 
     except Exception as e:
