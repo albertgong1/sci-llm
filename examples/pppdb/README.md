@@ -4,43 +4,23 @@ Scripts to scrape data from the [Polymer Property Predicted Database](https://pp
 
 ## Setup Instructions
 
+1. Please following the instructions in [README.md](../../README.md#setup-instructions)
+
+<details>
+    <summary>Create CSV files from scratch (optional) </summary>
+
+1. Install additional dependencies:
+
 ```bash
 uv pip install selenium webdriver-manager beautifulsoup4 pandas
 ```
 
-## Available Scrapers
-
-### Chi (χ) Database
-Scrapes Flory-Huggins interaction parameters between polymer pairs.
+2. Run Python scripts to scrape the data from the official website:
 
 ```bash
 uv run python scrape_all_chi_entries.py
-```
-
-Outputs: `pppdb_chi_complete.csv`
-
-### Tg Database
-Scrapes glass transition temperatures for polymers.
-
-```bash
 uv run python scrape_all_tg_entries.py
-```
-
-Outputs: `pppdb_tg_complete.csv`
-
-### Cloud Points Database
-Scrapes binary polymer solution cloud point data (phase separation temperatures).
-
-```bash
 uv run python scrape_all_cloud_point_entries.py
 ```
 
-Outputs: `pppdb_cloud_point_complete.csv`
-
-## Options
-
-All scripts support a `--show-browser` flag to display the browser window (useful for debugging):
-
-```bash
-uv run python scrape_all_cloud_point_entries.py --show-browser
-```
+</details>
