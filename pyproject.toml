@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sci-llm"
 description = ""
 version = "0.0.0"
+requires-python = "==3.13"
 authors = [
     {name="Albert Gong", email="agong@cs.cornell.edu"},
 ]
@@ -16,24 +17,22 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "huggingface_hub[cli]",
+    "huggingface_hub",
     "datasets",
     "pdfplumber",
     "langchain",
     "pymatgen",
+    "pandas",
+    "google-genai"
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pre-commit",
 ]
-
-[project.optional-dependencies]
 validator = [
     "streamlit",
-    "pandas",
     "pymupdf",
-    "google-genai"
 ]
 
 [project.urls]

@@ -4,44 +4,18 @@ This guide explains how to use the Property Validator App for two main workflows
 
 ## Setup & Configuration
 
-### 1. Prerequisites
-Ensure you have Python 3.9+ installed.
+1. Following the setup instructions in [README.md](../README.md#setup-instructions)
 
-### 2. Installation (Using uv)
-
-The project includes an optional dependency group named `validator` in `pyproject.toml`.
-
-**Option A: Run Directly (Recommended)**
-You can run the app using the configured group without manually installing anything:
-
-```bash
-uv run --group validator streamlit run examples/extraction/validator_app.py
-```
-
-**Option B: Install Dependencies**
-If you want to install the validator dependencies into your environment:
+2. Install additional dependencies:
 
 ```bash
 uv sync --group validator
 ```
-Then run simply:
-```bash
-streamlit run examples/extraction/validator_app.py
-```
 
-### 3. API Key Setup
-To use the **AI Search** feature, you must provide a Google Gemini API Key.
+3. Setup API keys for **AI Search** feature (optional): create a file named `.env` in the root directory and add
 
-**Option A: `.env` file (Recommended for local use)**
-Create a file named `.env` in the root directory and add:
 ```bash
 GOOGLE_API_KEY=your_api_key_here
-```
-
-**Option B: Streamlit Secrets**
-Create a file at `.streamlit/secrets.toml` and add:
-```toml
-GOOGLE_API_KEY = "your_api_key_here"
 ```
 
 ## Getting Started
@@ -49,13 +23,13 @@ GOOGLE_API_KEY = "your_api_key_here"
 Run the app using Streamlit:
 
 ```bash
-streamlit run examples/extraction/validator_app.py
+uv run streamlit run examples/extraction/validator_app.py
 ```
 
 You can optionally specify a CSV file to load directly:
 
 ```bash
-streamlit run examples/extraction/validator_app.py --csv_path "path/to/my_data.csv"
+uv run streamlit run examples/extraction/validator_app.py --csv_path "path/to/my_data.csv"
 ```
 
 ### Data Loading & File Selection
@@ -65,8 +39,9 @@ By default, the app looks for files in:
 *   **PDFs**: `examples/extraction/assets/Paper_DB/`
 
 You can customize these folders using CLI flags:
+
 ```bash
-streamlit run examples/extraction/validator_app.py --csv_folder "my_csvs/" --paper_folder "my_pdfs/"
+uv run streamlit run examples/extraction/validator_app.py --csv_folder "my_csvs/" --paper_folder "my_pdfs/"
 ```
 
 **Workflow**:
