@@ -1,32 +1,52 @@
-# Property Extraction
+# SuperCon Property Extraction
 
-## Experiments
+> \[!NOTE\]
+> Currently, only Gemini is supported.
+
+## Setup Instructions
+
+1. Follow the instructions at [README.md](../../README.md#setup-instructions)
+
+2. Install additional dependencies:
+
+```bash
+conda activate sci-llm
+uv pip install google-genai pandas tqdm
+# Setup Gemini API key
+conda env config vars set GOOGLE_API_KEY="your-api-key-here"
+```
+
+<details>
+    <summary>Create a HuggingFace dataset (from scratch)</summary>
 
 >\[!IMPORTANT\]
 > To push to huggingface, you need to authenticate using `hf auth login`. When creating a new token, set the permission level to "write".
 
-1. Create a HuggingFace dataset containing the questions, context (i.e., path to PDF), and answer.
+1. Download [PaperDB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/`:
 
 ```bash
-python create_huggingface_dataset.py --repo_name REPO_NAME
+# Assumes Paper_DB.zip is in the current directory
+mkdir data && tar -xvf Paper_DB.tar -C data
 ```
 
-2. To extract properties from a paper, please run the following command:
-
-We use the papers and properties listed in `assets/dataset.csv`.
-With the following command, we can extract listed properties from the papers in `Paper_DB/` with Gemini-2.5-Flash.
-The resulting CSV is stored at `results/preds__gemini-2.5-flash.csv`.
+2. Run the following script to generate a HF dataset and push to `kilian-group/supercon-mini`:
 
 ```bash
-pip install uv
-uv pip install google-genai pandas tqdm
-
-conda env config vars set GOOGLE_API_KEY="your-api-key-here"
-
-python extract_supercon_properties_w_gemini.py --save_results_csv_dir results --model_name gemini-2.5-flash
+python create_huggingface_dataset.py --repo_name kilian-group/supercon-mini
 ```
 
-3. Evaluate the accuracy of the extracted information, use the following command:
+</details>
+
+## Experiments
+
+1. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task:
 
 ```bash
+python pred_gemini.py --task tc --output_dir out-MMDD
+```
+
+2. Compute the accuracy of the extracted information using the following command:
+
+```bash
+python score_task.py --task tc --output_dir out-MMDD --model gemini-2.5-flash
 ```
