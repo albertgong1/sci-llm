@@ -27,10 +27,12 @@ dependencies = [
     "tqdm",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "pre-commit",
 ]
+
+[dependency-groups]
 validator = [
     "streamlit",
     "pymupdf",

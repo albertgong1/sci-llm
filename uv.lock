@@ -1615,10 +1615,12 @@ dependencies = [
     { name = "tqdm" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 dev = [
     { name = "pre-commit" },
 ]
+
+[package.dev-dependencies]
 validator = [
     { name = "pymupdf" },
     { name = "streamlit" },
@@ -1632,12 +1634,13 @@ requires-dist = [
     { name = "langchain" },
     { name = "pandas" },
     { name = "pdfplumber" },
+    { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pymatgen" },
     { name = "tqdm" },
 ]
+provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pre-commit" }]
 validator = [
     { name = "pymupdf" },
     { name = "streamlit" },
