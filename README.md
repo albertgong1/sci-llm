@@ -3,7 +3,8 @@
 ## Setup Instructions
 
 ```bash
-conda create -n sci-llm python=3.13
 pip install uv
-uv pip install -e .
+uv sync --all-groups
+# Install pre-commit hooks (one-time setup)
+uv run pre-commit install
 ```

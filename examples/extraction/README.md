@@ -7,13 +7,10 @@
 
 1. Follow the instructions at [README.md](../../README.md#setup-instructions)
 
-2. Install additional dependencies:
+2. Setup API key: create a file named `.env` in the root directory and add
 
 ```bash
-conda activate sci-llm
-uv pip install google-genai pandas tqdm
-# Setup Gemini API key
-conda env config vars set GOOGLE_API_KEY="your-api-key-here"
+GOOGLE_API_KEY=your_api_key_here
 ```
 
 <details>
