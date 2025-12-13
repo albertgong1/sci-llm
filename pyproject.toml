@@ -23,7 +23,8 @@ dependencies = [
     "langchain",
     "pymatgen",
     "pandas",
-    "google-genai"
+    "google-genai",
+    "tqdm",
 ]
 
 [dependency-groups]

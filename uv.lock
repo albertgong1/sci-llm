@@ -1612,6 +1612,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pdfplumber" },
     { name = "pymatgen" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -1632,6 +1633,7 @@ requires-dist = [
     { name = "pandas" },
     { name = "pdfplumber" },
     { name = "pymatgen" },
+    { name = "tqdm" },
 ]
 
 [package.metadata.requires-dev]
