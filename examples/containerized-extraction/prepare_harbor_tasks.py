@@ -1,0 +1,404 @@
+"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
+
+This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
+each with:
+  - `environment/`: Docker build context with the paper (and optional extracted text)
+  - `instruction.md`: a single prompt/instruction file shared across tasks via a template
+  - `tests/`: verifier that scores predictions using rubric tolerances
+  - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
+
+The source of truth for the benchmark is the Hugging Face dataset
+`kilian-group/supercon-mini`, grouped by `refno` (one Harbor task per paper).
+
+By default this script writes tasks under `out/harbor/supercon-mini/<task>/<paper-mode>/` so the
+repository doesn't contain a persistent `harbor/` directory until you build.
+
+Example (from repo root):
+    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --paper-mode easy --force
+    uv run python examples/containerized-extraction/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini/tc/easy/job.yaml -a oracle
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import shutil
+import textwrap
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Iterable, cast
+
+import pdfplumber
+from datasets import load_dataset
+
+
+def repo_root() -> Path:
+    """Return the repository root directory."""
+    return Path(__file__).resolve().parents[2]
+
+
+def templates_dir() -> Path:
+    """Return the directory containing files copied into generated Harbor tasks."""
+    return Path(__file__).parent / "task_templates"
+
+
+def read_template(relative_path: str) -> str:
+    """Read a template file relative to `task_templates/`."""
+    return (templates_dir() / relative_path).read_text()
+
+
+def copy_template(relative_path: str, dest_path: Path) -> None:
+    """Copy a template file relative to `task_templates/` to the destination path."""
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(templates_dir() / relative_path, dest_path)
+
+
+def slugify(value: str) -> str:
+    """Normalize strings for file-safe task IDs."""
+    return (
+        value.lower()
+        .replace(" ", "-")
+        .replace("/", "-")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
+def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
+    """Load the property_name -> rubric mapping from the rubric CSV."""
+    mapping: dict[str, str] = {}
+    with rubric_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            property_name = row.get("property_name")
+            rubric = row.get("rubric")
+            if property_name and rubric:
+                mapping[property_name] = rubric
+    return mapping
+
+
+def extract_pdf_text(pdf_path: Path) -> str:
+    """Extract a best-effort plain-text representation of a PDF.
+
+    This makes tasks solvable by terminal agents like `gemini-cli` without requiring PDF
+    tooling inside the container. The extracted text is bundled into the task
+    environment as `/app/paper.txt` and can be injected into Gemini CLI prompts via
+    the `@paper.txt` "At command".
+    """
+    pages: list[str] = []
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page in pdf.pages:
+            page_text = (page.extract_text() or "").strip()
+            if page_text:
+                pages.append(page_text)
+    return "\n\n".join(pages)
+
+
+def dockerfile_contents(*, include_text: bool) -> str:
+    """Render the task environment Dockerfile.
+
+    The environment always includes the PDF at `/app/paper.pdf`.
+    - Easy mode includes a pre-extracted `/app/paper.txt`
+    - Hard mode omits `paper.txt` and installs `pdftotext` (poppler-utils) so
+      agents can decide how to extract text themselves.
+    """
+    install_pdf_tools = ""
+    copy_paper_txt = ""
+    if include_text:
+        copy_paper_txt = "COPY paper.txt /app/paper.txt"
+    else:
+        install_pdf_tools = (
+            "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+            "    poppler-utils \\\n"
+            "    procps \\\n"
+            "  && rm -rf /var/lib/apt/lists/*"
+        )
+
+    return read_template("environment/Dockerfile").format(
+        install_pdf_tools=install_pdf_tools,
+        copy_paper_txt=copy_paper_txt,
+    )
+
+
+def group_rows(dataset: Iterable[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group dataset rows by `refno` to build one Harbor task per paper."""
+    grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in dataset:
+        grouped[row["refno"]].append(row)
+    return grouped
+
+
+def write_job_config(tasks_dir: Path, job_path: Path) -> None:
+    """Write a Harbor job YAML pointing at the generated tasks."""
+    tasks_rel = tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
+    job_yaml = f"""\
+jobs_dir: jobs
+n_attempts: 1
+timeout_multiplier: 1.0
+orchestrator:
+  type: local
+  n_concurrent_trials: 2
+  quiet: false
+environment:
+  type: docker
+  force_build: true
+  delete: true
+agents:
+  - name: oracle
+datasets:
+  - path: {tasks_rel.as_posix()}
+"""
+    job_path.parent.mkdir(parents=True, exist_ok=True)
+    job_path.write_text(job_yaml)
+
+
+def build_task(
+    task_dir: Path,
+    *,
+    pdf_path: Path,
+    task_name: str,
+    refno: str,
+    rows: list[dict[str, str]],
+    rubric_mapping: dict[str, str],
+    include_text: bool,
+) -> None:
+    """Build a single Harbor task directory (one paper, many questions)."""
+    env_dir = task_dir / "environment"
+    tests_dir = task_dir / "tests"
+    solution_dir = task_dir / "solution"
+
+    env_dir.mkdir(parents=True, exist_ok=True)
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    solution_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(pdf_path, env_dir / "paper.pdf")
+    if include_text:
+        paper_text = extract_pdf_text(pdf_path)
+        if not paper_text.strip():
+            raise ValueError(f"Failed to extract any text from {pdf_path}")
+        (env_dir / "paper.txt").write_text(paper_text)
+
+    questions: list[dict[str, str]] = []
+    expected_rows: list[dict[str, str]] = []
+    for row in rows:
+        rubric = rubric_mapping.get(row["property_name"], "categorical")
+        questions.append(
+            {
+                "material": row["material"],
+                "property_name": row["property_name"],
+                "definition": row["definition"],
+            }
+        )
+        expected_rows.append(
+            {
+                "material": row["material"],
+                "property_name": row["property_name"],
+                "property_value": str(row["property_value"]),
+                "property_unit": str(row.get("property_unit", "")),
+                "rubric": rubric,
+            }
+        )
+
+    expected = {
+        "task": task_name,
+        "refno": refno,
+        "ground_truth": expected_rows,
+    }
+    (tests_dir / "expected.json").write_text(json.dumps(expected, indent=2))
+
+    task_meta = {
+        "refno": refno,
+        "paper_mode": "easy" if include_text else "hard",
+        "pdf_path": "/app/paper.pdf",
+        "text_path": "/app/paper.txt" if include_text else None,
+        "predictions_path": "/app/output/predictions.json",
+        "questions": questions,
+    }
+    (env_dir / "task_meta.json").write_text(json.dumps(task_meta, indent=2))
+
+    question_blocks = "\n\n".join(
+        textwrap.dedent(
+            f"""\
+            [{idx}]
+            Question: What is the {item['property_name']} recommended for {item['material']}? Here, "{item['property_name']}" is defined as "{item['definition']}".
+            Answer:
+            """
+        ).strip()
+        for idx, item in enumerate(questions)
+    )
+    paper_context = "\n".join(
+        [
+            f"- PDF: /app/paper.pdf",
+            (
+                "- Extracted text (provided): /app/paper.txt"
+                if include_text
+                else "- No pre-extracted text is provided for this task."
+            ),
+        ]
+    )
+    gemini_at_commands = (
+        "`@paper.txt`"
+        if include_text
+        else "`@paper.pdf`"
+    )
+    paper_at_command = "@paper.txt" if include_text else "@paper.pdf"
+    claude_file_examples = (
+        "`/app/paper.pdf`, `/app/paper.txt`" if include_text else "`/app/paper.pdf`"
+    )
+
+    instruction_template = read_template("instruction.md.template")
+    instruction = instruction_template.format(
+        refno=refno,
+        meta_path="/app/task_meta.json",
+        predictions_path="/app/output/predictions.json",
+        question_blocks=question_blocks,
+        paper_context=paper_context,
+        paper_at_command=paper_at_command,
+        gemini_at_commands=gemini_at_commands,
+        claude_file_examples=claude_file_examples,
+    )
+    (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
+
+    task_toml = read_template("task.toml.template").format(task_name=task_name)
+    (task_dir / "task.toml").write_text(task_toml)
+
+    (env_dir / "Dockerfile").write_text(dockerfile_contents(include_text=include_text))
+    copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
+    copy_template("tests/test.sh", tests_dir / "test.sh")
+
+    solution_predictions = [
+        {
+            "material": row["material"],
+            "property_name": row["property_name"],
+            "pred_value": row["property_value"],
+            "pred_unit": row.get("property_unit", ""),
+        }
+        for row in expected_rows
+    ]
+    solution_script = f"""\
+#!/bin/bash
+set -euo pipefail
+
+mkdir -p /app/output
+cat > /app/output/predictions.json <<'EOF'
+{json.dumps(solution_predictions, indent=2)}
+EOF
+"""
+    (solution_dir / "solve.sh").write_text(solution_script)
+
+    for script in [tests_dir / "test.sh", solution_dir / "solve.sh"]:
+        script.chmod(0o755)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate Harbor tasks for the superconductor extraction benchmark."
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default="tc",
+        help="Dataset configuration to load from kilian-group/supercon-mini (default: tc)",
+    )
+    parser.add_argument(
+        "--paper-mode",
+        type=str,
+        default="easy",
+        choices=["easy", "hard"],
+        help="easy: bundle a pre-extracted paper.txt; hard: PDF-only (no pre-transcription).",
+    )
+    parser.add_argument(
+        "--pdf-dir",
+        type=Path,
+        default=Path(__file__).parent / "data" / "Paper_DB",
+        help="Directory containing PDFs named <refno>.pdf.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=repo_root() / "out" / "harbor" / "supercon-mini",
+        help="Where to write generated Harbor tasks (default: out/harbor/supercon-mini).",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional cap on number of tasks (papers) to generate.",
+    )
+    parser.add_argument(
+        "--refno",
+        action="append",
+        default=None,
+        help="Only build tasks for specific refno(s). Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the output task directory if it already exists.",
+    )
+    parser.add_argument(
+        "--write-job-config",
+        action="store_true",
+        help="Also emit a Harbor job config pointing at the generated tasks.",
+    )
+    args = parser.parse_args()
+
+    if not args.pdf_dir.exists():
+        raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
+
+    task_root = args.output_dir / args.task / args.paper_mode
+    tasks_dir = task_root / "tasks"
+    if task_root.exists():
+        if args.force:
+            shutil.rmtree(task_root)
+        elif any(task_root.iterdir()):
+            raise FileExistsError(
+                f"{task_root} already exists. Re-run with --force to rebuild tasks."
+            )
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+
+    rubric_mapping = load_rubric_mapping(Path(__file__).parent / "rubric.csv")
+
+    dataset = load_dataset("kilian-group/supercon-mini", name=args.task, split="test")
+    grouped = group_rows(cast(Iterable[dict[str, Any]], dataset))
+
+    refnos = list(grouped.keys())
+    if args.refno:
+        requested = {value.strip() for value in args.refno if value and value.strip()}
+        missing = sorted(requested - set(refnos))
+        if missing:
+            raise ValueError(f"Unknown refno(s) requested: {missing}")
+        refnos = [refno for refno in refnos if refno in requested]
+    if args.limit is not None:
+        refnos = refnos[: args.limit]
+
+    for refno in refnos:
+        pdf_path = args.pdf_dir / f"{refno}.pdf"
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"Missing PDF for refno {refno} at {pdf_path}")
+
+        task_id = f"{slugify(refno)}--{slugify(args.task)}"
+        task_dir = tasks_dir / task_id
+        task_dir.mkdir(parents=True, exist_ok=True)
+
+        build_task(
+            task_dir,
+            pdf_path=pdf_path,
+            task_name=args.task,
+            refno=refno,
+            rows=grouped[refno],
+            rubric_mapping=rubric_mapping,
+            include_text=(args.paper_mode == "easy"),
+        )
+        print(f"Wrote task {task_id} -> {task_dir.relative_to(repo_root())}")
+
+    if args.write_job_config:
+        job_path = task_root / "job.yaml"
+        write_job_config(tasks_dir, job_path)
+        print(f"Wrote job config -> {job_path.relative_to(repo_root())}")
+
+
+if __name__ == "__main__":
+    main()

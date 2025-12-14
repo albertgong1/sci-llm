@@ -1,0 +1,213 @@
+"""Build and smoke-test Harbor tasks with Gemini and CC agents.
+
+This script is a local verification that:
+1) Task "compilation" (casual use of the word) works for both modes:
+   - easy: includes `/app/paper.txt` (pre-extracted)
+   - hard: PDF-only (no pre-transcription)
+2) Harbor can run a single task with different agents (ex. `gemini-cli` orc`claude-code`).
+
+Secrets:
+  - Gemini: set `GOOGLE_API_KEY=...` in the repo root `.env`
+  - Claude Code: set `ANTHROPIC_API_KEY=...` or `CLAUDE_CODE_OAUTH_TOKEN=...` in `.env`
+
+Example:
+  uv run python examples/containerized-extraction/smoke_harbor.py --task tc --refno PR05001178
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def repo_root() -> Path:
+    """Return the repository root directory."""
+    return Path(__file__).resolve().parents[2]
+
+
+def _parse_dotenv(path: Path) -> dict[str, str]:
+    """Parse a minimal `.env` file."""
+    if not path.exists():
+        return {}
+
+    env: dict[str, str] = {}
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+
+        if value and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        else:
+            if " #" in value:
+                value = value.split(" #", 1)[0].rstrip()
+
+        env[key] = value
+
+    return env
+
+
+def _run(command: list[str]) -> None:
+    subprocess.run(command, check=True, cwd=repo_root())
+
+def slugify(value: str) -> str:
+    """Normalize strings for file-safe task IDs (mirrors the compiler)."""
+    return (
+        value.lower()
+        .replace(" ", "-")
+        .replace("/", "-")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
+def build_tasks(*, task: str, paper_mode: str, refno: str | None, force: bool) -> Path:
+    """Compile tasks and return the tasks directory path."""
+    compiler = repo_root() / "examples" / "containerized-extraction" / "prepare_harbor_tasks.py"
+    out_dir = repo_root() / "out" / "harbor" / "supercon-mini"
+    task_root = out_dir / task / paper_mode
+    tasks_dir = task_root / "tasks"
+
+    if tasks_dir.exists() and any(tasks_dir.iterdir()) and not force:
+        return tasks_dir
+
+    cmd = [
+        sys.executable,
+        str(compiler),
+        "--task",
+        task,
+        "--paper-mode",
+        paper_mode,
+        "--output-dir",
+        str(out_dir),
+        "--write-job-config",
+    ]
+    if refno:
+        cmd.extend(["--refno", refno])
+    if force:
+        cmd.append("--force")
+
+    _run(cmd)
+    return tasks_dir
+
+
+def run_trial(*, task_path: Path, agent: str, model: str | None) -> None:
+    """Run a Harbor trial for a single local task directory."""
+    runner = repo_root() / "examples" / "containerized-extraction" / "run_harbor.py"
+
+    cmd = [
+        sys.executable,
+        str(runner),
+        "trials",
+        "start",
+        "-p",
+        str(task_path),
+        "-a",
+        agent,
+    ]
+    if model:
+        cmd.extend(["-m", model])
+    _run(cmd)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Smoke test Harbor task variants + agents.")
+    parser.add_argument("--task", default="tc", help="HF config name (e.g. tc, rawmat, ...).")
+    parser.add_argument(
+        "--refno",
+        default="PR05001178",
+        help="Which refno to test (must exist in PDFs + HF split).",
+    )
+    parser.add_argument(
+        "--paper-modes",
+        default="easy,hard",
+        help="Comma-separated list: easy,hard (default: easy,hard).",
+    )
+    parser.add_argument(
+        "--agents",
+        default="gemini-cli,claude-code",
+        help="Comma-separated list: gemini-cli,claude-code,oracle,... (default: gemini-cli,claude-code).",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default="gemini/gemini-2.5-flash",
+        help="Model for gemini-cli (must be provider/model).",
+    )
+    parser.add_argument(
+        "--claude-model",
+        default=None,
+        help="Optional model for claude-code (provider/model). If omitted, uses Claude Code defaults.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Rebuild the generated task directories.",
+    )
+    args = parser.parse_args()
+
+    dotenv = _parse_dotenv(repo_root() / ".env")
+    merged_env = {**dotenv, **os.environ}
+
+    paper_modes = [m.strip() for m in str(args.paper_modes).split(",") if m.strip()]
+    agents = [a.strip() for a in str(args.agents).split(",") if a.strip()]
+
+    for paper_mode in paper_modes:
+        if paper_mode not in {"easy", "hard"}:
+            raise ValueError(f"Unknown paper mode: {paper_mode}")
+
+        tasks_dir = build_tasks(
+            task=str(args.task),
+            paper_mode=paper_mode,
+            refno=str(args.refno) if args.refno else None,
+            force=bool(args.force),
+        )
+        task_id = f"{slugify(str(args.refno))}--{slugify(str(args.task))}"
+        task_path = tasks_dir / task_id
+        if not task_path.exists():
+            raise FileNotFoundError(f"Expected task directory missing: {task_path}")
+
+        for agent in agents:
+            if agent == "gemini-cli":
+                if not (merged_env.get("GOOGLE_API_KEY") or merged_env.get("GEMINI_API_KEY")):
+                    print("Skipping gemini-cli: missing GOOGLE_API_KEY/GEMINI_API_KEY in env/.env")
+                    continue
+                run_trial(task_path=task_path, agent=agent, model=str(args.gemini_model))
+                continue
+
+            if agent == "claude-code":
+                if not (
+                    merged_env.get("ANTHROPIC_API_KEY")
+                    or merged_env.get("CLAUDE_CODE_OAUTH_TOKEN")
+                    or merged_env.get("CLAUDE_API_KEY")
+                    or merged_env.get("CLAUDE_CODE_TOKEN")
+                    or merged_env.get("CLAUDE_CODE_API_TOKEN")
+                ):
+                    print(
+                        "Skipping claude-code: missing ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in env/.env"
+                    )
+                    continue
+                run_trial(task_path=task_path, agent=agent, model=args.claude_model)
+                continue
+
+            run_trial(task_path=task_path, agent=agent, model=None)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

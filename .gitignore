@@ -228,3 +228,7 @@ arxiv/credentials.json
 arxiv/token.json
 
 *jobs*/
+# Harbor related
+out/
+jobs/
+trials/

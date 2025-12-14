@@ -1,0 +1,38 @@
+{paper_at_command}
+
+You are given the following paper (refno: {refno}).
+
+{paper_context}
+
+Task metadata (structured questions): {meta_path}
+
+Agent tips:
+- Gemini CLI supports At commands, e.g. {gemini_at_commands}
+- Claude Code can read files from disk (e.g. {claude_file_examples}) or use terminal tools.
+
+You will be provided questions about extracting a material property from the paper.
+Your task is to provide an answer according to these instructions:
+- Identify the material by its chemical formula or name
+- Locate the property name, value, and unit in the text
+- Ensure the property value corresponds to the correct material
+- Extract exact values as they appear in the paper
+- If a property is not found, set `pred_value` to `NOT_FOUND` and `pred_unit` to `N/A`
+- DO NOT include any additional information beyond the requested format.
+
+Output format:
+- Produce a JSON array (no prose) with one entry per question, in the same order as listed:
+
+[
+  {{"material": "...", "property_name": "...", "pred_value": "...", "pred_unit": "..."}},
+  ...
+]
+
+Print ONLY this JSON array as your final response. If you can write to disk, also save
+it to {predictions_path} with the same structure.
+
+Questions:
+{question_blocks}
+
+Important:
+- Some papers may contain multiple rows with the same material + property_name but different values.
+  Do NOT deduplicate; output one JSON entry per question, in order.

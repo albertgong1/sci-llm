@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sci-llm"
 description = ""
 version = "0.0.0"
+requires-python = ">=3.12"
 authors = [
     {name="Albert Gong", email="agong@cs.cornell.edu"},
 ]
@@ -21,10 +22,12 @@ dependencies = [
     "pdfplumber",
     "langchain",
     "pymatgen",
+    "google-genai>=1.55.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "harbor>=0.1.23",
     "pre-commit",
 ]
 
