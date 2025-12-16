@@ -21,10 +21,12 @@ dependencies = [
     "datasets",
     "pdfplumber",
     "langchain",
-    "pymatgen",
     "pandas",
-    "google-genai",
+    "pydantic",
+    "pymatgen",
     "tqdm",
+    "google-genai",
+    "openai",
 ]
 
 [dependency-groups]
