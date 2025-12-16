@@ -1,0 +1,442 @@
+paper,material,property_name,property_value,property_unit,definition
+Paper_DB/Paper_1.pdf,Ru7B3,common formula of materials,Ru7B3,,common formula of materials
+Paper_DB/Paper_1.pdf,Ru7B3,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_1.pdf,Ru7B3,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_1.pdf,Ru7B3,common name of structure,Th7Fe3,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_1.pdf,Ru7B3,space group,P6<3>mc,,space group
+Paper_DB/Paper_1.pdf,Ru7B3,international table number,186,,"The number assigned to a space group, found in the International Tables for Crystallography, which defines the symmetry of a crystal structure."
+Paper_DB/Paper_1.pdf,Ru7B3,lattice constant a,7.441,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_1.pdf,Ru7B3,lattice constant c,4.7,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_1.pdf,Ru7B3,Tc from susceptibility measurement,2.8,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_1.pdf,Ru7B3,Tc from susceptibility measurement,3.3,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_1.pdf,Ru7B3,Tc (of this sample) recommended,2.8,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_1.pdf,Ru7B3,Tc (of this sample) recommended,3.3,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_1.pdf,Ru7B3,method of Hc1 derivation,linear M-H curve,Oe,"method of Hc1 derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_1.pdf,Ru7B3,Hc1 at 0 K for single crystal for H //ab-plane,53,Oe,Hc1 at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_1.pdf,Ru7B3,Hc1 at 0 K for single crystal for H //c-axis,68,Oe,Hc1 at 0 K for single crystal for H //c-axis
+Paper_DB/Paper_1.pdf,Ru7B3,method of Hc2 derivation,SP-heat,T,method of Hc2 derivation
+Paper_DB/Paper_1.pdf,Ru7B3,Hc2 at 0 K for single crystal for H //ab-plane,1.72,T,Hc2 at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_1.pdf,Ru7B3,Hc2 at 0 K for single crystal for H //c-axis,1.58,T,Hc2 at 0 K for single crystal for H //c-axis
+Paper_DB/Paper_1.pdf,Ru7B3,method of dHc2/dT derivation,SP-heat,T/K,"method of dHc2/dT derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_1.pdf,Ru7B3,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,0.782,T/K,-slope in Hc2 vs T at Tc for single crystal for H //ab plane
+Paper_DB/Paper_1.pdf,Ru7B3,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,0.707,T/K,-slope in Hc2 vs T at Tc for single crystal for H //c-axis
+Paper_DB/Paper_1.pdf,Ru7B3,method of COHERE derivation,from Hc2,A,The technique used to determine the superconducting coherence length.
+Paper_DB/Paper_1.pdf,Ru7B3,coherence length at 0 K for single crystal for H //ab-plane,138,A,coherence length at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_1.pdf,Ru7B3,coherence length at 0 K for single crystal for H ⊥ab-plane,144,A,"The characteristic size of a Cooper pair or the spatial scale over which the superconducting order parameter varies at zero temperature, measured for a single crystal with the magnetic field applied perpendicular to the ab-plane."
+Paper_DB/Paper_1.pdf,Ru7B3,method of PENET derivation,"G-L theory, Hc(0)",A,The technique used to measure the penetration depth of a superconductor.
+Paper_DB/Paper_1.pdf,Ru7B3,penetration depth at 0 K for single crystal for H //ab-plane,3520,A,penetration depth at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_1.pdf,Ru7B3,penetration depth at 0 K for single crystal for H⊥ab-plane,3110,A,"The magnetic field penetration distance in a single crystal superconductor at zero temperature, measured with the field perpendicular to the ab-plane, reflecting the superfluid density along the c-axis."
+Paper_DB/Paper_1.pdf,Ru7B3,"energy gap at 0 K , delta(0)",0.38,meV,"The minimum energy, denoted as $\Delta(0)$, required to break an electronic pair into two individual quasi-particles in a superconductor at absolute zero (0K)."
+Paper_DB/Paper_1.pdf,Ru7B3,"normarized energy gap at 0 K , 2delta(0)/kTc",3.3,meV,"normarized energy gap at 0 K , 2delta(0)/kTc"
+Paper_DB/Paper_1.pdf,Ru7B3,method of measuring energy gap,14,meV,"Experimental techniques used to determine the gap energy in superconductors, including tunneling, infrared spectroscopy, thermal conductivity, Raman spectroscopy, AC susceptibility, nuclear magnetic resonance, surface impedance, neutron diffraction, ultraviolet photoemission spectroscopy, and microwave transmission."
+Paper_DB/Paper_1.pdf,Ru7B3,coefficient of electronic specific heat,43.7,mJ/mol.K2,coefficient of electronic specific heat
+Paper_DB/Paper_1.pdf,Ru7B3,Debye temperature,640,,Debye temperature
+Paper_DB/Paper_1.pdf,Ru7B3,method for derivation of Debye temperature,SP-heat,,method for derivation of Debye temperature
+Paper_DB/Paper_1.pdf,Ru7B3,resistivity at 4.2 K for single crystal for J//ab-plane,0.014,mOhm.cm,Electrical resistivity measured at 4.2 Kelvin for a single-crystal material when the current density (J) flows parallel to the ab-plane of the crystal structure. This value typically represents the residual or normal-state resistivity just above the superconducting transition temperature.
+Paper_DB/Paper_1.pdf,Ru7B3,resistivity at 4.2 K for single crystal for J//c-axis,0.026,mOhm.cm,"The electrical resistivity of a single crystal, measured at 4.2 K, with the current density (J) directed parallel to the c-axis, used to study fundamental electronic transport properties at cryogenic temperatures."
+Paper_DB/Paper_1.pdf,Ru7B3,resistivity at RT for single crystal for J//ab-plane,0.055,mOhm.cm,"The electrical resistivity of a single-crystal material at room temperature (RT), measured with the current density (J) parallel to the crystal's ab-plane."
+Paper_DB/Paper_1.pdf,Ru7B3,resistivity at RT for single crystal for J//c-axis,0.097,mOhm.cm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,common formula of materials,"(Sr,Ca)14Cu24O41",,common formula of materials
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,common name of structure,LAD,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,lattice constant a,11.25,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,lattice constant b,12.43,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,lattice constant c,3.906,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,temperature dependence of LATA,-0.013,A/GPa,The variation of the lattice constant 'a' of a crystal structure with changes in temperature.
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,temperature dependence of LATB,-0.087,A/GPa,The change in the lattice constant along the 'b' direction of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr0.4Ca13.6Cu24O41,temperature dependence of LATC,-0.0075,A/GPa,The change in the lattice constant c of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,common formula of materials,"(Sr,Ba)14Cu24O41",,common formula of materials
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,common name of structure,LAD,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,lattice constant a,11.52,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,lattice constant b,13.8,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,lattice constant c,3.96,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,temperature dependence of LATA,-0.0113,A/GPa,The variation of the lattice constant 'a' of a crystal structure with changes in temperature.
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,temperature dependence of LATB,-0.125,A/GPa,The change in the lattice constant along the 'b' direction of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr10Ba4Cu24O41,temperature dependence of LATC,-0.00741,A/GPa,The change in the lattice constant c of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,lattice constant a,11.46,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,lattice constant b,13.4,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,lattice constant c,3.975,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,temperature dependence of LATA,-0.01,A/GPa,The variation of the lattice constant 'a' of a crystal structure with changes in temperature.
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,temperature dependence of LATB,-0.1,A/GPa,The change in the lattice constant along the 'b' direction of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr14Cu24O41,temperature dependence of LATC,-0.01,A/GPa,The change in the lattice constant c of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,lattice constant a,11.38,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,lattice constant b,13,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,lattice constant c,3.917,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,temperature dependence of LATA,-0.11,A/GPa,The variation of the lattice constant 'a' of a crystal structure with changes in temperature.
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,temperature dependence of LATB,-0.1,A/GPa,The change in the lattice constant along the 'b' direction of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr8Ca6Cu24O41,temperature dependence of LATC,-0.0069,A/GPa,The change in the lattice constant c of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,common formula of materials,"(Sr,Nd)14Cu24O41",,common formula of materials
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,common name of structure,LAD,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,lattice constant a,11.35,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,lattice constant b,13,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,lattice constant c,3.985,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,temperature dependence of LATA,-0.01,A/GPa,The variation of the lattice constant 'a' of a crystal structure with changes in temperature.
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,temperature dependence of LATB,-0.075,A/GPa,The change in the lattice constant along the 'b' direction of a crystal structure with respect to temperature.
+Paper_DB/Paper_10.pdf,Sr8Nd6Cu24O41,temperature dependence of LATC,-0.0075,A/GPa,The change in the lattice constant c of a crystal structure with respect to temperature.
+Paper_DB/Paper_11.pdf,La1Ru2P2,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_11.pdf,La1Ru2P2,space group,I4/mmm,,space group
+Paper_DB/Paper_11.pdf,La1Ru2P2,lattice constant c,10.67,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_11.pdf,La1Ru2P2,transition temperature (mid point),3.7,,The critical temperature ($T_c$) of a superconductor measured as the temperature at which the electrical resistivity (R) reaches 50% of its normal-state value during the transition to the superconducting state.
+Paper_DB/Paper_11.pdf,La1Ru2P2,transition width for resistive transition,0.1,K,The temperature range where a superconductor's electrical resistivity drops from 90% to 10% during the transition to the superconducting state.
+Paper_DB/Paper_11.pdf,La1Ru2P2,Tc (of this sample) recommended,3.7,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_11.pdf,La1Ru2P2,volume fraction of Meissner effect(%),80,,"volume fraction of Meissner effect, unit=%"
+Paper_DB/Paper_11.pdf,La1Ru2P2,method of Hc1 derivation,"M-H curve, linear approx.",Oe,"method of Hc1 derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_11.pdf,La1Ru2P2,Hc1 at 0 K for single crystal for H //ab-plane,230,Oe,Hc1 at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_11.pdf,La1Ru2P2,Hc1 at given temperature for single crystal H//ab-plane,114,Oe,Hc1 at given temperature for single crystal H//ab-plane
+Paper_DB/Paper_11.pdf,La1Ru2P2,Hc1 at given temperature for single crystal H//c-axis,100,Oe,Hc1 at given temperature for single crystal H//c-axis
+Paper_DB/Paper_11.pdf,La1Ru2P2,measuring temperature,1.8,,measuring temperature
+Paper_DB/Paper_11.pdf,La1Ru2P2,method of Hc2 derivation,"RES, R=0.5Rn, WHH",Oe,method of Hc2 derivation
+Paper_DB/Paper_11.pdf,La1Ru2P2,Hc2 at 0 K for single crystal for H //ab-plane,1140,Oe,Hc2 at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_11.pdf,La1Ru2P2,Hc2 at 0 K for single crystal for H //c-axis,1140,Oe,Hc2 at 0 K for single crystal for H //c-axis
+Paper_DB/Paper_11.pdf,La1Ru2P2,method of COHERE derivation,from Hc2(0),A,The technique used to determine the superconducting coherence length.
+Paper_DB/Paper_11.pdf,La1Ru2P2,coherence length at 0 K for poly crystal,540,A,coherence length at 0 K for poly crystal
+Paper_DB/Paper_11.pdf,La1Ru2P2,method of PENET derivation,from Hc1(T),A,The technique used to measure the penetration depth of a superconductor.
+Paper_DB/Paper_11.pdf,La1Ru2P2,penetration depth at 0 K for poly crystal,800,A,penetration depth at 0 K for poly crystal
+Paper_DB/Paper_11.pdf,La1Ru2P2,resistivity at normal-T for single crystal for J//ab-plane,8.9,uOhm.cm,"Electrical resistivity of a single crystal superconductor measured in the normal state (above $T_c$), with the current density (J) directed parallel to the crystallographic $ab$-plane."
+Paper_DB/Paper_11.pdf,La1Ru2P2,resistivity at RT for single crystal for J//ab-plane,110,uOhm.cm,"The electrical resistivity of a single-crystal material at room temperature (RT), measured with the current density (J) parallel to the crystal's ab-plane."
+Paper_DB/Paper_11.pdf,La1Ru2P2,carrier density at 300 K,3.00E+22,n/cm3,carrier density at 300K
+Paper_DB/Paper_11.pdf,La1Ru2P2,raw materials,"La,Ru,P",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,common formula of materials,Pb0.9Bi2Te3.8,,common formula of materials
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,"*crystal structure, symmetry",6,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,space group,R-3m,,space group
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,lattice constant a,4.42,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,lattice constant b,4.42,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,lattice constant c,41.57,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,*method of analysis for structure,1,,*method of analysis for structure (1.X-ray crystallography 2.Neutron　crystallography 3.Powder x-ray diffraction 4.Powder neutron diffraction　5.Electron diffraction）
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,Tc (of this sample) recommended,7.9,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,tc measurement method,1,K,"A technique used to determine the superconducting critical temperature ($T_c$), categorized by methods such as: 1. magnetization, 2. AC susceptibility, 3. resistivity, 4. heat capacity, 5. tunneling, 6. infrared spectroscopy, 7. thermal conductivity, 8. Raman spectroscopy, 9. nuclear magnetic resonance, 10. surface impedance, 11. neutron diffraction, 12. photoemission spectroscopy, 13. microwave transmission, or 14. others."
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,maximum pressure applied,50.8,,The highest pressure applied to a sample in an experiment.
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,method of Hc2 derivation,resistivity,T,method of Hc2 derivation
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,Hc2 at 0 K for poly crystal,5.8,T,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,Hc2 at 0 K for single crystal for H //ab-plane,21.7,T,Hc2 at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,Hc2 at given temperature for single crystal H//ab-plane,0,T,Hc2 at given temperature for single crystal H//ab-plane
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,thermal conductivity at 300 K,1.54,W/K.m,"The material's ability to conduct heat, measured at a temperature of 300 Kelvin."
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,thermopower at 300 K for parallel to ab-plane,100,microW/mK2,thermopower at 300K for parallel to ab-plane
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,raw materials,PbBi2Te4,,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_12.pdf,Pb0.9Bi2Te3.8,*preparation method,9,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,common formula of materials,YBa2Cu3O7-d,,common formula of materials
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,shape,5,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,transition temperature (R = 100%),90.4,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,transition temperature (R = 100%),90.3,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,Tc (of this sample) recommended,90.4,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,Tc (of this sample) recommended,90.3,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,method of COHERE derivation,Determined from Microwave Data.,A,The technique used to determine the superconducting coherence length.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,coherence length at 0 K for poly crystal,20,A,coherence length at 0 K for poly crystal
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,method of PENET derivation,Determined from Microwave Data.,A,The technique used to measure the penetration depth of a superconductor.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,method of PENET derivation,Determined from Microwave Data,A,The technique used to measure the penetration depth of a superconductor.
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,penetration depth at 0 K for poly crystal,1700,A,penetration depth at 0 K for poly crystal
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,"Jc at 4.2 K, H = 0 T",12000000,,"Jc at 4.2K, H=0 T"
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,"Jc at 4.2 K, H = 0 T",2700000,,"Jc at 4.2K, H=0 T"
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,resistivity at 4.2 K for poly crystal,4.22,mic.ohm.cm,resistivity at 4.2K for poly crystal
+Paper_DB/Paper_13.pdf,Y1Ba2Cu3O7-d,*preparation method,16,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,common formula of materials,YBa2Cu3O6.92,,common formula of materials
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,transition temperature (R = 100%),90,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,Tc (of this sample) recommended,90,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,resistivity at normal-T for single crystal for J//ab-plane,0.03,m.ohm.cm,"Electrical resistivity of a single crystal superconductor measured in the normal state (above $T_c$), with the current density (J) directed parallel to the crystallographic $ab$-plane."
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,"Hall coefficient at 300 K for single, H//c-axis",3.00E-10,m3/C,"The Hall coefficient measured at 300 K for a single-crystal material, specifically indicating the response of free charge carriers to a magnetic field applied parallel to the c-axis."
+Paper_DB/Paper_14.pdf,Y1Ba2Cu3O6.92,"Hall coefficient at 300 K for single, H//ab-plane",-3.00E-10,m3/C,"The measure of how free charge carriers in a single-crystal material respond to a magnetic field applied parallel to the ab-plane, specifically measured at 300 K."
+Paper_DB/Paper_15.pdf,La1.28Nd0.6Sr0.12Cu1O4,common formula of materials,"(La,Nd,Sr)2CuO4",,common formula of materials
+Paper_DB/Paper_15.pdf,La1.28Nd0.6Sr0.12Cu1O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La1.28Nd0.6Sr0.12Cu1O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La1.68Eu0.2Sr0.12Cu1O4,common formula of materials,"(La,Eu,Sr)2CuO4",,common formula of materials
+Paper_DB/Paper_15.pdf,La1.68Eu0.2Sr0.12Cu1O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La1.68Eu0.2Sr0.12Cu1O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La1.96Sr0.04Cu1O4,thermal conductivity at 300 K for heat flow//c-axis,2.37,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La1.96Sr0.04Cu1O4,thermal conductivity at 300 K for heat flow//ab-plane,3.88,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La1.98Sr0.02Cu1O4,common formula of materials,"(La,Sr)2CuO4",,common formula of materials
+Paper_DB/Paper_15.pdf,La1.98Sr0.02Cu1O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La1.98Sr0.02Cu1O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La1.98Sr0.02Cu1O4,thermal conductivity at 300 K for heat flow//c-axis,2.37,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La1.98Sr0.02Cu1O4,thermal conductivity at 300 K for heat flow//ab-plane,4.32,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La1.99Sr0.01Cu1O4,Neel temperature,242,,Neel temperature
+Paper_DB/Paper_15.pdf,La1.99Sr0.01Cu1O4,thermal conductivity at 300 K for heat flow//c-axis,2.37,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La1.99Sr0.01Cu1O4,thermal conductivity at 300 K for heat flow//ab-plane,5.79,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La2Cu0.96Zn0.04O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La2Cu0.96Zn0.04O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La2Cu0.96Zn0.04O4,thermal conductivity at 300 K for heat flow//c-axis,2.27,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La2Cu0.96Zn0.04O4,thermal conductivity at 300 K for heat flow//ab-plane,5.61,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La2Cu0.98Zn0.02O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La2Cu0.98Zn0.02O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La2Cu0.98Zn0.02O4,thermal conductivity at 300 K for heat flow//c-axis,2.17,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La2Cu0.98Zn0.02O4,thermal conductivity at 300 K for heat flow//ab-plane,7.84,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La2Cu0.99Zn0.01O4,common formula of materials,"La2(Cu,Zn)O4",,common formula of materials
+Paper_DB/Paper_15.pdf,La2Cu0.99Zn0.01O4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_15.pdf,La2Cu0.99Zn0.01O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_15.pdf,La2Cu0.99Zn0.01O4,thermal conductivity at 300 K for heat flow//c-axis,2.17,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La2Cu0.99Zn0.01O4,thermal conductivity at 300 K for heat flow//ab-plane,9.06,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_15.pdf,La2Cu1O4,Neel temperature,306,,Neel temperature
+Paper_DB/Paper_15.pdf,La2Cu1O4,thermal conductivity at 300 K for heat flow//c-axis,2.69,W/m.K,thermal conductivity at 300K for heat flow//c-axis
+Paper_DB/Paper_15.pdf,La2Cu1O4,thermal conductivity at 300 K for heat flow//ab-plane,13.74,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+Paper_DB/Paper_2.pdf,Ir1Sn4,common formula of materials,beta-IrSn4,,common formula of materials
+Paper_DB/Paper_2.pdf,Ir1Sn4,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_2.pdf,Ir1Sn4,common name of structure,MoSn4,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_2.pdf,Ir1Sn4,space group,I4<1>/acd,,space group
+Paper_DB/Paper_2.pdf,Ir1Sn4,lattice constant a,6.308,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_2.pdf,Ir1Sn4,lattice constant c,22.739,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_2.pdf,Ir1Sn4,transition temperature (R = 0),0.84,,The temperature below which a superconductor exhibits zero electrical resistivity ($R=0$).
+Paper_DB/Paper_2.pdf,Ir1Sn4,transition temperature (mid point),0.93,,The critical temperature ($T_c$) of a superconductor measured as the temperature at which the electrical resistivity (R) reaches 50% of its normal-state value during the transition to the superconducting state.
+Paper_DB/Paper_2.pdf,Ir1Sn4,transition temperature (R = 100%),1,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_2.pdf,Ir1Sn4,Tc from susceptibility measurement,0.9,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_2.pdf,Ir1Sn4,transition width for resistive transition,0.15,K,The temperature range where a superconductor's electrical resistivity drops from 90% to 10% during the transition to the superconducting state.
+Paper_DB/Paper_2.pdf,Ir1Sn4,Tc (of this sample) recommended,0.93,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of Hc1 derivation,M-H curve,mT,"method of Hc1 derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_2.pdf,Ir1Sn4,Hc1 at given temperature for poly crystal,3,mT,Hc1 at given temperature for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,measuring temperature,0.5,,measuring temperature
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of Hc2 derivation,"RES, WHH",mT,method of Hc2 derivation
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of Hc2 derivation,"SP,RES,WHH",mT,method of Hc2 derivation
+Paper_DB/Paper_2.pdf,Ir1Sn4,Hc2 at 0 K for poly crystal,8,mT,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,Hc2 at 0 K for poly crystal,8.1,mT,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,Hc2 at given temperature for poly crystal,6.8,mT,Hc2 at given temperature for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,measuring temperature,0.15,,measuring temperature
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of dHc2/dT derivation,"RES,SP",mT/K,"method of dHc2/dT derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_2.pdf,Ir1Sn4,#NAME?,9.83,mT/K,"The negative derivative of the upper critical magnetic field ($H_{c2}$) with respect to temperature ($T$) evaluated at the superconducting transition temperature ($T_c$), representing how rapidly $H_{c2}$ decreases with increasing temperature near $T_c$ in a polycrystalline sample."
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of COHERE derivation,"Hc2, spherical Fermi surface model",A,The technique used to determine the superconducting coherence length.
+Paper_DB/Paper_2.pdf,Ir1Sn4,coherence length at 0 K for poly crystal,1930,A,coherence length at 0 K for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of PENET derivation,"Hc2, spherical Fermi surface model",A,The technique used to measure the penetration depth of a superconductor.
+Paper_DB/Paper_2.pdf,Ir1Sn4,penetration depth at 0 K for poly crystal,1150,A,penetration depth at 0 K for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,"normarized energy gap at 0 K , 2delta(0)/kTc",3.55,,"normarized energy gap at 0 K , 2delta(0)/kTc"
+Paper_DB/Paper_2.pdf,Ir1Sn4,method of measuring energy gap,14,,"Experimental techniques used to determine the gap energy in superconductors, including tunneling, infrared spectroscopy, thermal conductivity, Raman spectroscopy, AC susceptibility, nuclear magnetic resonance, surface impedance, neutron diffraction, ultraviolet photoemission spectroscopy, and microwave transmission."
+Paper_DB/Paper_2.pdf,Ir1Sn4,coefficient of electronic specific heat,5.2,mJ/mol.K2,coefficient of electronic specific heat
+Paper_DB/Paper_2.pdf,Ir1Sn4,Debye temperature,221,,Debye temperature
+Paper_DB/Paper_2.pdf,Ir1Sn4,method for derivation of Debye temperature,SP,,method for derivation of Debye temperature
+Paper_DB/Paper_2.pdf,Ir1Sn4,resistivity at normal-T for poly crystal,3,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,resistivity at RT for poly crystal,80,uOhm.cm,resistivity at RT for poly crystal
+Paper_DB/Paper_2.pdf,Ir1Sn4,Hall coefficient at 300 K,8.95E-10,m3/C,Hall coefficient at 300K
+Paper_DB/Paper_2.pdf,Ir1Sn4,"Hall coefficient for single, H//c-axis",8.95E-10,,"The Hall coefficient specifically measured in a single crystal material where the applied magnetic field (H) is oriented parallel to the crystallographic c-axis, quantifying the response of free charge carriers to the magnetic field in this configuration."
+Paper_DB/Paper_2.pdf,Ir1Sn4,carrier density at 300 K,6.98E+27,n/m3,carrier density at 300K
+Paper_DB/Paper_2.pdf,Ir1Sn4,raw materials,"Ir(4N),Sn(5N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_3.pdf,Mo2C1,common formula of materials,Mo2C,,common formula of materials
+Paper_DB/Paper_3.pdf,Mo2C1,shape,3,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_3.pdf,Mo2C1,"*crystal structure, symmetry",1,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+Paper_DB/Paper_3.pdf,Mo2C1,common name of structure,orthrhombic,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_3.pdf,Mo2C1,lattice constant a,4.77,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_3.pdf,Mo2C1,lattice constant b,5.98,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_3.pdf,Mo2C1,lattice constant c,5.21,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_3.pdf,Mo2C1,*method of analysis for structure,1,,*method of analysis for structure (1.X-ray crystallography 2.Neutron　crystallography 3.Powder x-ray diffraction 4.Powder neutron diffraction　5.Electron diffraction）
+Paper_DB/Paper_3.pdf,Mo2C1,transition temperature (R = 0),2.76,,The temperature below which a superconductor exhibits zero electrical resistivity ($R=0$).
+Paper_DB/Paper_3.pdf,Mo2C1,transition temperature (R = 100%),3.3,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_3.pdf,Mo2C1,Tc (of this sample) recommended,3.03,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_3.pdf,Mo2C1,tc measurement method,3,K,"A technique used to determine the superconducting critical temperature ($T_c$), categorized by methods such as: 1. magnetization, 2. AC susceptibility, 3. resistivity, 4. heat capacity, 5. tunneling, 6. infrared spectroscopy, 7. thermal conductivity, 8. Raman spectroscopy, 9. nuclear magnetic resonance, 10. surface impedance, 11. neutron diffraction, 12. photoemission spectroscopy, 13. microwave transmission, or 14. others."
+Paper_DB/Paper_3.pdf,Mo2C1,Hc2 at given temperature for single crystal H//ab-plane,8.35,T,Hc2 at given temperature for single crystal H//ab-plane
+Paper_DB/Paper_3.pdf,Mo2C1,Hc2 at given temperature for single crystal H//c-axis,0.327,T,Hc2 at given temperature for single crystal H//c-axis
+Paper_DB/Paper_3.pdf,Mo2C1,measuring temperature,1.8,,measuring temperature
+Paper_DB/Paper_3.pdf,Mo2C1,method of COHERE derivation,resistivity,,The technique used to determine the superconducting coherence length.
+Paper_DB/Paper_3.pdf,Mo2C1,coherence length at 0 K for single crystal for H ⊥ab-plane,22,,"The characteristic size of a Cooper pair or the spatial scale over which the superconducting order parameter varies at zero temperature, measured for a single crystal with the magnetic field applied perpendicular to the ab-plane."
+Paper_DB/Paper_3.pdf,Mo2C1,resistivity at normal-T for single crystal for J//ab-plane,4.85,ohm,"Electrical resistivity of a single crystal superconductor measured in the normal state (above $T_c$), with the current density (J) directed parallel to the crystallographic $ab$-plane."
+Paper_DB/Paper_3.pdf,Mo2C1,normal temperature,10,,"The temperature, typically room temperature, at which a material is in its normal state and does not exhibit superconductivity."
+Paper_DB/Paper_3.pdf,Mo2C1,carrier density at 300 K,4.80E+16,cm-2,carrier density at 300K
+Paper_DB/Paper_3.pdf,Mo2C1,raw materials,"Mo, C",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_3.pdf,Mo2C1,*preparation method,18,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_3.pdf,Mo2C1,substrate,Mo foil,,The foundational material onto which a superconducting thin film is grown or deposited.
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,common formula of materials,HfPdSi,,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,temperature independent term in susceptibility,-0.000051,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,Curie constant,0.0000717,emu/mol,Curie constant
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,magnetic moment per formula,0.00482,myu-B/mol,magnetic moment per formula
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,Curie temperature,-1.23,,Curie temperature
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,density (gcm-3),10,,Density
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,"*crystal structure, symmetry",3,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,common name of structure,Co2Si,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,space group,Pnma,,space group
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,lattice constant a,6.57,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,lattice constant b,3.874,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,lattice constant c,7.565,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,lowest temperature for measurement (not superconducting),1.5,K,The minimum measured temperature for samples that do not exhibit superconductivity.
+Paper_DB/Paper_4.pdf,Hf1Pd1Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,common formula of materials,HfPtSi,,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,temperature independent term in susceptibility,-0.000133,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,Curie constant,0.000288,emu/mol,Curie constant
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,magnetic moment per formula,0.00482,myu-B/mol,magnetic moment per formula
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,Curie temperature,-1.82,,Curie temperature
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,density (gcm-3),13.98,,Density
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,"*crystal structure, symmetry",3,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,common name of structure,Co2Si,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,space group,Pnma,,space group
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,lattice constant a,6.549,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,lattice constant b,3.883,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,lattice constant c,7.506,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,lowest temperature for measurement (not superconducting),1.5,K,The minimum measured temperature for samples that do not exhibit superconductivity.
+Paper_DB/Paper_4.pdf,Hf1Pt1Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,common formula of materials,"Hf(Rh,Pd)Si",,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,temperature independent term in susceptibility,0.000113,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,lattice constant a,6.4897,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,lattice constant b,3.8756,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,lattice constant c,7.4606,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,Tc from susceptibility measurement,1.75,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,Tc (of this sample) recommended,1.75,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,resistivity at normal-T for poly crystal,901,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh0.7Pd0.3Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,common formula of materials,"Hf(Rh,Pd)Si",,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,temperature independent term in susceptibility,0.000122,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,lattice constant a,6.4984,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,lattice constant b,3.8938,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,lattice constant c,7.4598,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,Tc from susceptibility measurement,1.85,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,Tc (of this sample) recommended,1.85,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,resistivity at normal-T for poly crystal,392,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh0.8Pd0.2Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,common formula of materials,"Hf(Rh,Pd)Si",,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,temperature independent term in susceptibility,0.000127,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,lattice constant a,6.4851,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,lattice constant b,3.8985,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,lattice constant c,7.434,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,Tc from susceptibility measurement,1.95,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,Tc (of this sample) recommended,1.95,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,resistivity at normal-T for poly crystal,344,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh0.9Pd0.1Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,common formula of materials,HfPdSi,,common formula of materials
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,temperature independent term in susceptibility,0.00013,emu/mol,"The static magnetic susceptibility, $\chi(0)$, representing the term in susceptibility that is independent of temperature, often associated with Temperature Independent Paramagnetism (TIP)."
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,lattice constant a,6.4697,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,lattice constant b,3.8995,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,lattice constant c,7.4061,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,Tc from susceptibility measurement,2.18,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,Tc (of this sample) recommended,2.18,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,method of Hc1 derivation,"M-H curve, Linear approx.",Oe,"method of Hc1 derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,Hc1 at 0 K for poly crystal,57,Oe,Hc1 at 0 K for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,Hc1 at given temperature for poly crystal,10,Oe,Hc1 at given temperature for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,measuring temperature,1.7,,measuring temperature
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,method of Hc2 derivation,Linear approx.,T,method of Hc2 derivation
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,Hc2 at 0 K for poly crystal,0.54,T,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,resistivity at normal-T for poly crystal,67,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_4.pdf,Hf1Rh1Si1,raw materials,"Hf(3N),Si(6N),Pt(4N),Pd(3N)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,common formula of materials,"(La,Sr)2CuO4",,common formula of materials
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,Tc from susceptibility measurement,24.7,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,Tc (of this sample) recommended,24.7,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,"alpha in Tc = A * M^(-alpha), isotope effect",0.9,,"The exponent $\alpha$ relating the critical temperature ($T_c$) of a superconductor to the isotopic mass ($M$) as $T_c \propto M^{-\alpha}$, defining the magnitude of the isotope effect."
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,isotope element,O,,The element in a superconductor that is isotopically varied to measure the critical temperature change due to the isotope effect.
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,exchange ratio of isotope(%),85,,"The isotope shift coefficient ($\alpha$) quantifying the dependence of the superconducting transition temperature ($T_c$) on the atomic mass ($M$) of the constituent elements, where $T_c \propto M^{-\alpha}$."
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,DTC = Tc - Tc0 for isotope element,2.6,,The change in superconducting critical temperature due to the presence of an isotope element.
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,volume fraction of Meissner effect(%),12.1,,"volume fraction of Meissner effect, unit=%"
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,raw materials,"La2O3,SrCO3,CuO",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_5.pdf,La1.885Sr0.115Cu1O4,*preparation method,1,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,common formula of materials,"(La,Sr)2CuO4",,common formula of materials
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,common name of structure,T,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,Tc from susceptibility measurement,26.3,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,Tc (of this sample) recommended,26.3,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,"alpha in Tc = A * M^(-alpha), isotope effect",0.5,,"The exponent $\alpha$ relating the critical temperature ($T_c$) of a superconductor to the isotopic mass ($M$) as $T_c \propto M^{-\alpha}$, defining the magnitude of the isotope effect."
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,isotope element,O,,The element in a superconductor that is isotopically varied to measure the critical temperature change due to the isotope effect.
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,exchange ratio of isotope(%),86,,"The isotope shift coefficient ($\alpha$) quantifying the dependence of the superconducting transition temperature ($T_c$) on the atomic mass ($M$) of the constituent elements, where $T_c \propto M^{-\alpha}$."
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,DTC = Tc - Tc0 for isotope element,1.5,,The change in superconducting critical temperature due to the presence of an isotope element.
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,volume fraction of Meissner effect(%),15.5,,"volume fraction of Meissner effect, unit=%"
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,raw materials,"La2O3,SrCO3,CuO",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_5.pdf,La1.895Sr0.105Cu1O4,*preparation method,1,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,Tc from susceptibility measurement,24.5,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,Tc (of this sample) recommended,24.5,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,"alpha in Tc = A * M^(-alpha), isotope effect",0.54,,"The exponent $\alpha$ relating the critical temperature ($T_c$) of a superconductor to the isotopic mass ($M$) as $T_c \propto M^{-\alpha}$, defining the magnitude of the isotope effect."
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,isotope element,O,,The element in a superconductor that is isotopically varied to measure the critical temperature change due to the isotope effect.
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,exchange ratio of isotope(%),90,,"The isotope shift coefficient ($\alpha$) quantifying the dependence of the superconducting transition temperature ($T_c$) on the atomic mass ($M$) of the constituent elements, where $T_c \propto M^{-\alpha}$."
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,DTC = Tc - Tc0 for isotope element,1.6,,The change in superconducting critical temperature due to the presence of an isotope element.
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,volume fraction of Meissner effect(%),14,,"volume fraction of Meissner effect, unit=%"
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,raw materials,"La2O3,SrCO3,CuO",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_5.pdf,La1.89Sr0.11Cu1O4,*preparation method,1,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,common formula of materials,"(Sr,Ca)14Cu24O41",,common formula of materials
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,common name of structure,LAD,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,lattice constant a,11.26,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,lattice constant b,12.426,A,"The length of the unit cell edge along the 'b' direction, which defines the crystal structure geometry in condensed matter materials like superconductors."
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,lattice constant c,27.38,A,"The length of the unit cell along the c-axis, critical to the crystal structure in condensed matter physics and superconductivity."
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,*method of analysis for structure,3,,*method of analysis for structure (1.X-ray crystallography 2.Neutron　crystallography 3.Powder x-ray diffraction 4.Powder neutron diffraction　5.Electron diffraction）
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,pressure dependence of LATA,0.08,%/GPa,The change in the lattice constant 'a' (a crystallographic dimension) of a material in response to applied external pressure.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,pressure dependence of LATB,0.73,%/GPa,The rate at which the lattice constant 'b' of a crystal structure changes in response to applied external pressure.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,pressure dependence of LATC,0.22,%/GPa,The change in the lattice constant 'c' (one of the unit cell dimensions) of a crystal structure in response to applied pressure.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,transition temperature (R = 100%),10,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,lowest temperature for measurement (not superconducting),0,K,The minimum measured temperature for samples that do not exhibit superconductivity.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,Tc (of this sample) recommended,10,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,resistivity at 77 K for poly crystal,0.033,ohm.cm,resistivity at 77K for poly crystal
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,resistivity at normal-T for poly crystal,0.033,ohm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,resistivity at RT for poly crystal,0.026,ohm.cm,resistivity at RT for poly crystal
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,raw materials,"SrCO3, CaCO3, CuO",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_6.pdf,Sr0.4Ca13.6Cu24O41+z,*preparation method,1,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,common formula of materials,TmBa2Cu3Oz,,common formula of materials
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,Neel temperature,35,,Neel temperature
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,Neel temperature,60,,Neel temperature
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,common name of structure,Y123,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at 77 K for single crystal for J//ab-plane,0.6,mohmcm,"The electrical resistivity of a single crystal measured at 77 Kelvin, with the current density (J) applied parallel to the crystal's ab-plane."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at 77 K for single crystal for J//ab-plane,0.4,mohmcm,"The electrical resistivity of a single crystal measured at 77 Kelvin, with the current density (J) applied parallel to the crystal's ab-plane."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at 77 K for single crystal for J//c-axis,1700,mohmcm,"Electrical resistivity of a single crystal at 77 K (liquid nitrogen temperature), measured with the current density (J) parallel to the crystallographic c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at 77 K for single crystal for J//c-axis,1280,mohmcm,"Electrical resistivity of a single crystal at 77 K (liquid nitrogen temperature), measured with the current density (J) parallel to the crystallographic c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at RT for single crystal for J//ab-plane,2,mohmcm,"The electrical resistivity of a single-crystal material at room temperature (RT), measured with the current density (J) parallel to the crystal's ab-plane."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at RT for single crystal for J//ab-plane,1.6,mohmcm,"The electrical resistivity of a single-crystal material at room temperature (RT), measured with the current density (J) parallel to the crystal's ab-plane."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at RT for single crystal for J//c-axis,1350,mohmcm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,resistivity at RT for single crystal for J//c-axis,650,mohmcm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.37,*preparation method,5,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,common formula of materials,TmBa2Cu3Oz,,common formula of materials
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,common name of structure,Y123,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,transition temperature (R = 100%),19,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,Tc (of this sample) recommended,19,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,resistivity at 77 K for single crystal for J//c-axis,1350,mohmcm,"Electrical resistivity of a single crystal at 77 K (liquid nitrogen temperature), measured with the current density (J) parallel to the crystallographic c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,resistivity at normal-T for single crystal for J//c-axis,1120,mohmcm,"Electrical resistivity of a single crystal above its critical temperature, measured with current density parallel to the c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,resistivity at RT for single crystal for J//c-axis,830,mohmcm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.41,*preparation method,5,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,common formula of materials,TmBa2Cu3Oz,,common formula of materials
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,common name of structure,Y123,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,transition temperature (R = 100%),28,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,Tc (of this sample) recommended,28,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,resistivity at 77 K for single crystal for J//c-axis,1030,mohmcm,"Electrical resistivity of a single crystal at 77 K (liquid nitrogen temperature), measured with the current density (J) parallel to the crystallographic c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,resistivity at normal-T for single crystal for J//c-axis,100,mohmcm,"Electrical resistivity of a single crystal above its critical temperature, measured with current density parallel to the c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,resistivity at RT for single crystal for J//c-axis,420,mohmcm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.44,*preparation method,5,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,common formula of materials,TmBa2Cu3Oz,,common formula of materials
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,common name of structure,Y123,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,transition temperature (R = 100%),50,,"The critical temperature ($T_c$) of a superconductor, measured at the onset of superconductivity (where electrical resistivity R = 100%)."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,Tc (of this sample) recommended,50,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,resistivity at 77 K for single crystal for J//c-axis,700,mohmcm,"Electrical resistivity of a single crystal at 77 K (liquid nitrogen temperature), measured with the current density (J) parallel to the crystallographic c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,resistivity at normal-T for single crystal for J//c-axis,750,mohmcm,"Electrical resistivity of a single crystal above its critical temperature, measured with current density parallel to the c-axis."
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,resistivity at RT for single crystal for J//c-axis,250,mohmcm,Electrical resistivity measured in a single crystal at room temperature (RT) with the current density (J) directed parallel to the crystallographic c-axis.
+Paper_DB/Paper_7.pdf,Tm1Ba2Cu3O6.49,*preparation method,5,,The specific technique or process used to create or synthesize the material sample.
+Paper_DB/Paper_8.pdf,Re24Ti5,shape,1,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_8.pdf,Re24Ti5,space group,I$[-]3m,,space group
+Paper_DB/Paper_8.pdf,Re24Ti5,international table number,217,,"The number assigned to a space group, found in the International Tables for Crystallography, which defines the symmetry of a crystal structure."
+Paper_DB/Paper_8.pdf,Re24Ti5,lattice constant a,9.6076,A,The crystallographic parameter 'a' defining the length of the unit cell along the 'a' direction.
+Paper_DB/Paper_8.pdf,Re24Ti5,Tc from susceptibility measurement,5.8,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_8.pdf,Re24Ti5,Tc (of this sample) recommended,5.8,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_8.pdf,Re24Ti5,volume fraction of Meissner effect(%),100,,"volume fraction of Meissner effect, unit=%"
+Paper_DB/Paper_8.pdf,Re24Ti5,method of Hc2 derivation,"SP(mid), WHH",T,method of Hc2 derivation
+Paper_DB/Paper_8.pdf,Re24Ti5,Hc2 at 0 K for poly crystal,10.75,T,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_8.pdf,Re24Ti5,"energy gap at 0 K , delta(0)",10.6,k<B>T,"The minimum energy, denoted as $\Delta(0)$, required to break an electronic pair into two individual quasi-particles in a superconductor at absolute zero (0K)."
+Paper_DB/Paper_8.pdf,Re24Ti5,"normarized energy gap at 0 K , 2delta(0)/kTc",3.68,k<B>T,"normarized energy gap at 0 K , 2delta(0)/kTc"
+Paper_DB/Paper_8.pdf,Re24Ti5,method of measuring energy gap,14,k<B>T,"Experimental techniques used to determine the gap energy in superconductors, including tunneling, infrared spectroscopy, thermal conductivity, Raman spectroscopy, AC susceptibility, nuclear magnetic resonance, surface impedance, neutron diffraction, ultraviolet photoemission spectroscopy, and microwave transmission."
+Paper_DB/Paper_8.pdf,Re24Ti5,specific heat jump at Tc (delta-C),1.51,gamma*Tc,specific heat jump at Tc (delta-C)
+Paper_DB/Paper_8.pdf,Re24Ti5,coefficient of electronic specific heat,111.8,mJ/mol.K2,coefficient of electronic specific heat
+Paper_DB/Paper_8.pdf,Re24Ti5,Debye temperature,428,,Debye temperature
+Paper_DB/Paper_8.pdf,Re24Ti5,method for derivation of Debye temperature,SP,,method for derivation of Debye temperature
+Paper_DB/Paper_8.pdf,Re24Ti5,thermal conductivity at 300 K,7.29,W/m.K,"The material's ability to conduct heat, measured at a temperature of 300 Kelvin."
+Paper_DB/Paper_8.pdf,Re24Ti5,thermopower at 300 K,10.1,uV/K,thermopower at 300K
+Paper_DB/Paper_8.pdf,Re24Ti5,resistivity at normal-T for poly crystal,214.8,uOhm.cm,resistivity at normal-T for poly crystal
+Paper_DB/Paper_8.pdf,Re24Ti5,resistivity at RT for poly crystal,279.2,uOhm.cm,resistivity at RT for poly crystal
+Paper_DB/Paper_8.pdf,Re24Ti5,raw materials,"Re(4N7),Ti(3N5)",,The foundational substances used for the synthesis of a specific superconducting material.
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,common formula of materials,Bi2Sr2CaCu2O8+y,,common formula of materials
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,shape,5,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,common name of structure,Bi2212,,"The conventional or informal name for a material's crystal structure, as commonly used within the condensed matter physics community, particularly as it relates to superconducting materials."
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,Tc from susceptibility measurement,90.4,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,Tc (of this sample) recommended,90.4,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,Hc2 at 0 K for poly crystal,158,T,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,method of dHc2/dT derivation,direct observation.,T/K,"method of dHc2/dT derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,#NAME?,2.5,T/K,"The negative derivative of the upper critical magnetic field ($H_{c2}$) with respect to temperature ($T$) evaluated at the superconducting transition temperature ($T_c$), representing how rapidly $H_{c2}$ decreases with increasing temperature near $T_c$ in a polycrystalline sample."
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,coherence length at 0 K for single crystal for H //ab-plane,14.2,A,coherence length at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,penetration depth at 0 K for single crystal for H //ab-plane,2630,A,penetration depth at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,"Jc at T = 77 K, H = 0 T",100000,,"Jc at T=77K,H=0T"
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,magnetic field for Hall effect,1,,magnetic field for Hall effect
+Paper_DB/Paper_9.pdf,Bi2Sr2Ca1Cu2O8+x,target material,Bi2212 composition,,The source material used for the synthesis of a superconducting material.
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,Tc from susceptibility measurement,93,K,"The critical temperature (Tc) of a superconductor as determined by the abrupt change in magnetic susceptibility, which signifies the onset of perfect diamagnetism and the superconducting state."
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,Tc (of this sample) recommended,93,K,The recommended superconducting critical temperature ($T_c$) specific to the sample.
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,Hc2 at 0 K for poly crystal,150,T,Hc2 at 0 K for poly crystal
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,method of dHc2/dT derivation,direct observation.,T/K,"method of dHc2/dT derivation (1.magnetization, 2.ac susceptibility, 3.resistivity, 4.heat capacity, 5.tunneling, 6.infrared spectroscopy, 7.thermal conductivity, 8.Raman spectroscopy , 9.nuclear magnetic resonance, 10.surface impedance, 11.neutron diffraction, 12.photoemission spectroscopy, 13.microwave transmission, 14.Others)"
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,#NAME?,2.4,T/K,"The negative derivative of the upper critical magnetic field ($H_{c2}$) with respect to temperature ($T$) evaluated at the superconducting transition temperature ($T_c$), representing how rapidly $H_{c2}$ decreases with increasing temperature near $T_c$ in a polycrystalline sample."
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,coherence length at 0 K for single crystal for H //ab-plane,14.5,A,coherence length at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,penetration depth at 0 K for single crystal for H //ab-plane,1170,A,penetration depth at 0 K for single crystal for H //ab plane
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,"Jc at T = 77 K, H = 0 T",500000,,"Jc at T=77K,H=0T"
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,magnetic field for Hall effect,1,,magnetic field for Hall effect
+Paper_DB/Paper_9.pdf,Y1Ba2Cu3O7-d,target material,stoichiometric YBCO,,The source material used for the synthesis of a superconducting material.
