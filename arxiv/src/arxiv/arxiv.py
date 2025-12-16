@@ -121,7 +121,9 @@ def get_arxiv_search_results_by_dois(
     _captcha_auth = captcha_auth
     success = 0
     pbar = tqdm(true_dois)
-    pbar.set_description(f"Looking for arxiv search results by DOI... found {success}: ")
+    pbar.set_description(
+        f"Looking for arxiv search results by DOI... found {success}: "
+    )
     for doi in pbar:
         while True:
             try:
@@ -135,7 +137,9 @@ def get_arxiv_search_results_by_dois(
                 # captcha expires every ~1,000 entries or so
                 print(f"Go to: https://arxiv.org/")
                 _captcha_auth = input("Recaptcha expired, enter value: ").strip()
-        pbar.set_description(f"Looking for arxiv search results by DOI... found {success}: ")
+        pbar.set_description(
+            f"Looking for arxiv search results by DOI... found {success}: "
+        )
     return results
 
 

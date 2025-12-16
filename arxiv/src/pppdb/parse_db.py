@@ -159,4 +159,3 @@ def get_pppdb_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str
     all_dois += df_cloud_points["doi"].tolist()
     all_dois = list(sorted(set([x for b in all_dois for x in b])))
     return df_chi, df_tg, df_cloud_points, all_dois
-
