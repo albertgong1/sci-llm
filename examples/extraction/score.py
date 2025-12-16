@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from utils import scorer_categorical, scorer_pymatgen, scorer_si
+from utils import scorer_categorical, scorer_pymatgen, scorer_si, scorer_space_group
 
 
 def parse_numeric_value(value: str) -> float | None:
@@ -77,6 +77,11 @@ def score_row(pred_value: str, answer_value: str, rubric: str) -> bool | None:
         if pd.isna(pred_value) or pd.isna(answer_value):
             return None
         return scorer_categorical(str(pred_value), str(answer_value))
+
+    elif rubric == "space_group":
+        if pd.isna(pred_value) or pd.isna(answer_value):
+            return None
+        return scorer_space_group(str(pred_value), str(answer_value))
     
     else:
         # Unknown rubric
