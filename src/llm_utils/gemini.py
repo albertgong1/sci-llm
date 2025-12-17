@@ -8,6 +8,7 @@ from google.genai import types as genai_types
 
 from llm_utils.common import (
     Conversation,
+    File,
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
@@ -32,19 +33,40 @@ class GeminiChat(LLMChat):
 
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
         """Convert conversation to Gemini's format.
+        https://ai.google.dev/gemini-api/docs/document-processing#large-pdfs
+
+        Requires:
+        - All files in the conversation must be uploaded before calling this method.
+
+        Examples of text and file messages:
+        ```
+        {
+            "role": "user",
+            "parts": ["Hello, how are you?"]
+        }
+        {
+            "role": "user",
+            "parts": [file.uploaded_handle]
+        }
+        ```
 
         Args:
             conv: The conversation to convert.
 
         Returns:
-            Messages in Gemini's format (role: "user" or "model", parts: [text]).
+            Messages in Gemini's format.
 
         """
         messages = []
         for msg in conv.messages:
             # Gemini uses "model" instead of "assistant"
             role = "model" if msg.role == "assistant" else msg.role
-            messages.append({"role": role, "parts": [{"text": msg.content}]})
+            if isinstance(msg.content, str):
+                messages.append({"role": role, "parts": [msg.content]})
+            elif isinstance(msg.content, File):
+                messages.append({"role": role, "parts": [msg.content.uploaded_handle]})
+            else:
+                raise ValueError(f"Invalid message content type: {type(msg.content)}")
         return messages
 
     def _call_api(
@@ -77,7 +99,7 @@ class GeminiChat(LLMChat):
 
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
-        if messages[0]["role"] == "system":
+        if messages and messages[0]["role"] == "system":
             gen_kwargs["system_instruction"] = messages[0]["parts"][0]["text"]
             messages = messages[1:]
 
@@ -117,3 +139,25 @@ class GeminiChat(LLMChat):
                 usage={},
                 error=str(e),
             )
+
+    def upload_file(self, file: File) -> None:
+        """Upload a file to Gemini.
+
+        Args:
+            file: File to upload.
+
+        """
+        if not file.is_uploaded():
+            file_handle = self.client.files.upload(file=file.path)
+            file.uploaded_handle = file_handle
+
+    def delete_file(self, file: File) -> None:
+        """Delete an uploaded file from Gemini.
+
+        Args:
+            file: The file to delete.
+
+        """
+        if file.is_uploaded():
+            self.client.files.delete(name=file.uploaded_handle.name)
+            file.uploaded_handle = None

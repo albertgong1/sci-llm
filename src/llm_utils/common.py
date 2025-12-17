@@ -1,6 +1,7 @@
 """Common utilities and base classes for LLM interactions."""
 
 import abc
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -24,11 +25,22 @@ class InferenceGenerationConfig(BaseModel):
     thinking_budget: int = Field(default=-1)
 
 
+class File(BaseModel):
+    """A file wrapper to interface with the LLM server."""
+
+    path: Path
+    uploaded_handle: Any | None = None
+
+    def is_uploaded(self) -> bool:
+        """Check if a file is uploaded to the LLM server."""
+        return self.uploaded_handle is not None
+
+
 class Message(BaseModel):
-    """A single message in a conversation."""
+    """A single message in a conversation. The content can be a text string or a file path."""
 
     role: Literal["user", "assistant", "system"]
-    content: str
+    content: str | File
 
 
 class Conversation(BaseModel):
@@ -41,8 +53,8 @@ class LLMChatResponse(BaseModel):
     """Response from an LLM chat completion."""
 
     pred: str
-    usage: dict[str, Any] = Field(default={})
-    error: str | None = None
+    usage: dict[str, Any]
+    error: str | None
 
 
 class LLMChat(abc.ABC):
@@ -72,9 +84,27 @@ class LLMChat(abc.ABC):
             The LLM's response.
 
         """
+        # Upload all files first
+        for msg in conv.messages:
+            if isinstance(msg.content, File):
+                self.upload_file(msg.content)
+
         messages = self._convert_conv_to_api_format(conv)
         response = self._call_api(messages, inf_gen_config)
         return self._parse_api_output(response)
+
+    @abc.abstractmethod
+    def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
+        """Convert conversation to server-specific format.
+
+        Args:
+            conv: The conversation to convert.
+
+        Returns:
+            Messages in server-specific format.
+
+        """
+        pass
 
     @abc.abstractmethod
     def _call_api(
@@ -107,16 +137,22 @@ class LLMChat(abc.ABC):
         """
         pass
 
-    def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
-        """Convert conversation to server-specific format.
-        The default implementation converts a conversation to a list of messages
-        of the form {"role": "user" | "assistant" | "system", "content": str}.
+    @abc.abstractmethod
+    def upload_file(self, file: File) -> None:
+        """Upload a file to the LLM server, if it does not already exist.
 
         Args:
-            conv: The conversation to convert.
-
-        Returns:
-            Messages in server-specific format.
+            file: File to upload.
 
         """
-        return [{"role": msg.role, "content": msg.content} for msg in conv.messages]
+        pass
+
+    @abc.abstractmethod
+    def delete_file(self, file: File) -> None:
+        """Delete an uploaded file from the LLM server, if it exists.
+
+        Args:
+            file: The file to delete.
+
+        """
+        pass

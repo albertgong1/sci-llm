@@ -6,6 +6,8 @@ from typing import Any
 from openai import OpenAI
 
 from llm_utils.common import (
+    Conversation,
+    File,
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
@@ -27,6 +29,47 @@ class OpenAIChat(LLMChat):
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
         self.client = OpenAI(api_key=api_key)
+
+    def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
+        f"""Convert conversation to OpenAI's Responses API format.
+        # https://platform.openai.com/docs/guides/pdf-files
+
+        Requires:
+        - All files in the conversation must be uploaded before calling this method.
+
+        Examples of text and file messages:
+        ```
+        {"role": "user",
+            "content": {"type": "input_text",
+                "text": "Hello, how are you?"
+            }
+        }
+        {"role": "user",
+            "content": {"type": "input_file",
+                "file_id": file.uploaded_handle.id
+            }
+        }
+        ```
+
+        Args:
+            conv: The conversation to convert.
+
+        Returns:
+            Messages in OpenAI's format.
+        """
+        messages = []
+        for msg in conv.messages:
+            if isinstance(msg.content, str):
+                content = {"type": "input_text", "text": msg.content}
+            elif isinstance(msg.content, File):
+                content = {
+                    "type": "input_file",
+                    "file_id": msg.content.uploaded_handle.id,
+                }
+            else:
+                raise ValueError(f"Invalid message content type: {type(msg.content)}")
+            messages.append({"role": msg.role, "content": content})
+        return messages
 
     def _call_api(
         self,
@@ -89,3 +132,26 @@ class OpenAIChat(LLMChat):
             return LLMChatResponse(pred=pred, usage=usage, error=None)
         except Exception as e:
             return LLMChatResponse(pred="", usage={}, error=str(e))
+
+    def upload_file(self, file: File) -> None:
+        """Upload a file to OpenAI server.
+
+        Args:
+            file: File to upload.
+
+        """
+        if not file.is_uploaded():
+            with open(file.path, "rb") as f:
+                file_handle = self.client.files.create(file=f, purpose="user_data")
+                file.uploaded_handle = file_handle
+
+    def delete_file(self, file: File) -> None:
+        """Delete an uploaded file from OpenAI server.
+
+        Args:
+            file: The file to delete.
+
+        """
+        if file.is_uploaded():
+            self.client.files.delete(file.uploaded_handle.id)
+            file.uploaded_handle = None
