@@ -137,13 +137,12 @@ class GeminiChat(LLMChat):
         """
         try:
             pred = response.text
-            usage = None
-            if hasattr(response, "usage_metadata"):
-                usage = {
-                    "prompt_tokens": response.usage_metadata.prompt_token_count,
-                    "completion_tokens": response.usage_metadata.candidates_token_count,
-                    "total_tokens": response.usage_metadata.total_token_count,
-                }
+            usage = {
+                "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "completion_tokens": response.usage_metadata.candidates_token_count,
+                "thinking_tokens": response.usage_metadata.thoughts_token_count,
+                "total_tokens": response.usage_metadata.total_token_count,
+            }
             return LLMChatResponse(pred=pred, usage=usage, error=None)
         except Exception as e:
             # Handle cases where Gemini refuses to generate

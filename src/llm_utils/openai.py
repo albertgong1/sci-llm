@@ -130,7 +130,11 @@ class OpenAIChat(LLMChat):
         """
         try:
             pred = response.output_text
-            usage = response.get("usage", {})
+            usage = {
+                "prompt_tokens": response.usage.input_tokens,
+                "completion_tokens": response.usage.output_tokens,
+                "total_tokens": response.usage.total_tokens,
+            }
             return LLMChatResponse(pred=pred, usage=usage, error=None)
         except Exception as e:
             return LLMChatResponse(pred="", usage={}, error=str(e))

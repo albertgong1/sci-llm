@@ -224,7 +224,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     assert args.task == "supercon", "Only supercon task is supported for now"
-    assert args.server == "gemini", "Only gemini server is supported for now"
 
     args.output_dir = Path(args.output_dir)
     args.output_task_dir: Path = args.output_dir / args.task
