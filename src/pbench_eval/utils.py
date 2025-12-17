@@ -1,6 +1,24 @@
 """Helper functions"""
 
+import logging
+
 from pymatgen.core import Composition
+
+
+def setup_logging(log_level: int = logging.INFO) -> None:
+    """Setup logging for the script.
+
+    Args:
+        log_level: Logging level (default: `logging.INFO`)
+
+    """
+    # Suppress logging from httpx
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 def normalize_formula(formula: str) -> str:

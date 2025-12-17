@@ -1,35 +1,35 @@
 #!/usr/bin/env -S uv run --env-file=.env -- python
 """Extract properties from PDF files using LLMs.
-Currently supported:
-- Properties from supercon
-- gemini LLM server
-
-This script processes a dataset of superconductor properties, extracts information
-from PDF papers using Google's Gemini API, and stores the results.
 
 Usage:
 ```bash
 ./src/pbench_eval/extract_properties.py \
-    --task supercon \
+    --domain supercon \
+    --task tc \
     --server gemini \
     --model_name gemini-2.5-flash \
     -od out/
 ```
 
-For this example, the results will be saved in `out/supercon/preds__model=gemini-2.5-flash.csv`.
+For this example, the results will be saved in `out/supercon/preds/*.json`.
 """
 
 import argparse
 import re
-import time
+import logging
+import math
 from pathlib import Path
+import json
 
 import pandas as pd
 from tqdm import tqdm
+from datasets import load_dataset
 
 import llm_utils
 from llm_utils.common import Conversation, File, LLMChatResponse, Message
-from pbench_eval import constants
+from pbench_eval import constants, utils
+
+logger = logging.getLogger(__name__)
 
 # Prompt template for property extraction
 # Use as PROMPT.format(material=material, property_name=property_name, definition=definition)
@@ -79,35 +79,30 @@ def process_paper(
     paper_path: Path,
     df_paper: pd.DataFrame,
     llm: llm_utils.LLMChat,
-) -> pd.DataFrame:
+    inf_gen_config: llm_utils.InferenceGenerationConfig,
+    batch_results: list,
+) -> None:
     """Process a single paper and extract properties for all rows.
 
     Args:
         paper_path: Path to the PDF file
         df_paper: DataFrame containing all rows for this paper
         llm: LLMChat instance
-
-    Returns:
-        DataFrame with added LLM response columns
+        inf_gen_config: InferenceGenerationConfig instance
+        batch_results: List to store results (modified in-place)
 
     """
     # Initialize file object so that the upload is cached on the first call to the LLM
     file = File(path=paper_path)
 
-    # Initialize result columns
-    df_paper[f"{llm.model_name}"] = ""
-    df_paper[f"{llm.model_name}-pred-value"] = ""
-    df_paper[f"{llm.model_name}-pred-unit"] = ""
-
-    inf_gen_config = llm_utils.InferenceGenerationConfig()
-
     # Process each row for this paper
-    for idx, row in df_paper.iterrows():
+    for _, row in df_paper.iterrows():
+        refno = row["refno"]
         material = row["material"]
-        property_name = row["property_name"]
         definition = row["definition"]
-
-        print(f"Processing row {idx}: {material} {property_name}")
+        property_name = row["property_name"]
+        true_value = row["property_value"]
+        true_unit = row["property_unit"]
 
         # Format prompt with property name and definition
         formatted_prompt = PROMPT.format(
@@ -122,81 +117,149 @@ def process_paper(
         )
 
         try:
-            # Generate response
             response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
-
-            if response.error:
-                response_text = f"<error>{response.error}</error>"
-            else:
-                response_text = response.pred
-
-            # TODO: Save the full LLMChatResponse in a json file
-            # Store full response
-            df_paper.at[idx, f"{llm.model_name}"] = response_text
-
-            # Parse and store extracted values
-            _, value, unit = extract_property_from_response(response_text)
-            df_paper.at[idx, f"{llm.model_name}-pred-value"] = value
-            df_paper.at[idx, f"{llm.model_name}-pred-unit"] = unit
-
-            print(f"  Extracted: {material} {property_name} = {value} {unit}")
-
         except Exception as e:
-            print(f"Error processing row {idx}: {e}")
-            raise e
-            df_paper.at[idx, f"{llm.model_name}"] = f"<error>{str(e)}</error>"
-            df_paper.at[idx, f"{llm.model_name}-pred-value"] = (
-                f"<error>{str(e)}</error>"
-            )
-            df_paper.at[idx, f"{llm.model_name}-pred-unit"] = f"<error>{str(e)}</error>"
+            response = LLMChatResponse(pred="", usage={}, error=str(e))
 
-        # Rate limiting - add delay between requests
-        time.sleep(0.5)
+        # Parse and store extracted values
+        _, pred_value, pred_unit = extract_property_from_response(response.pred)
 
+        result = {
+            "refno": refno,
+            "material": material,
+            "property_name": property_name,
+            "true": {
+                "value": true_value,
+                "unit": true_unit,
+            },
+            "pred": {
+                "value": pred_value,
+                "unit": pred_unit,
+            },
+            "response": response.model_dump(),
+        }
+        batch_results.append(result)
+
+    # Remove the file from the LLM server
     llm.delete_file(file)
-
-    return df_paper
 
 
 def main(args: argparse.Namespace) -> None:
     """Main function to extract properties from PDF files using LLMs."""
-    output_csv_fname = f"preds__model={args.model_name}.csv"
-    output_csv_path = args.output_task_dir / output_csv_fname
+    # Load dataset from HuggingFace
+    hf_dataset_name = constants.DOMAIN2HF_DATASET_NAME[args.domain]
+    logger.info(
+        f"Loading dataset from HuggingFace: {hf_dataset_name} (task={args.task})"
+    )
+    dataset = load_dataset(hf_dataset_name, name=args.task, split=args.split)
+    df: pd.DataFrame = dataset.to_pandas()
+    logger.info(f"Loaded {len(df)} rows")
 
-    # Load dataset
-    dataset_csv_path = constants.ASSETS_DIR / args.task / "dataset.csv"
-    print(f"Loading dataset from {dataset_csv_path}")
-    df = pd.read_csv(dataset_csv_path)
-    print(f"Loaded {len(df)} rows")
+    # Validate batch_number if specified
+    num_rows = len(df)
+    bs = args.batch_size
+    if args.batch_number is not None:
+        assert args.batch_number >= 1, "Batch number must be >= 1"
+        assert args.batch_number <= math.ceil(num_rows / bs), (
+            f"Batch number must be <= {math.ceil(num_rows / bs)}"
+        )
 
-    # Group by paper and process each
-    grouped = df.groupby("paper")
-    total_papers = len(grouped)
+    # Setup paths
+    paper_dir = args.data_dir / args.domain / "Paper_DB"
+    preds_dir = args.output_dir / args.domain / "preds"
+    preds_dir.mkdir(parents=True, exist_ok=True)
 
-    results = []
+    llm = llm_utils.get_llm(args.server, args.model_name)
 
-    # Loop over each paper and process it
-    for paper, df_paper in tqdm(grouped, total=total_papers, desc="Processing papers"):
-        paper_path = constants.ASSETS_DIR / args.task / str(paper)
+    # TODO: Load inference generation config from yaml file
+    inf_gen_config = llm_utils.InferenceGenerationConfig()
 
-        df_processed = process_paper(paper_path, df_paper, args.llm)
-        results.append(df_processed)
+    # Process batches
+    for bn in range(1, math.ceil(num_rows / bs) + 1):
+        # Skip if specific batch_number is requested and this isn't it
+        if (args.batch_number is not None) and (bn != args.batch_number):
+            continue
 
-    # Save results as a pandas DataFrame
-    results_df = pd.concat(results, ignore_index=True)
-    results_df.to_csv(output_csv_path, index=False)
-    print(f"Results saved to {output_csv_path}")
+        # Construct output_path
+        preds_path = preds_dir / (
+            f"task={args.task}__model={args.model_name.replace('/', '--')}__bs={bs}__bn={bn}.json"
+        )
+
+        # Skip if output file already exists and --force is not set
+        if preds_path.exists() and not args.force:
+            logger.info(
+                f"Skipping batch {bn} as {preds_path} already exists. Use --force to overwrite."
+            )
+            continue
+
+        # Get batch
+        batch_start_idx = (bn - 1) * bs
+        batch_end_idx = batch_start_idx + bs
+        logger.info(
+            f"Processing batch {bn}: rows [{batch_start_idx}, {batch_end_idx}) out of {num_rows}"
+        )
+        batch_df = df.iloc[batch_start_idx:batch_end_idx]
+
+        # Group batch by refno and process each paper
+        batch_grouped = batch_df.groupby("refno")
+        batch_n_papers = len(batch_grouped)
+        logger.info(f"Batch contains {batch_n_papers} unique papers")
+
+        batch_results = []
+
+        # Loop over each paper and process it
+        for refno, df_paper in tqdm(
+            batch_grouped, total=batch_n_papers, desc=f"Processing papers in batch {bn}"
+        ):
+            paper_path = paper_dir / f"{refno}.pdf"
+            if not paper_path.exists():
+                logger.warning(f"PDF not found at {paper_path}, skipping...")
+                continue
+
+            process_paper(paper_path, df_paper, llm, inf_gen_config, batch_results)
+
+        if len(batch_results) > 0:
+            with open(preds_path, "w") as f:
+                json.dump(batch_results, f, indent=4)
+            logger.info(f"Batch {bn} results saved to {preds_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Extract properties from PDF files using LLMs"
+    )
     # Task-specific arguments
+    parser.add_argument(
+        "--domain",
+        type=str,
+        required=True,
+        choices=constants.SUPPORTED_DOMAINS,
+        help="Domain to perform extraction on",
+    )
     parser.add_argument(
         "--task",
         type=str,
-        default="supercon",
-        choices=constants.SUPPORTED_TASKS,
-        help="Task to perform",
+        required=True,
+        help="HuggingFace dataset configuration name, depending on the domain (e.g., 'Tc', 'gap')",
+    )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        help="Split of the dataset to use",
+    )
+    parser.add_argument(
+        "--data_dir",
+        type=Path,
+        default="data/",
+        help="Directory containing Paper_DB folder with PDFs",
+    )
+    parser.add_argument(
+        "--output_dir",
+        "-od",
+        type=Path,
+        default="out/",
+        help="Output directory for results",
     )
 
     # LLM arguments
@@ -211,24 +274,34 @@ if __name__ == "__main__":
         "--model_name",
         type=str,
         default="gemini-2.5-flash",
-        help="Name of the Gemini model to use",
+        help="Name of the LLM to use for extraction",
     )
 
+    # Batch processing arguments
     parser.add_argument(
-        "--output_dir",
-        "-od",
-        type=str,
-        default="out",
-        help="Directory to save the results csv file",
+        "--batch_size",
+        "-bs",
+        type=int,
+        default=10,
+        help="Number of rows to process per batch",
     )
+    parser.add_argument(
+        "--batch_number",
+        "-bn",
+        type=int,
+        default=None,
+        help="Specific batch number to process (1-indexed). If None, process all batches",
+    )
+    parser.add_argument(
+        "--force", "-f", action="store_true", help="Overwrite existing output files"
+    )
+    parser.add_argument(
+        "--log_level", type=int, default=logging.INFO, help="Logging level"
+    )
+
     args = parser.parse_args()
+    utils.setup_logging(args.log_level)
 
-    assert args.task == "supercon", "Only supercon task is supported for now"
-
-    args.output_dir = Path(args.output_dir)
-    args.output_task_dir: Path = args.output_dir / args.task
-    args.output_task_dir.mkdir(parents=True, exist_ok=True)
-
-    args.llm = llm_utils.get_llm(args.server, args.model_name)
+    assert args.domain == "supercon", "Only supercon domain is supported for now"
 
     main(args)
