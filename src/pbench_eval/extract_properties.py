@@ -80,8 +80,7 @@ def process_paper(
     df_paper: pd.DataFrame,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
-    batch_results: list,
-) -> None:
+) -> list[dict]:
     """Process a single paper and extract properties for all rows.
 
     Args:
@@ -91,9 +90,15 @@ def process_paper(
         inf_gen_config: InferenceGenerationConfig instance
         batch_results: List to store results (modified in-place)
 
+    Returns:
+        List of results (true values, predicted values, response, etc.)
+        for each row in the paper
+
     """
     # Initialize file object so that the upload is cached on the first call to the LLM
     file = File(path=paper_path)
+
+    paper_results = []
 
     # Process each row for this paper
     for _, row in df_paper.iterrows():
@@ -124,6 +129,7 @@ def process_paper(
         # Parse and store extracted values
         _, pred_value, pred_unit = extract_property_from_response(response.pred)
 
+        # TODO: Make this a pydantic model so that score_task.py can use it
         result = {
             "refno": refno,
             "material": material,
@@ -137,11 +143,14 @@ def process_paper(
                 "unit": pred_unit,
             },
             "response": response.model_dump(),
+            "inf_gen_config": inf_gen_config.model_dump(),
         }
-        batch_results.append(result)
+        paper_results.append(result)
 
     # Remove the file from the LLM server
     llm.delete_file(file)
+
+    return paper_results
 
 
 def main(args: argparse.Namespace) -> None:
@@ -180,9 +189,9 @@ def main(args: argparse.Namespace) -> None:
         if (args.batch_number is not None) and (bn != args.batch_number):
             continue
 
-        # Construct output_path
+        # Construct preds path
         preds_path = preds_dir / (
-            f"task={args.task}__model={args.model_name.replace('/', '--')}__bs={bs}__bn={bn}.json"
+            f"task={args.task}__split={args.split}__model={args.model_name.replace('/', '--')}__bs={bs}__bn={bn}.json"
         )
 
         # Skip if output file already exists and --force is not set
@@ -216,7 +225,10 @@ def main(args: argparse.Namespace) -> None:
                 logger.warning(f"PDF not found at {paper_path}, skipping...")
                 continue
 
-            process_paper(paper_path, df_paper, llm, inf_gen_config, batch_results)
+            paper_results: list[dict] = process_paper(
+                paper_path, df_paper, llm, inf_gen_config
+            )
+            batch_results.extend(paper_results)
 
         if len(batch_results) > 0:
             with open(preds_path, "w") as f:

@@ -46,7 +46,6 @@ Outputs are stored at `out/supercon/preds/*.json`.
 
 3. Compute the accuracy of the extracted information:
 
-TODO
 ```bash
 ./src/pbench_eval/score_task.py \
     --domain supercon \
