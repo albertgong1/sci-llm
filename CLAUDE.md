@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Strict code rules
+
+- Never hard-code, store, or commit any API keys, always assume they are available through environment variables
+
 ## Code best practices
 
 Generally:
@@ -13,6 +17,7 @@ Generally:
 - Avoid long and nested for loops, create separate functions and files for complex logic
 
 For python files:
+- Start with shebang `#!/usr/bin/env -S uv run --env-file=.env -- python` to ensure the script can be run with correct python paths and environment variables
 - Use python 3.13 version
 - Use type hints like `x: int, list, dict, Any, Literal["value"], df: pd.DataFrame`. Also use nested types like `convo: list[dict[str, str]]`. Always use such type hints for function signatures, and often for variables that could be difficult to understand.
 - Use `Path` for file paths
@@ -27,10 +32,8 @@ For bash files:
 ## Common Commands
 
 ### Environment Setup
-```bash
-# Set up conda environment and install dependencies
-./setup_conda_environment.sh
 
+```bash
 uv sync --all-groups
 ```
 
