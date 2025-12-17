@@ -42,11 +42,13 @@ class GeminiChat(LLMChat):
         ```
         {
             "role": "user",
-            "parts": ["Hello, how are you?"]
-        }
-        {
-            "role": "user",
-            "parts": [file.uploaded_handle]
+            "parts": [
+                {"text": "Hello, how are you?"},
+                {"file_data": {
+                    "mime_type": file.uploaded_handle.mime_type,
+                    "file_uri": file.uploaded_handle.uri,
+                }}
+            ]
         }
         ```
 
@@ -61,12 +63,23 @@ class GeminiChat(LLMChat):
         for msg in conv.messages:
             # Gemini uses "model" instead of "assistant"
             role = "model" if msg.role == "assistant" else msg.role
-            if isinstance(msg.content, str):
-                messages.append({"role": role, "parts": [msg.content]})
-            elif isinstance(msg.content, File):
-                messages.append({"role": role, "parts": [msg.content.uploaded_handle]})
-            else:
-                raise ValueError(f"Invalid message content type: {type(msg.content)}")
+            parts: list[dict[str, Any]] = []
+            for c in msg.content:
+                if isinstance(c, str):
+                    parts.append({"text": c})
+                elif isinstance(c, File):
+                    parts.append(
+                        {
+                            "file_data": {
+                                "mime_type": c.uploaded_handle.mime_type,
+                                "file_uri": c.uploaded_handle.uri,
+                            }
+                        }
+                    )
+                else:
+                    raise ValueError(f"Invalid message content type: {type(c)}")
+            messages.append({"role": role, "parts": parts})
+
         return messages
 
     def _call_api(
@@ -100,7 +113,7 @@ class GeminiChat(LLMChat):
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
         if messages and messages[0]["role"] == "system":
-            gen_kwargs["system_instruction"] = messages[0]["parts"][0]["text"]
+            gen_kwargs["system_instruction"] = messages[0]["parts"][0]
             messages = messages[1:]
 
         # Gemini's chat expects history (all but last message) and current message

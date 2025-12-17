@@ -37,10 +37,10 @@ class File(BaseModel):
 
 
 class Message(BaseModel):
-    """A single message in a conversation. The content can be a text string or a file path."""
+    """A single message in a conversation. The content is list of either text string or a file."""
 
     role: Literal["user", "assistant", "system"]
-    content: str | File
+    content: list[str | File]
 
 
 class Conversation(BaseModel):
@@ -86,8 +86,9 @@ class LLMChat(abc.ABC):
         """
         # Upload all files first
         for msg in conv.messages:
-            if isinstance(msg.content, File):
-                self.upload_file(msg.content)
+            for content in msg.content:
+                if isinstance(content, File):
+                    self.upload_file(content)
 
         messages = self._convert_conv_to_api_format(conv)
         response = self._call_api(messages, inf_gen_config)

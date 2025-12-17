@@ -16,17 +16,17 @@ uv sync --all-groups
 
 ## Run experiments
 
-First, set your API keys (`GOOGLE_API_KEY`, `OPENAI_API_KEY`), e.g. in your conda environment:
+First, set your API keys (`GOOGLE_API_KEY`, `OPENAI_API_KEY`), e.g. in a `.env` file:
 
 ```bash
-conda env config vars set GOOGLE_API_KEY="xxxxx"
-conda env config vars set OPENAI_API_KEY="xxxxx"
+echo "GOOGLE_API_KEY=xxxx" >> .env
+echo "OPENAI_API_KEY=xxxx" >> .env
 ```
 
 ### Property extraction
 
 ```bash
-uv run python -m pbench_eval.extract_properties \
+./src/pbench_eval/extract_properties.py \
     --task supercon \
     --server gemini \
     --model_name gemini-2.5-flash \

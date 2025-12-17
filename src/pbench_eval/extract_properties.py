@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run --env-file=.env -- python
 """Extract properties from PDF files using LLMs.
 Currently supported:
 - Properties from supercon
@@ -8,7 +9,7 @@ from PDF papers using Google's Gemini API, and stores the results.
 
 Usage:
 ```bash
-uv run python -m pbench_eval.extract_properties \
+./src/pbench_eval/extract_properties.py \
     --task supercon \
     --server gemini \
     --model_name gemini-2.5-flash \
@@ -26,9 +27,8 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-from google.genai import types as genai_types
-
 import llm_utils
+from llm_utils.common import Conversation, File, LLMChatResponse, Message
 from pbench_eval import constants
 
 # Prompt template for property extraction
@@ -48,22 +48,6 @@ You will be provided a question about extracting a material property from the pa
 Question: What is the {property_name} recommended for {material}? Here, "{property_name}" is defined as "{definition}".
 Answer:
 """
-
-
-def upload_pdf_to_gemini(pdf_path: Path, llm: llm_utils.LLMChat) -> genai_types.File:
-    """Upload a PDF file to Gemini API for processing.
-
-    Args:
-        pdf_path: Path to the PDF file
-        llm: LLMChat instance
-
-    Returns:
-        File object from Gemini API
-
-    """
-    print(f"Uploading {pdf_path}...")
-    google_pdf_file = llm.client.files.upload(file=pdf_path)
-    return google_pdf_file
 
 
 def extract_property_from_response(response_text: str) -> tuple[str, str, str]:
@@ -92,7 +76,9 @@ def extract_property_from_response(response_text: str) -> tuple[str, str, str]:
 
 
 def process_paper(
-    paper_path: Path, df_paper: pd.DataFrame, llm: llm_utils.LLMChat
+    paper_path: Path,
+    df_paper: pd.DataFrame,
+    llm: llm_utils.LLMChat,
 ) -> pd.DataFrame:
     """Process a single paper and extract properties for all rows.
 
@@ -102,19 +88,18 @@ def process_paper(
         llm: LLMChat instance
 
     Returns:
-        DataFrame with added Gemini response columns
+        DataFrame with added LLM response columns
 
     """
-    # Upload PDF to Gemini
-    pdf_file = upload_pdf_to_gemini(paper_path, llm)
-    if pdf_file is None:
-        raise Exception(f"Failed to upload PDF to Gemini: {paper_path}")
-    time.sleep(1)  # wait for file to be processed
+    # Initialize file object so that the upload is cached on the first call to the LLM
+    file = File(path=paper_path)
 
     # Initialize result columns
-    df_paper[f"{args.model_name}"] = ""
-    df_paper[f"{args.model_name}-pred-value"] = ""
-    df_paper[f"{args.model_name}-pred-unit"] = ""
+    df_paper[f"{llm.model_name}"] = ""
+    df_paper[f"{llm.model_name}-pred-value"] = ""
+    df_paper[f"{llm.model_name}-pred-unit"] = ""
+
+    inf_gen_config = llm_utils.InferenceGenerationConfig()
 
     # Process each row for this paper
     for idx, row in df_paper.iterrows():
@@ -122,45 +107,53 @@ def process_paper(
         property_name = row["property_name"]
         definition = row["definition"]
 
+        print(f"Processing row {idx}: {material} {property_name}")
+
         # Format prompt with property name and definition
         formatted_prompt = PROMPT.format(
             material=material, property_name=property_name, definition=definition
         )
 
-        try:
-            # Generate response from Gemini
-            print(f"Processing row {idx}: {material} {property_name}")
-            # TODO Add support for PDF files as a message
-            response = llm.client.models.generate_content(
-                model=args.model_name, contents=[pdf_file, formatted_prompt]
-            )
-            if response and response.text:
-                response_text = response.text
-            else:
-                response_text = "ERROR: No response from Gemini"
+        # Create a conversation with PDF file attachment and prompt
+        conv = Conversation(
+            messages=[
+                Message(role="user", content=[file, formatted_prompt]),
+            ]
+        )
 
+        try:
+            # Generate response
+            response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
+
+            if response.error:
+                response_text = f"<error>{response.error}</error>"
+            else:
+                response_text = response.pred
+
+            # TODO: Save the full LLMChatResponse in a json file
             # Store full response
-            df_paper.at[idx, f"{args.model_name}"] = response_text
+            df_paper.at[idx, f"{llm.model_name}"] = response_text
 
             # Parse and store extracted values
             _, value, unit = extract_property_from_response(response_text)
-            df_paper.at[idx, f"{args.model_name}-pred-value"] = value
-            df_paper.at[idx, f"{args.model_name}-pred-unit"] = unit
+            df_paper.at[idx, f"{llm.model_name}-pred-value"] = value
+            df_paper.at[idx, f"{llm.model_name}-pred-unit"] = unit
 
             print(f"  Extracted: {material} {property_name} = {value} {unit}")
 
         except Exception as e:
             print(f"Error processing row {idx}: {e}")
-            df_paper.at[idx, f"{args.model_name}"] = f"ERROR: {str(e)}"
-            df_paper.at[idx, f"{args.model_name}-pred-value"] = f"ERROR: {str(e)}"
-            df_paper.at[idx, f"{args.model_name}-pred-unit"] = f"ERROR: {str(e)}"
+            raise e
+            df_paper.at[idx, f"{llm.model_name}"] = f"<error>{str(e)}</error>"
+            df_paper.at[idx, f"{llm.model_name}-pred-value"] = (
+                f"<error>{str(e)}</error>"
+            )
+            df_paper.at[idx, f"{llm.model_name}-pred-unit"] = f"<error>{str(e)}</error>"
 
         # Rate limiting - add delay between requests
         time.sleep(0.5)
 
-    # Remove the file from the client
-    llm.client.files.delete(name=pdf_file.name)  # type: ignore
-    print(f"Deleted uploaded file: {pdf_file.name}")  # type: ignore
+    llm.delete_file(file)
 
     return df_paper
 
@@ -188,8 +181,6 @@ def main(args: argparse.Namespace) -> None:
 
         df_processed = process_paper(paper_path, df_paper, args.llm)
         results.append(df_processed)
-
-        break  # TODO Remove this
 
     # Save results as a pandas DataFrame
     results_df = pd.concat(results, ignore_index=True)

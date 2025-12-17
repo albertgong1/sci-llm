@@ -31,7 +31,7 @@ class OpenAIChat(LLMChat):
         self.client = OpenAI(api_key=api_key)
 
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
-        f"""Convert conversation to OpenAI's Responses API format.
+        """Convert conversation to OpenAI's Responses API format.
         # https://platform.openai.com/docs/guides/pdf-files
 
         Requires:
@@ -39,15 +39,12 @@ class OpenAIChat(LLMChat):
 
         Examples of text and file messages:
         ```
-        {"role": "user",
-            "content": {"type": "input_text",
-                "text": "Hello, how are you?"
-            }
-        }
-        {"role": "user",
-            "content": {"type": "input_file",
-                "file_id": file.uploaded_handle.id
-            }
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": "Hello, how are you?"},
+                {"type": "input_file", "file_id": file.uploaded_handle.id}
+            ]
         }
         ```
 
@@ -56,18 +53,23 @@ class OpenAIChat(LLMChat):
 
         Returns:
             Messages in OpenAI's format.
+
         """
         messages = []
         for msg in conv.messages:
-            if isinstance(msg.content, str):
-                content = {"type": "input_text", "text": msg.content}
-            elif isinstance(msg.content, File):
-                content = {
-                    "type": "input_file",
-                    "file_id": msg.content.uploaded_handle.id,
-                }
-            else:
-                raise ValueError(f"Invalid message content type: {type(msg.content)}")
+            content: list[dict[str, Any]] = []
+            for c in msg.content:
+                if isinstance(c, str):
+                    content.append({"type": "input_text", "text": c})
+                elif isinstance(c, File):
+                    content.append(
+                        {
+                            "type": "input_file",
+                            "file_id": c.uploaded_handle.id,
+                        }
+                    )
+                else:
+                    raise ValueError(f"Invalid message content type: {type(c)}")
             messages.append({"role": msg.role, "content": content})
         return messages
 
@@ -106,7 +108,7 @@ class OpenAIChat(LLMChat):
         # If messages has a system message, add it to kwargs["instructions"]
         # and remove it from messages
         if messages[0]["role"] == "system":
-            gen_kwargs["instructions"] = messages[0]["content"]
+            gen_kwargs["instructions"] = messages[0]["content"][0]["text"]
             messages = messages[1:]
 
         response = self.client.responses.create(
