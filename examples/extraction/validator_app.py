@@ -9,6 +9,7 @@ import argparse
 import unicodedata
 from google import genai
 from google.genai import types
+import json
 
 # Property Validator App
 #
@@ -112,7 +113,6 @@ def search_with_ai(pdf_path, value, prop_name, unit="", material_or_system=""):
             )
         )
         
-        import json
         text = response.text.strip()
         # Clean markdown code blocks if present
         if text.startswith("```"):
@@ -145,7 +145,7 @@ def get_available_csv_files():
     if not os.path.exists(CSV_FOLDER):
         return []
 
-    csv_files = [f for f in os.listdir(CSV_FOLDER) if f.endswith('.csv')]
+    csv_files = [f for f in os.listdir(CSV_FOLDER) if f.endswith('.csv') and not f.endswith('_validated.csv')]
     return sorted(csv_files)
 
 def get_available_pdf_files():
@@ -177,7 +177,9 @@ def preprocess_dataframe(df):
         # Ensure boolean type (fill NaN with False)
         df["flagged"] = df["flagged"].fillna(False).astype(bool)
 
-    for text_col in ["validator_name", "validation_date"]:
+    for text_col in ["validator_name", "validation_date", "validator_note"]:
+        if text_col not in df.columns:
+            df[text_col] = ""
         # Force object dtype so assigning strings doesn't clash with floats
         df[text_col] = df[text_col].astype(object).fillna("")
         
@@ -188,36 +190,67 @@ def preprocess_dataframe(df):
     # Ensure location columns exist (crucial for extraction pipeline compatibility)
     if "location.page" not in df.columns:
         df["location.page"] = None # Default to None so we can auto-discover it
+    # Force object type for page (it can be int or str or None)
+    df["location.page"] = df["location.page"].astype(object)
+
     if "location.section" not in df.columns:
         df["location.section"] = ""
+    # Force object type for section (text)
+    df["location.section"] = df["location.section"].astype(str)
+
     if "location.evidence" not in df.columns:
         df["location.evidence"] = ""
+    # Force object type for evidence (text)
+    df["location.evidence"] = df["location.evidence"].astype(str)
 
-    # Ensure location columns exist (crucial for extraction pipeline compatibility)
-    if "location.page" not in df.columns:
-        df["location.page"] = None # Default to None so we can auto-discover it
-    if "location.section" not in df.columns:
-        df["location.section"] = ""
-    if "location.evidence" not in df.columns:
-        df["location.evidence"] = ""
 
-    # Reverted the forced overwrite here. 
-    # We will handle PDF path updating dynamically in the UI when the user selects a PDF.
-        
     return df
 
 def load_data(csv_path):
-    """Loads the CSV and ensures required columns exist."""
+    """
+    Loads the CSV. Implements 'Shadow Loader' pattern:
+    1. Checks for a validated copy (suffix '_validated.csv').
+    2. If found, loads that instead.
+    3. If not found, CREATES it (Copy-on-Load) and loads it.
+    This ensures we never edit the original file, but preserve all original data (including PDF paths).
+    """
     if not os.path.exists(csv_path):
         st.error(f"CSV not found at {csv_path}")
         return pd.DataFrame()
 
-    df = pd.read_csv(csv_path)
+    # Determine validated path
+    if csv_path.endswith("_validated.csv"):
+        validated_path = csv_path
+    else:
+        validated_path = csv_path.replace(".csv", "_validated.csv")
+
+    # Copy-on-Load Logic
+    if not os.path.exists(validated_path):
+        # Read original
+        original_df = pd.read_csv(csv_path)
+        # Save immediately to validated path
+        original_df.to_csv(validated_path, index=False)
+        st.toast(f"Created working copy: {os.path.basename(validated_path)}", icon="🆕")
+    
+    # Always load from the validated path (which now guaranteed exists)
+    df = pd.read_csv(validated_path)
+    
+    # Store the WORKING path in session state so we know where to save
+    st.session_state.current_working_csv_path = validated_path
+    
     return preprocess_dataframe(df)
 
-def save_data(df, csv_path):
-    """Saves the dataframe back to CSV."""
-    df.to_csv(csv_path, index=False)
+def save_data(df):
+    """
+    Saves the dataframe to the validated CSV path.
+    Args: 
+        df: dataframe to save
+        original_csv_path_ignored: Legacy arg, ignored. We use st.session_state.current_working_csv_path
+    """
+    if "current_working_csv_path" in st.session_state:
+        df.to_csv(st.session_state.current_working_csv_path, index=False)
+    else:
+        st.error("Cannot save: No working CSV path found in session state.")
 
 # --- Search Logic ---
 
@@ -225,15 +258,117 @@ def normalize(text):
     """Normalize text: NFKD decomposition, replace non-alphanumeric with space (except ...), lower case."""
     if not isinstance(text, str):
         return ""
+
+    # Remove newlines and carriage returns early - they're just formatting artifacts in PDFs
+    # This helps match text that spans multiple lines in the PDF
+    text = text.replace('\n', ' ').replace('\r', ' ')
+
+    # CRITICAL: Handle context-dependent patterns FIRST before simple replacements
+    # In this PDF, ð (U+00F0) can mean either ξ (xi) or ( depending on context
+    # Pattern 1: ð followed by digit and Þ means ξ(...)
+    # Example: ð0Þ -> ξ(0) which should tokenize as "xi 0"
+    text = re.sub(r'ð(\d+)Þ', r'xi \1 ', text)  # ð0Þ -> "xi 0 "
+    text = re.sub(r'ð(\d+)þ', r'xi \1 ', text)  # Alternative with lowercase thorn
+
+    # Pattern 2: \tðHÞ or \tðHþ means γ(H)
+    # Tab character followed by ð/Þ or ð/þ is gamma in mathematical context
+    text = re.sub(r'\tð([A-Za-z]+)[Þþ]', r'gamma \1 ', text)  # \tðHÞ -> "gamma H"
+
+    # CRITICAL: Apply PDF-specific character replacements BEFORE NFKD normalization
+    # because NFKD will convert things like ½ (U+00BD) into "1/2" which breaks our logic
+    pdf_char_replacements = {
+        # Custom font brackets (common in mathematical PDFs)
+        '\xf0': '(',  # ð -> ( (only for remaining ð not matched by pattern above)
+        '\xfe': ')',  # þ -> )
+        '\xfd': ')',  # Alternative closing bracket
+        '\xde': ')',  # Þ (capital thorn) -> )
+        '\xbd': '[',  # ½ -> [ (MUST be before NFKD which converts to "1/2")
+        '\xbc': ']',  # ¼ -> ]
+        '\x02': ']',  # STX control character -> ]
+        '\x03': ']',  # ETX control character -> ]
+        '\x04': ']',  # EOT control character -> ]
+        # Mathematical symbols
+        '≃': '~',     # approximately equal
+        '≈': '~',     # approximately equal
+        '∥': '||',    # parallel to
+        '⊥': '_|_',   # perpendicular
+        '×': 'x',     # multiplication
+        '·': '',      # middle dot (often used in units)
+    }
+
+    for old, new in pdf_char_replacements.items():
+        text = text.replace(old, new)
+
+    # Now apply NFKD normalization
     text = unicodedata.normalize('NFKD', text)
-    # Preserve '...' as a unique token
+
+    # Normalize Greek letters by mapping to their name equivalents
+    # This handles both actual Greek unicode AND common PDF encodings
+    greek_replacements = {
+        'α': 'alpha',
+        'β': 'beta',
+        'γ': 'gamma',
+        'δ': 'delta',
+        'ε': 'epsilon',
+        'ζ': 'zeta',
+        'η': 'eta',
+        'θ': 'theta',
+        'κ': 'kappa',
+        'λ': 'lambda',
+        'μ': 'mu',
+        'ν': 'nu',
+        'ξ': 'xi',
+        'π': 'pi',
+        'ρ': 'rho',
+        'σ': 'sigma',
+        'τ': 'tau',
+        'φ': 'phi',
+        'χ': 'chi',
+        'ψ': 'psi',
+        'ω': 'omega',
+        'Δ': 'Delta',
+        'Θ': 'Theta',
+        'Λ': 'Lambda',
+        'Ξ': 'Xi',
+        'Π': 'Pi',
+        'Σ': 'Sigma',
+        'Φ': 'Phi',
+        'Ψ': 'Psi',
+        'Ω': 'Omega',
+    }
+
+    for old, new in greek_replacements.items():
+        text = text.replace(old, new)
+
+    # Handle common PDF encoding where tab character represents gamma
+    # in mathematical contexts like γ(H) -> \t(H)
+    # Must do AFTER pdf_char_replacements converted ð to (
+    text = re.sub(r'\t(\(|\[)', r'gamma\1', text)
+
+    # Normalize subscripts: remove underscores before letters/numbers
+    # This handles cases like ξ(0)_GL vs ξ(0)GL
+    text = re.sub(r'_([A-Za-z0-9])', r'\1', text)
+
+    # Normalize Angstrom symbol variations
+    # Å (precomposed) -> angstrom
+    text = text.replace('Å', 'angstrom')
+    # A˚ (A + combining ring) -> angstrom (after NFKD, may have space: "A ̊")
+    text = re.sub(r'A\s*[\u0300-\u036f]+', 'angstrom', text)  # A with optional space and combining diacritics
+    # Also handle lowercase after processing
+    text = re.sub(r'a\s*[\u0300-\u036f]+', 'angstrom', text)
+
+    # Preserve '...' as a unique token (handle after symbol replacements)
     if '...' in text:
-        text = text.replace('...', ' wildcardtoken ') 
-    
-    # Remove non-alphanumeric but replace with space
-    # We want to split 17.2 -> 17 2, so dots correspond to space
-    # underscores also replaced by space
-    text = re.sub(r'[^a-zA-Z0-9]', ' ', text).lower()
+        text = text.replace('...', ' ELLIPSIS ')
+
+    # Handle hyphenated line breaks (e.g., "super-\nconductor" or "super- conductor")
+    # This is common in PDFs where words are split across lines
+    # Pattern: word characters, hyphen, optional whitespace (including newlines), word characters
+    text = re.sub(r'(\w+)-\s+(\w+)', r'\1\2', text)  # "super- conductor" -> "superconductor"
+
+    # Remove non-alphanumeric (but keep unicode letters) by replacing with space
+    # \w matches any unicode word character
+    text = re.sub(r'[^\w]', ' ', text).lower()
     return text.strip()
 
 def is_valid_page(page_num):
@@ -251,10 +386,12 @@ def is_valid_page(page_num):
         return False, None
 
 def get_tokens(text):
-    """Split text into alphanumeric tokens."""
+    """Split text into alphanumeric tokens, filtering out ellipsis tokens."""
     if not isinstance(text, str): return []
     text = normalize(text)
-    return text.split()
+    tokens = text.split()
+    # Filter out ellipsis tokens - we'll handle them separately in matching
+    return [t for t in tokens if t != 'ellipsis']
 
 def find_best_match_on_page(page, evidence_text):
     """
@@ -273,7 +410,6 @@ def find_best_match_on_page(page, evidence_text):
 
     # Strategy 2: Fuzzy Sequence Match
     # 1. Get all words from page with their bboxes
-    # page.get_text("words") returns list of (x0, y0, x1, y1, "text", block_no, line_no, word_no)
     words = page.get_text("words") 
     
     if not words:
@@ -300,120 +436,76 @@ def find_best_match_on_page(page, evidence_text):
     best_match_indices = []
     best_match_score = 0.0
     
-    start_token = evidence_tokens[0]
-    # Find all occurrences of the first token to start checking sequences
-    possible_starts = [i for i, pt in enumerate(page_tokens) if pt[0] == start_token]
+    # Allow starting from the first FEW tokens to handle missing prefixes (like Greek chars stripped)
+    possible_starts = []
+    start_tokens_to_check = evidence_tokens[:3] # Check first 3 tokens
     
-    # If first token not found, try finding substring match for first token? 
-    # Or just loop all? For efficiency, let's stick to exact start match or substring start match.
-    # To be more robust, let's allow substring start for the first token too.
-    if not possible_starts:
-         possible_starts = [i for i, pt in enumerate(page_tokens) if start_token in pt[0]]
+    for s_idx, s_token in enumerate(start_tokens_to_check):
+        # find original index in evidence_tokens
+        full_e_idx = evidence_tokens.index(s_token)
+        
+        matches = [i for i, pt in enumerate(page_tokens) if pt[0] == s_token or (len(s_token) > 2 and s_token in pt[0])]
+        for m in matches:
+            possible_starts.append((m, full_e_idx))
 
     # Optimization: if evidence is long, maybe try to match rare tokens? 
     # For now, stick to left-to-right scan.
 
-    for start_idx in possible_starts:
+    for start_p_idx, start_e_idx in possible_starts:
         current_match_word_indices = []
-        p_idx = start_idx
-        e_idx = 0
+        p_idx = start_p_idx
+        e_idx = start_e_idx
         
         # Align sequence allowing for skips
+        # Note: ellipsis tokens are already filtered out by get_tokens(),
+        # so we just match the actual content tokens flexibly
         while p_idx < len(page_tokens) and e_idx < len(evidence_tokens):
             p_token = page_tokens[p_idx][0]
             e_token = evidence_tokens[e_idx]
-            
-            # 1. Handle Ellipsis Wildcard
-            if "wildcardtoken" in e_token: 
-                 # Skip ahead in PDF until we find the NEXT evidence token
-                if e_idx + 1 < len(evidence_tokens):
-                    next_e_token = evidence_tokens[e_idx + 1]
-                    # Search forward in PDF for next_e_token
-                    found_next_start = False
-                    # Limit lookahead to avoid false positives across the whole page
-                    limit = 200 # words
-                    for search_p_idx in range(p_idx, min(p_idx + limit, len(page_tokens))):
-                        # fast forward
-                        cand = page_tokens[search_p_idx][0]
-                        if cand == next_e_token or (len(next_e_token) > 2 and next_e_token in cand):
-                            p_idx = search_p_idx # Jump to it
-                            e_idx += 1 # Consumed the wildcard
-                            found_next_start = True
-                            break
-                    
-                    if found_next_start:
-                        continue # Continue outer loop from new p_idx
-                    else:
-                        break # Failed to find resume point
-                else:
-                    # Wildcard is last token - we matched everything up to here
-                    e_idx += 1
-                    break 
-            
-            # 2. Exact Match
+
+            # 1. Exact Match
             if p_token == e_token:
                 current_match_word_indices.append(page_tokens[p_idx][1])
                 p_idx += 1
                 e_idx += 1
                 continue
 
-            # 3. Substring Match (e.g. 001 inside 2001)
+            # 2. Substring Match (e.g. 001 inside 2001)
             if len(e_token) > 1 and e_token in p_token:
                 current_match_word_indices.append(page_tokens[p_idx][1])
                 p_idx += 1
                 e_idx += 1
                 continue
 
-            # 4. Greedy Merge Match (Handles split formulas like P6 + 3 + mc -> P63mc)
-            # Try to merge next K tokens as long as they build up the target token
-            merged_text = p_token
-            # Look ahead up to 10 tokens (arbitrary limit for sanity)
-            found_merge = False
-            
-            # Start loop looking at next token
-            temp_idx = p_idx + 1
-            while temp_idx < len(page_tokens) and (temp_idx - p_idx) <= 10:
-                next_part = page_tokens[temp_idx][0]
-                potential_merge = merged_text + next_part
-                
-                # If perfect match
-                if potential_merge == e_token:
-                    # Found it! Record all indices involved
-                    for k in range(p_idx, temp_idx + 1):
-                         current_match_word_indices.append(page_tokens[k][1])
-                    p_idx = temp_idx + 1
-                    e_idx += 1
-                    found_merge = True
-                    break
-                
-                # If it's a valid prefix, keep going (e.g. "P6" + "3" = "P63", which is start of "P63mc")
-                if e_token.startswith(potential_merge):
-                    merged_text = potential_merge
-                    temp_idx += 1
-                else:
-                    # Not a prefix, so this path is dead. Stop trying to merge.
-                    break
-            
-            if found_merge:
-                continue
-
-            # 5. Skip Mismatch (Lookahead/Noise tolerance)
-            found_next = False
-            lookahead = 5
+            # 3. Skip Mismatch (Lookahead in PDF - "Extra words in PDF")
+            # Increased lookahead to handle evidence with ellipses (tokens far apart)
+            # Some evidence strings have tokens 30+ words apart (e.g., "coherence length ... 138")
+            found_next_pdf = False
+            lookahead = 20  # Allow matching across larger gaps
             for look in range(1, lookahead + 1):
                 if p_idx + look < len(page_tokens):
                     cand = page_tokens[p_idx + look][0]
                     # Check if the next evidence token matches a future page token
                     if cand == e_token or (len(e_token) > 2 and e_token in cand):
                         p_idx += look
-                        found_next = True
+                        found_next_pdf = True
                         break
             
-            if found_next:
+            if found_next_pdf:
                 continue
-            else:
-                # Sequence broken
-                break
+
+            # 4. Skip Mismatch (Lookahead in Evidence - "Missing words in PDF")
+            # If the current page token doesn't match current evidence, 
+            # maybe it matches the NEXT evidence token? (i.e. we skip one word in evidence)
+            if e_idx + 1 < len(evidence_tokens):
+                next_e_token = evidence_tokens[e_idx + 1]
+                # Check if current page token matches NEXT evidence token
+                if p_token == next_e_token or (len(next_e_token) > 2 and next_e_token in p_token):
+                    e_idx += 1 # Skip the current failing evidence token
+                    continue
+
+            # Sequence broken
+            break
         
         # Calculate score for this start position
         # simple coverage score
@@ -441,120 +533,101 @@ def find_best_match_on_page(page, evidence_text):
 def find_evidence_in_pdf(pdf_path, evidence_text, suggested_page_num=None, scan_all_pages=True):
     """
     Search for evidence in the PDF.
-    
+
     Args:
         pdf_path: Path to PDF file.
         evidence_text: The text string to find.
         suggested_page_num: 1-based page number to check first.
         scan_all_pages: If False, only check suggested_page_num.
-        
+
     Returns:
         (best_page_num, best_score, best_rects)
         best_page_num is 1-based.
     """
-    try:
-        doc = fitz.open(pdf_path)
-    except Exception as e:
-        print(f"Error opening PDF {pdf_path}: {e}")
-        return None, 0.0, []
-
     best_global_score = 0.0
     best_global_page = None
     best_global_rects = []
     
-    # Check suggested page first
-    if suggested_page_num is not None:
-        p_idx = int(suggested_page_num) - 1
-        if 0 <= p_idx < len(doc):
-            score, rects = find_best_match_on_page(doc[p_idx], evidence_text)
-            # If good enough, return immediately
-            if score > 0.85:
-                doc.close()
-                return suggested_page_num, score, rects
-            
-            best_global_score = score
-            best_global_page = suggested_page_num
-            best_global_rects = rects
-
-    # If we are strictly checking only the suggested page, return what we found there
-    if not scan_all_pages:
-        doc.close()
-        # Only return if we found something reasonable? 
-        # Actually user wants "no highlighting" if not found, so we return whatever matches we got (even if specific score is low, rects might be empty or partial).
-        # find_best_match_on_page returns best local match.
-        return best_global_page, best_global_score, best_global_rects
-
-    # Global search (if strict check failed or wasn't requested)
-    # Only scan if we didn't get a perfect match already
-    step = 1# if len(doc) < 20 else 2 # Optimization?
-    for p_idx in range(0, len(doc), step):
-        # Skip suggested page as we already checked it
-        if suggested_page_num is not None and p_idx == (int(suggested_page_num) - 1):
-            continue
-            
-        score, rects = find_best_match_on_page(doc[p_idx], evidence_text)
+    try:
+        with fitz.open(pdf_path) as doc:
+            # Check suggested page first
+            if suggested_page_num is not None:
+                p_idx = int(suggested_page_num) - 1
+                if 0 <= p_idx < len(doc):
+                    score, rects = find_best_match_on_page(doc[p_idx], evidence_text)
+                    # If good enough, return immediately
+                    if score > 0.85:
+                        return suggested_page_num, score, rects
         
-        if score > best_global_score:
-            best_global_score = score
-            best_global_page = p_idx + 1
-            best_global_rects = rects
-            
-            if best_global_score > 0.9:
-                break
+                    best_global_score = score
+                    best_global_page = suggested_page_num
+                    best_global_rects = rects
+        
+            # If we are strictly checking only the suggested page, return what we found there
+            if not scan_all_pages:
+                return best_global_page, best_global_score, best_global_rects
+        
+            # Global search (if strict check failed or wasn't requested)
+            # Only scan if we didn't get a perfect match already
+            step = 1
+            for p_idx in range(0, len(doc), step):
+                # Skip suggested page as we already checked it
+                if suggested_page_num is not None and p_idx == (int(suggested_page_num) - 1):
+                    continue
+                    
+                score, rects = find_best_match_on_page(doc[p_idx], evidence_text)
                 
-    doc.close()
+                if score > best_global_score:
+                    best_global_score = score
+                    best_global_page = p_idx + 1
+                    best_global_rects = rects
+        
+                    # Early exit if we found a very good match
+                    if best_global_score > 0.9:
+                        break
+                        
+    except Exception as e:
+        print(f"Error processing PDF {pdf_path}: {e}")
+        return None, 0.0, []
+
     return best_global_page, best_global_score, best_global_rects
 
-    # If match is poor, scan all pages
-    for i, page in enumerate(doc):
-        # Skip the suggested page as we already checked it
-        current_page_num = i + 1
-        if current_page_num == suggested_page_num:
-            continue
-            
-        score, rects = find_best_match_on_page(page, evidence_text)
-        
-        if score > best_global_score:
-            best_global_score = score
-            best_global_page = current_page_num
-            best_global_rects = rects
-            
-            # If we find a near perfect match, stop scanning?
-            if best_global_score > 0.95:
-                break
-                
-    doc.close()
-    return best_global_page, best_global_score, best_global_rects
+# --- Main App Logic ---
 
-def render_page_image(pdf_path, page_num, highlight_rects=None):
+def get_pdf_images(pdf_path, highlight_rects=None, page_num=None):
     """
-    Renders a PDF page as an image with optional highlighting.
-    page_num is 1-based.
-    highlight_rects is a list of fitz.Rect objects.
+    Generates a list of images for each page in the PDF.
+    Target page will have highlights applied.
+    Returns: list of (img_bytes, page_caption)
     """
     try:
         doc = fitz.open(pdf_path)
     except Exception as e:
-        return None, f"Error opening PDF: {e}"
+        return [], f"Error opening PDF: {e}"
 
-    if page_num < 1 or page_num > len(doc):
-        return None, f"Page {page_num} out of range (1-{len(doc)})"
+    images = []
+    # Handle page_num as 0-indexed integer for internal usage
+    target_page_idx = int(page_num) - 1 if page_num else -1
+
+    for i, page in enumerate(doc):
+        # Apply highlights only to the target page
+        if highlight_rects and i == target_page_idx:
+             for rect in highlight_rects:
+                 page.add_highlight_annot(rect)
         
-    page_idx = int(page_num) - 1
-    page = doc[page_idx]
-    
-    # Highlight rects if provided
-    if highlight_rects:
-        for rect in highlight_rects:
-            page.add_highlight_annot(rect)
+        # Render page
+        # Matrix(2, 2) = 2x zoom for clear text
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) 
+        img_bytes = pix.tobytes("png")
+        
+        caption = f"Page {i+1}"
+        if i == target_page_idx:
+            caption += " (Evidence)"
+            
+        images.append((img_bytes, caption))
 
-    # Render page to image
-    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2)) # 2x zoom for better quality
-    img_bytes = pix.tobytes("png")
     doc.close()
-    return img_bytes, None
-
-# --- Main App Logic ---
+    return images, None
 
 def main():
     st.title("Property Validator")
@@ -664,7 +737,7 @@ def main():
              if need_update and st.session_state.df is not None:
                  with st.spinner(f"Updating all records to use {selected_pdf}..."):
                      st.session_state.df["paper_pdf_path"] = full_pdf_path
-                     save_data(st.session_state.df, csv_path)
+                     save_data(st.session_state.df)
                      st.toast(f"Linked {selected_pdf} to this CSV!", icon="🔗")
                      st.rerun()
         else:
@@ -845,97 +918,140 @@ def main():
     with col1:
         # Top Left: Validation Card
         st.subheader("Validation")
+        # st.write("**Is this valid?**")
+
+        # Check if validator name is provided
+        name_provided = validator_name and validator_name.strip() != ""
+
+        if not name_provided:
+                st.warning("Please enter your name in the sidebar to begin validation.")
+
+        # Validation Controls
+        # Give more weight to Valid/Invalid to prevent wrapping
+        col_valid, col_invalid, col_flag, col_reset = st.columns([1.5, 1.5, 1.1, 1.1])
+
+        is_validated = row["validated"]
+        is_flagged = row["flagged"]
+        
+        # Determine button styles based on state
+        valid_type = "primary" if is_validated is True else "secondary"
+        invalid_type = "primary" if is_validated is False else "secondary"
+        flag_type = "primary" if is_flagged else "secondary"
+
+        with col_valid:
+            # Modifying Valid Button to Handle Pending AI Matches
+            if st.button("✅ Valid", type=valid_type, width="stretch", disabled=not name_provided):
+                # Check if there is a pending AI suggestion for this row
+                if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
+                        suggestion = st.session_state.pending_ai_match
+                        df.at[selected_index, 'location.page'] = suggestion['page']
+                        df.at[selected_index, 'location.evidence'] = suggestion['evidence']
+                        df.at[selected_index, 'location.section'] = "AI Discovered"
+                        df.at[selected_index, 'location.source_type'] = "text"
+                        
+                        # Clear the pending match after accepting
+                        del st.session_state.pending_ai_match
+                
+                df.at[selected_index, "validated"] = True
+                df.at[selected_index, "validator_name"] = st.session_state.validator_name
+                df.at[selected_index, "validation_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_data(df)
+                st.session_state.df = df
+                st.rerun()
+
+        with col_invalid:
+            if st.button("❌ Invalid", type=invalid_type, width="stretch", disabled=not name_provided):
+                df.at[selected_index, "validated"] = False
+                df.at[selected_index, "validator_name"] = st.session_state.validator_name
+                df.at[selected_index, "validation_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Also clear pending AI match if invalidated? Maybe user rejected the AI suggestion implicitly.
+                if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
+                    del st.session_state.pending_ai_match
+
+                save_data(df)
+                st.session_state.df = df
+                st.rerun()
+
+        with col_flag:
+            flag_label = "Unflag" if is_flagged else "Flag"
+            if st.button(flag_label, type=flag_type, width="stretch"):
+                new_flag_state = not is_flagged
+                df.at[selected_index, "flagged"] = new_flag_state
+                save_data(df)
+                st.session_state.df = df
+                st.rerun()
+                
+        with col_reset:
+            if st.button("Reset", type="secondary", width="stretch"):
+                df.at[selected_index, "validated"] = None
+                df.at[selected_index, "validator_name"] = ""
+                df.at[selected_index, "validation_date"] = ""
+                
+                # Clear pending match
+                if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
+                    del st.session_state.pending_ai_match
+
+                save_data(df)
+                st.session_state.df = df
+                st.rerun()
+                
+        if is_flagged:
+            st.warning("This property is flagged for review.")
         
         container = st.container(border=True)
         with container:
-            st.markdown(f"**Property:** `{row['property_name']}`")
-            st.markdown(f"**Value:** `{row['value_string']}`")
-            st.markdown(f"**Unit:** `{row['units']}`")
             st.markdown(f"**Material:** `{row['material_or_system']}`")
+            st.markdown(f"**Property:** `{row['property_name']}`")
+            st.markdown(f"**Value String:** `{row['value_string']}`")
+            st.markdown(f"**Value Number:** `{row['value_number']}`")
+            st.markdown(f"**Unit:** `{row['units']}`")
             st.markdown(f"**Location:** Page {row['location.page']}, {row['location.section']}")
             st.markdown(f"**Evidence:** _{row['location.evidence']}_")
 
-            st.write("---")
-            st.write("**Is this valid?**")
+            with st.expander("More info"):
+                # Define columns to exclude (displayed above + system cols)
+                displayed_cols = {
+                    'property_name', 'value_string', 'value_number', 'units', 
+                    'material_or_system', 'location.page', 'location.section', 'location.evidence'
+                }
+                system_cols = {
+                    'validated', 'validator_name', 'validation_date', 'flagged', 
+                    'paper_pdf_path', 'validator_note'
+                }
+                exclude_cols = displayed_cols.union(system_cols)
+                
+                # Iterate and display
+                for col_name, val in row.items():
+                    if col_name not in exclude_cols and pd.notna(val) and str(val).strip() != "":
+                         st.markdown(f"**{col_name}:** `{val}`")
 
-            # Check if validator name is provided
-            name_provided = validator_name and validator_name.strip() != ""
-
-            if not name_provided:
-                st.warning("Please enter your name in the sidebar to begin validation.")
-
-            # Validation Controls
-            # Give more weight to Valid/Invalid to prevent wrapping
-            col_valid, col_invalid, col_flag, col_reset = st.columns([1.5, 1.5, 1.1, 1.1])
-
-            is_validated = row["validated"]
-            is_flagged = row["flagged"]
+            # st.write("---")
+            # Notes Section
             
-            # Determine button styles based on state
-            valid_type = "primary" if is_validated is True else "secondary"
-            invalid_type = "primary" if is_validated is False else "secondary"
-            flag_type = "primary" if is_flagged else "secondary"
+            
+            # Use text_area with on_change callback or just check for change
+            # We use key=f"note_{selected_index}" to ensure uniqueness if we want, 
+            # but simpler is just to bind to a stable key and handle updates.
+            # Actually, `st.text_area` works best if we just use the current value.
+            
+            current_note = row.get("validator_note", "")
+            if pd.isna(current_note): current_note = ""
+            current_note = str(current_note)
 
-            with col_valid:
-                # Modifying Valid Button to Handle Pending AI Matches
-                if st.button("✅ Valid", type=valid_type, width="stretch", disabled=not name_provided):
-                    # Check if there is a pending AI suggestion for this row
-                    if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
-                         suggestion = st.session_state.pending_ai_match
-                         df.at[selected_index, 'location.page'] = suggestion['page']
-                         df.at[selected_index, 'location.evidence'] = suggestion['evidence']
-                         df.at[selected_index, 'location.section'] = "AI Discovered"
-                         df.at[selected_index, 'location.source_type'] = "text"
-                         
-                         # Clear the pending match after accepting
-                         del st.session_state.pending_ai_match
-                    
-                    df.at[selected_index, "validated"] = True
-                    df.at[selected_index, "validator_name"] = st.session_state.validator_name
-                    df.at[selected_index, "validation_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    save_data(df, csv_path)
-                    st.session_state.df = df
-                    st.rerun()
-
-            with col_invalid:
-                if st.button("❌ Invalid", type=invalid_type, width="stretch", disabled=not name_provided):
-                    df.at[selected_index, "validated"] = False
-                    df.at[selected_index, "validator_name"] = st.session_state.validator_name
-                    df.at[selected_index, "validation_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Also clear pending AI match if invalidated? Maybe user rejected the AI suggestion implicitly.
-                    if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
-                        del st.session_state.pending_ai_match
-
-                    save_data(df, csv_path)
-                    st.session_state.df = df
-                    st.rerun()
-
-            with col_flag:
-                flag_label = "Unflag" if is_flagged else "Flag"
-                if st.button(flag_label, type=flag_type, width="stretch"):
-                    new_flag_state = not is_flagged
-                    df.at[selected_index, "flagged"] = new_flag_state
-                    save_data(df, csv_path)
-                    st.session_state.df = df
-                    st.rerun()
-                    
-            with col_reset:
-                if st.button("Reset", type="secondary", width="stretch"):
-                    df.at[selected_index, "validated"] = None
-                    df.at[selected_index, "validator_name"] = ""
-                    df.at[selected_index, "validation_date"] = ""
-                    
-                    # Clear pending match
-                    if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
-                        del st.session_state.pending_ai_match
-
-                    save_data(df, csv_path)
-                    st.session_state.df = df
-                    st.rerun()
-                    
-            if is_flagged:
-                st.warning("This property is flagged for review.")
+            new_note = st.text_area(
+                "Add notes:",
+                value=current_note,
+                key=f"note_input_{selected_index}",
+                height=100,
+                placeholder="Enter notes here..."
+            )
+            
+            if new_note != current_note:
+                df.at[selected_index, "validator_note"] = str(new_note)
+                save_data(df)
+                st.session_state.df = df
+                st.toast("Note saved!")
 
         # Bottom Left: Full Data Table (Read-only view of context)
         st.subheader("Property List")
@@ -985,31 +1101,48 @@ def main():
             # Check effective page num
             valid_page, p_num = is_valid_page(page_num)
             
-            img_bytes = None
-            caption = ""
-            
+            pdf_images = []
+
             if valid_page:
                 rects = []
                 score = 0.0
                 if pending_match:
                      # Highlight pending AI match (strict on the found AI page)
-                     # For AI match, we trust the AI found the text, but our finding logic might fail if text extraction is bad.
-                     # We still check score to avoid random highlights.
                      _, score, rects = find_evidence_in_pdf(pdf_path, evidence_text, suggested_page_num=p_num, scan_all_pages=False)
                 elif evidence_text and str(evidence_text).lower() != 'nan' and str(evidence_text).strip() != "":
                      # Highlight existing CSV evidence (User Request: Strict check on THIS page only)
                      _, score, rects = find_evidence_in_pdf(pdf_path, evidence_text, suggested_page_num=p_num, scan_all_pages=False)
-                
-                # Filter out low confidence matches (User: "If there is no good match, there just wont be any highlghting")
-                if score < 0.6: 
+
+                     # 2. If Strict Search failed (low score), try Global Search
+                     if score < 0.8:
+                         best_page, best_score, best_rects = find_evidence_in_pdf(pdf_path, evidence_text, suggested_page_num=p_num, scan_all_pages=True)
+
+                         # If Global Search found a strong match
+                         if best_score > 0.8:
+                             # Check if page changed
+                             old_page_int = int(p_num) if pd.notna(p_num) and str(p_num).replace('.','',1).isdigit() else -1
+                             new_page_int = int(best_page)
+
+                             # Always use the better rects/score from global search
+                             p_num = new_page_int
+                             rects = best_rects
+                             score = best_score
+
+                             if new_page_int != old_page_int:
+                                 # Auto-Correction event
+                                 df.at[selected_index, 'location.page'] = p_num
+                                 save_data(df)
+                                 st.session_state.df = df
+                                 st.toast(f"Page auto-corrected to {p_num}", icon="🔄")
+
+                # Filter out low confidence matches
+                if score < 0.6:
                      rects = []
 
-                img_bytes, error = render_page_image(pdf_path, p_num, highlight_rects=rects)
+                # Get all images
+                pdf_images, error = get_pdf_images(pdf_path, highlight_rects=rects, page_num=p_num)
                 
-                if img_bytes:
-                    caption = f"Page {p_num}"
-                    if pending_match: caption += " (AI Suggestion - Pending Validation)"
-                else:
+                if not pdf_images:
                     st.error(error)
 
             # If not valid page AND no pending match, show search
@@ -1017,7 +1150,13 @@ def main():
             elif (pd.isna(page_num) or page_num == ""):
                  st.info("No page number specified.")
                  
+                 # Show full PDF without highlights if no page specified? 
+                 # User requested "just convert each pdf page to an image and then display this".
+                 # So we should probably show it even if no page num, just no highlights.
+                 pdf_images, _ = get_pdf_images(pdf_path)
+
                  # AI Search Button
+                 st.divider()
                  if st.button("🤖 Find with AI", key="ai_search_btn"):
                      with st.spinner("Asking Gemini to find the value in the paper..."):
                          ai_page, ai_evidence, ai_conf = search_with_ai(
@@ -1061,11 +1200,53 @@ def main():
             else:
                  st.warning(f"Invalid page number: {page_num}")
 
-            if img_bytes:
-                st.image(img_bytes, caption=caption, width="stretch")
-            elif pdf_path and not img_bytes and (pd.isna(page_num) or page_num == ""):
-                 # Clean "Preview not available"
-                 pass
+            # Render Images
+            if pdf_images:
+                 # Create a scrollable container
+                 with st.container(height=800):
+                     for i, (img_bytes, caption) in enumerate(pdf_images):
+                         # Add an anchor for Javascript to target
+                         # The page_num is user-facing (1-based), so we use that index logic
+                         # caption "Page X (Evidence)" or "Page X"
+                         
+                         # Check if this is the target page to scroll to
+                         is_target = False
+                         if valid_page and (i + 1) == p_num:
+                             is_target = True
+
+                         # Inject a small script to scroll to this element if it is the target
+                         # We use a unique ID based on the loop index to ensure specificity
+                         if is_target:
+                             # We insert a dummy element to target - BEFORE the image so we scroll to top
+                             st.markdown(f'<div id="target_page_scroll_marker"></div>', unsafe_allow_html=True)
+                             
+                             # Javascript to scroll this marker into view
+                             # We must access window.parent to break out of the component iframe
+                             js = f"""
+                             <script>
+                                 setTimeout(function() {{
+                                     try {{
+                                         const element = window.parent.document.getElementById("target_page_scroll_marker");
+                                         if (element) {{
+                                             element.scrollIntoView({{behavior: "smooth", block: "start"}});
+                                         }}
+                                     }} catch (e) {{
+                                         console.log("Auto-scroll failed:", e);
+                                     }}
+                                 }}, 500);
+                             </script>
+                             """
+                             components.html(js, height=0)
+
+                         st.image(img_bytes, caption=caption, width="stretch")
+            elif pdf_path and not pdf_images and (pd.isna(page_num) or page_num == ""):
+                 # Fallback if get_pdf_images failed or returned empty but we have a path
+                 # Try one more time without highlights
+                 pdf_images, _ = get_pdf_images(pdf_path)
+                 if pdf_images:
+                      with st.container(height=800):
+                         for img_bytes, caption in pdf_images:
+                             st.image(img_bytes, caption=caption, width="stretch")
 
 if __name__ == "__main__":
     main()
