@@ -26,14 +26,14 @@ OPENAI_API_KEY=xxxxx
 ### SuperCon Domain
 
 1. Download files:
-    1. [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/supercon/`:
+    1. [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/supercon/`.
+
+    2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `data/supercon/SuperCon.csv`.
 
 ```bash
 # Assumes Paper_DB.tar is in the current directory
 mkdir -p data/supercon && tar -xvf Paper_DB.tar -C data/supercon/
 ```
-
-    2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `data/supercon/SuperCon.csv`.
 
 2. Generate a CSV of SuperCon properties, and optionally upload to a huggingface repo:
 
