@@ -2985,7 +2985,7 @@ requires-dist = [
     { name = "datasets" },
     { name = "google-genai", specifier = ">=1.55.0" },
     { name = "harbor", marker = "extra == 'dev'", specifier = ">=0.1.23" },
-    { name = "huggingface-hub", extras = ["cli"] },
+    { name = "huggingface-hub" },
     { name = "langchain" },
     { name = "pdfplumber" },
     { name = "pre-commit", marker = "extra == 'dev'" },
