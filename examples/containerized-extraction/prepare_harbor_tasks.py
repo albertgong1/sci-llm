@@ -41,7 +41,7 @@ def repo_root() -> Path:
 
 def templates_dir() -> Path:
     """Return the directory containing files copied into generated Harbor tasks."""
-    return Path(__file__).parent / "task_templates"
+    return Path(__file__).parent / "ground-template"
 
 
 def read_template(relative_path: str) -> str:
