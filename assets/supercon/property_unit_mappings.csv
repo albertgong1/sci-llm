@@ -18,41 +18,37 @@ dcdt,udldt,temperature dependence of LATC,unit of D(L)DT
 dadp,udldp,pressure dependence of LATA,unit of D(L)DP
 dbdp,udldp,pressure dependence of LATB,unit of D(L)DP
 dcdp,udldp,pressure dependence of LATC,unit of D(L)DP
+t1,utc,transition temperature (R = 0),unit of Tc
+t2,utc,transition temperature (mid point),unit of Tc
+t3,utc,transition temperature (R = 100%),unit of Tc
 tcsus,utc,Tc from susceptibility measurement,unit of Tc
 tcn,utc,lowest temperature for measurement (not superconducting),unit of Tc
 tcwidth,utc,transition width for resistive transition,unit of Tc
 tc,utc,Tc (of this sample) recommended,unit of Tc
-tcmeth,utc,tc measurement method,unit of Tc
 dtcdp,udtcdp,slope at P = 0 in Tc vs P plot,unit of DTCDP
-mhc1,uhc1,method of Hc1 derivation,unit of Hc1
 hc1zero,uhc1,Hc1 at 0 K for poly crystal,unit of Hc1
 phc1zero,uhc1,Hc1 at 0 K for single crystal for H //ab-plane,unit of Hc1
 nhc1zero,uhc1,Hc1 at 0 K for single crystal for H //c-axis,unit of Hc1
 hc1t,uhc1,Hc1 at given temperature for poly crystal,unit of Hc1
 phc1t,uhc1,Hc1 at given temperature for single crystal H//ab-plane,unit of Hc1
 nhc1t,uhc1,Hc1 at given temperature for single crystal H//c-axis,unit of Hc1
-mhc2,uhc2,method of Hc2 derivation,unit of Hc2
 hc2zero,uhc2,Hc2 at 0 K for poly crystal,unit of Hc2
 phc2zero,uhc2,Hc2 at 0 K for single crystal for H //ab-plane,unit of Hc2
 nhc2zero,uhc2,Hc2 at 0 K for single crystal for H //c-axis,unit of Hc2
 hc2t,uhc2,Hc2 at given temperature for poly crystal,unit of Hc2
 phc2t,uhc2,Hc2 at given temperature for single crystal H//ab-plane,unit of Hc2
 nhc2t,uhc2,Hc2 at given temperature for single crystal H//c-axis,unit of Hc2
-mdhc2dt,udhc2dt,method of dHc2/dT derivation,unit of dHc2/dT
-dhc2dt,udhc2dt,#NAME?,unit of dHc2/dT
 pdhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,unit of dHc2/dT
 ndhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,unit of dHc2/dT
-mcohere,ucohere,method of COHERE derivation,unit of COHERE
 cohere,ucohere,coherence length at 0 K for poly crystal,unit of COHERE
 pcohere,ucohere,coherence length at 0 K for single crystal for H //ab-plane,unit of COHERE
 ncohere,ucohere,coherence length at 0 K for single crystal for H ⊥ab-plane,unit of COHERE
-mpenet,upenet,method of PENET derivation,unit of PENET
 penet,upenet,penetration depth at 0 K for poly crystal,unit of PENET
 ppenet,upenet,penetration depth at 0 K for single crystal for H //ab-plane,unit of PENET
 npenet,upenet,penetration depth at 0 K for single crystal for H⊥ab-plane,unit of PENET
 gap,ugap,"energy gap at 0 K , delta(0)",unit of energy gap
 gapene,ugap,"normarized energy gap at 0 K , 2delta(0)/kTc",unit of energy gap
-gapmeth,ugap,method of measuring energy gap,unit of energy gap
+jche,ugap,"Jc at 4.2 K, H = 0 T",unit of energy gap
 spjump,ujump,specific heat jump at Tc (delta-C),unit of SPJUMP
 gamma,ugamma,coefficient of electronic specific heat,unit of GAMMA
 thc300,uthc,thermal conductivity at 300 K,unit of thermal conductivity
@@ -77,3 +73,5 @@ rh300,uhall,Hall coefficient at 300 K,unit of RH300
 rh300n,uhall,"Hall coefficient at 300 K for single, H//c-axis",unit of RH300
 rh300p,uhall,"Hall coefficient at 300 K for single, H//ab-plane",unit of RH300
 carrier,ucarr,carrier density at 300 K,unit of carrier density
+nort,utc,normal temperature,unit of Tc
+tempc1,utc,measuring temperature,unit of Tc
