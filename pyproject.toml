@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sci-llm"
 description = ""
 version = "0.0.0"
-requires-python = "==3.13"
+requires-python = "~=3.13.0"
 authors = [
     {name="Albert Gong", email="agong@cs.cornell.edu"},
 ]
@@ -21,15 +21,18 @@ dependencies = [
     "datasets",
     "pdfplumber",
     "langchain",
-    "pymatgen",
     "pandas",
-    "google-genai",
+    "pydantic",
+    "pymatgen",
     "tqdm",
+    "google-genai",
+    "openai",
 ]
 
 [dependency-groups]
 dev = [
     "pre-commit",
+    "ruff",
 ]
 validator = [
     "streamlit",
@@ -43,91 +46,3 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.ruff]
-
-exclude = [
-    ".git",
-    "__pycache__",
-]
-
-lint.ignore = [
-    "ANN101",
-    "ANN401",
-    "N801",
-    "E203",
-    "E266",
-    "E501",
-    "E741",
-    "N803",
-    "N802",
-    "N806",
-    "D400",
-    "D401",
-    "D104", #temporary
-    "D105",
-    "D415",
-    "D402",
-    "D205",
-    "D100",
-    "D101",
-    "D107",
-    "D203",
-    "D213",
-    "ANN204",
-    "ANN102",
-]
-lint.select = ["D", "E", "F", "N", "ANN"]
-lint.fixable = [
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "G",
-    "I",
-    "N",
-    "Q",
-    "S",
-    "T",
-    "W",
-    "ANN",
-    "ARG",
-    "BLE",
-    "COM",
-    "DJ",
-    "DTZ",
-    "EM",
-    "ERA",
-    "EXE",
-    "FBT",
-    "ICN",
-    "INP",
-    "ISC",
-    "NPY",
-    "PD",
-    "PGH",
-    "PIE",
-    "PL",
-    "PT",
-    "PTH",
-    "PYI",
-    "RET",
-    "RSE",
-    "RUF",
-    "SIM",
-    "SLF",
-    "TCH",
-    "TID",
-    "TRY",
-    "UP",
-    "YTT",
-]
-lint.unfixable = []
-
-[tool.pyright]
-venv = ".venv"
-venvPath = "."
-include = ["src"]
-pythonVersion = "3.10.4"
