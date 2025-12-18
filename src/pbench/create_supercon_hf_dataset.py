@@ -189,6 +189,7 @@ df_copy = (
     ]
 )
 save_path = args.output_dir / "supercon" / "property_extraction_dataset" / "dataset.csv"
+save_path.parent.mkdir(parents=True, exist_ok=True)
 df_copy.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 

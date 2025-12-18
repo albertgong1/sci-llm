@@ -39,7 +39,7 @@ mkdir -p data/supercon && tar -xvf Paper_DB.tar -C data/supercon/
 
 ```bash
 ./src/pbench/create_supercon_hf_dataset.py \
-    --data_dir data/ \
+    --domain supercon \
     --output_dir out/ \
     --repo_name <repo_name> \
     --filter_pdf
