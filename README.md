@@ -50,6 +50,5 @@ Outputs are stored at `out/supercon/preds/*.json`.
 ./src/pbench_eval/score_task.py \
     --domain supercon \
     --task tc \
-    --model_name gemini-2.5-flash \
     -od out/
 ```

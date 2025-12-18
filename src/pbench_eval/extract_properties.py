@@ -27,7 +27,7 @@ from datasets import load_dataset
 
 import llm_utils
 from llm_utils.common import Conversation, File, LLMChatResponse, Message
-from pbench_eval import constants, utils
+import pbench
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ def process_paper(
 def main(args: argparse.Namespace) -> None:
     """Main function to extract properties from PDF files using LLMs."""
     # Load dataset from HuggingFace
-    hf_dataset_name = constants.DOMAIN2HF_DATASET_NAME[args.domain]
+    hf_dataset_name = pbench.DOMAIN2HF_DATASET_NAME[args.domain]
     logger.info(
         f"Loading dataset from HuggingFace: {hf_dataset_name} (task={args.task})"
     )
@@ -240,54 +240,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Extract properties from PDF files using LLMs"
     )
-    # Task-specific arguments
-    parser.add_argument(
-        "--domain",
-        type=str,
-        required=True,
-        choices=constants.SUPPORTED_DOMAINS,
-        help="Domain to perform extraction on",
-    )
-    parser.add_argument(
-        "--task",
-        type=str,
-        required=True,
-        help="HuggingFace dataset configuration name, depending on the domain (e.g., 'Tc', 'gap')",
-    )
-    parser.add_argument(
-        "--split",
-        type=str,
-        default="test",
-        help="Split of the dataset to use",
-    )
-    parser.add_argument(
-        "--data_dir",
-        type=Path,
-        default="data/",
-        help="Directory containing Paper_DB folder with PDFs",
-    )
-    parser.add_argument(
-        "--output_dir",
-        "-od",
-        type=Path,
-        default="out/",
-        help="Output directory for results",
-    )
-
-    # LLM arguments
-    parser.add_argument(
-        "--server",
-        type=str,
-        default="gemini",
-        choices=llm_utils.SUPPORTED_SERVERS,
-        help="LLM server to use",
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default="gemini-2.5-flash",
-        help="Name of the LLM to use for extraction",
-    )
+    parser = pbench.add_base_args(parser)
 
     # Batch processing arguments
     parser.add_argument(
@@ -307,13 +260,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--force", "-f", action="store_true", help="Overwrite existing output files"
     )
-    parser.add_argument(
-        "--log_level", type=int, default=logging.INFO, help="Logging level"
-    )
 
     args = parser.parse_args()
-    utils.setup_logging(args.log_level)
+    pbench.setup_logging(args.log_level)
 
     assert args.domain == "supercon", "Only supercon domain is supported for now"
+    assert args.task is not None, "Task must be specified"
 
     main(args)

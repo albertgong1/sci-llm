@@ -24,13 +24,16 @@ import json
 import re
 from pathlib import Path
 import matplotlib.pyplot as plt
+import logging
 
 import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from pbench_eval import constants
+import pbench
 from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si
+
+logger = logging.getLogger(__name__)
 
 
 def parse_numeric_value(value: str) -> float | None:
@@ -389,43 +392,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Score extraction predictions based on property-specific rubrics."
     )
-    parser.add_argument(
-        "--domain",
-        type=str,
-        required=True,
-        choices=constants.SUPPORTED_DOMAINS,
-        help="Domain to score predictions for",
-    )
-    parser.add_argument(
-        "--task",
-        type=str,
-        default=None,
-        help="Filter by task name (e.g., 'tc'). Only used if preds_path is a directory.",
-    )
-    parser.add_argument(
-        "--split",
-        type=str,
-        default=None,
-        help="Filter by split name (e.g., 'test'). Only used if preds_path is a directory.",
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default=None,
-        help="Filter by model name (e.g., 'gemini-2.5-flash'). Only used if preds_path is a directory.",
-    )
+    parser = pbench.add_base_args(parser)
     parser.add_argument(
         "--rubric_csv_filename",
         type=str,
         default="rubric.csv",
         help="Filename of the rubric CSV file (default: rubric.csv)",
-    )
-    parser.add_argument(
-        "--output_dir",
-        "-od",
-        type=Path,
-        default="out/",
-        help="Output directory (default: out)",
     )
     parser.add_argument(
         "--analyze",
@@ -434,6 +406,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    pbench.setup_logging(args.log_level)
 
     # Load predictions
     preds_df = load_all_predictions(args)
@@ -477,9 +450,7 @@ def main() -> None:
     scores_dir.mkdir(parents=True, exist_ok=True)
 
     # Score predictions
-    rubric_path = (
-        Path(__file__).parent / "assets" / args.domain / args.rubric_csv_filename
-    )
+    rubric_path = pbench.ASSETS_DIR / args.domain / args.rubric_csv_filename
     scored_df = score_predictions(preds_df, rubric_path, output_path)
 
     # Analyze scores by material and property
