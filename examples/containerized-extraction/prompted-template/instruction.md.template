@@ -2,8 +2,6 @@
 
 You are given the following paper (refno: {refno}).
 
-{paper_context}
-
 Task metadata (structured questions): {meta_path}
 
 Agent tips:

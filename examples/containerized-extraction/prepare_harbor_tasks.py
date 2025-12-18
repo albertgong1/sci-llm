@@ -1,4 +1,4 @@
-"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
+r"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
 
 This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
 each with:
@@ -96,7 +96,7 @@ def extract_pdf_text(pdf_path: Path) -> str:
     return "\n\n".join(pages)
 
 
-def dockerfile_contents(*, include_text: bool) -> str:
+def dockerfile_contents() -> str:
     """Render the task environment Dockerfile.
 
     The environment always includes the PDF at `/app/paper.pdf`.
@@ -104,21 +104,15 @@ def dockerfile_contents(*, include_text: bool) -> str:
     - Hard mode omits `paper.txt` and installs `pdftotext` (poppler-utils) so
       agents can decide how to extract text themselves.
     """
-    install_pdf_tools = ""
-    copy_paper_txt = ""
-    if include_text:
-        copy_paper_txt = "COPY paper.txt /app/paper.txt"
-    else:
-        install_pdf_tools = (
-            "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
-            "    poppler-utils \\\n"
-            "    procps \\\n"
-            "  && rm -rf /var/lib/apt/lists/*"
-        )
+    install_pdf_tools = (
+        "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+        "    poppler-utils \\\n"
+        "    procps \\\n"
+        "  && rm -rf /var/lib/apt/lists/*"
+    )
 
     return read_template("environment/Dockerfile").format(
-        install_pdf_tools=install_pdf_tools,
-        copy_paper_txt=copy_paper_txt,
+        install_pdf_tools=install_pdf_tools
     )
 
 
@@ -132,7 +126,9 @@ def group_rows(dataset: Iterable[dict[str, Any]]) -> dict[str, list[dict[str, An
 
 def write_job_config(tasks_dir: Path, job_path: Path) -> None:
     """Write a Harbor job YAML pointing at the generated tasks."""
-    tasks_rel = tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
+    tasks_rel = (
+        tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
+    )
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
@@ -162,7 +158,6 @@ def build_task(
     refno: str,
     rows: list[dict[str, str]],
     rubric_mapping: dict[str, str],
-    include_text: bool,
 ) -> None:
     """Build a single Harbor task directory (one paper, many questions)."""
     env_dir = task_dir / "environment"
@@ -174,11 +169,6 @@ def build_task(
     solution_dir.mkdir(parents=True, exist_ok=True)
 
     shutil.copy2(pdf_path, env_dir / "paper.pdf")
-    if include_text:
-        paper_text = extract_pdf_text(pdf_path)
-        if not paper_text.strip():
-            raise ValueError(f"Failed to extract any text from {pdf_path}")
-        (env_dir / "paper.txt").write_text(paper_text)
 
     questions: list[dict[str, str]] = []
     expected_rows: list[dict[str, str]] = []
@@ -210,9 +200,7 @@ def build_task(
 
     task_meta = {
         "refno": refno,
-        "paper_mode": "easy" if include_text else "hard",
         "pdf_path": "/app/paper.pdf",
-        "text_path": "/app/paper.txt" if include_text else None,
         "predictions_path": "/app/output/predictions.json",
         "questions": questions,
     }
@@ -222,31 +210,15 @@ def build_task(
         textwrap.dedent(
             f"""\
             [{idx}]
-            Question: What is the {item['property_name']} recommended for {item['material']}? Here, "{item['property_name']}" is defined as "{item['definition']}".
+            Question: What is the {item["property_name"]} recommended for {item["material"]}? Here, "{item["property_name"]}" is defined as "{item["definition"]}".
             Answer:
             """
         ).strip()
         for idx, item in enumerate(questions)
     )
-    paper_context = "\n".join(
-        [
-            f"- PDF: /app/paper.pdf",
-            (
-                "- Extracted text (provided): /app/paper.txt"
-                if include_text
-                else "- No pre-extracted text is provided for this task."
-            ),
-        ]
-    )
-    gemini_at_commands = (
-        "`@paper.txt`"
-        if include_text
-        else "`@paper.pdf`"
-    )
-    paper_at_command = "@paper.txt" if include_text else "@paper.pdf"
-    claude_file_examples = (
-        "`/app/paper.pdf`, `/app/paper.txt`" if include_text else "`/app/paper.pdf`"
-    )
+    gemini_at_commands = "`@paper.pdf`"
+    paper_at_command = "@paper.pdf"
+    claude_file_examples = "`/app/paper.pdf`"
 
     instruction_template = read_template("instruction.md.template")
     instruction = instruction_template.format(
@@ -254,7 +226,6 @@ def build_task(
         meta_path="/app/task_meta.json",
         predictions_path="/app/output/predictions.json",
         question_blocks=question_blocks,
-        paper_context=paper_context,
         paper_at_command=paper_at_command,
         gemini_at_commands=gemini_at_commands,
         claude_file_examples=claude_file_examples,
@@ -264,7 +235,7 @@ def build_task(
     task_toml = read_template("task.toml.template").format(task_name=task_name)
     (task_dir / "task.toml").write_text(task_toml)
 
-    (env_dir / "Dockerfile").write_text(dockerfile_contents(include_text=include_text))
+    (env_dir / "Dockerfile").write_text(dockerfile_contents())
     copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
     copy_template("tests/test.sh", tests_dir / "test.sh")
 
@@ -293,6 +264,7 @@ EOF
 
 
 def main() -> None:
+    """Generate Harbor tasks for the benchmark."""
     parser = argparse.ArgumentParser(
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
@@ -301,13 +273,6 @@ def main() -> None:
         type=str,
         default="tc",
         help="Dataset configuration to load from kilian-group/supercon-mini (default: tc)",
-    )
-    parser.add_argument(
-        "--paper-mode",
-        type=str,
-        default="easy",
-        choices=["easy", "hard"],
-        help="easy: bundle a pre-extracted paper.txt; hard: PDF-only (no pre-transcription).",
     )
     parser.add_argument(
         "--pdf-dir",
@@ -348,7 +313,7 @@ def main() -> None:
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
 
-    task_root = args.output_dir / args.task / args.paper_mode
+    task_root = args.output_dir / args.task
     tasks_dir = task_root / "tasks"
     if task_root.exists():
         if args.force:
@@ -390,7 +355,6 @@ def main() -> None:
             refno=refno,
             rows=grouped[refno],
             rubric_mapping=rubric_mapping,
-            include_text=(args.paper_mode == "easy"),
         )
         print(f"Wrote task {task_id} -> {task_dir.relative_to(repo_root())}")
 

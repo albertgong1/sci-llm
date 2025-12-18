@@ -18,6 +18,15 @@ class RowKey:
 
     @staticmethod
     def from_strings(material: str, property_name: str) -> "RowKey":
+        """Docstring for from_strings
+
+        :param material: Description
+        :type material: str
+        :param property_name: Description
+        :type property_name: str
+        :return: Description
+        :rtype: RowKey
+        """
         return RowKey(material.strip().lower(), property_name.strip().lower())
 
 
@@ -54,12 +63,22 @@ def score_value(pred_value: str, answer_value: str, rubric: str | None) -> float
         except Exception:
             return 0.0
         try:
-            return 1.0 if Composition(str(pred_value)).almost_equals(Composition(str(answer_value))) else 0.0
+            return (
+                1.0
+                if Composition(str(pred_value)).almost_equals(
+                    Composition(str(answer_value))
+                )
+                else 0.0
+            )
         except Exception:
             return 0.0
 
     # Default categorical: case-insensitive equality.
-    return 1.0 if str(pred_value).strip().lower() == str(answer_value).strip().lower() else 0.0
+    return (
+        1.0
+        if str(pred_value).strip().lower() == str(answer_value).strip().lower()
+        else 0.0
+    )
 
 
 def _load_json(path: Path) -> Any:
@@ -128,7 +147,9 @@ def _extract_text_from_jsonlines_log(text: str) -> str | None:
                 content = message.get("content")
                 if isinstance(content, list):
                     for block in content:
-                        if isinstance(block, dict) and isinstance(block.get("text"), str):
+                        if isinstance(block, dict) and isinstance(
+                            block.get("text"), str
+                        ):
                             decoded_parts.append(block["text"])
 
             # Some tools may surface the final answer as `result`.
@@ -139,7 +160,9 @@ def _extract_text_from_jsonlines_log(text: str) -> str | None:
     if not any_json:
         return None
 
-    combined = "\n\n".join(part.strip() for part in decoded_parts if part and part.strip())
+    combined = "\n\n".join(
+        part.strip() for part in decoded_parts if part and part.strip()
+    )
     return combined or None
 
 
@@ -163,7 +186,9 @@ def load_predictions(predictions_path: Path) -> list[dict[str, Any]]:
             if records:
                 return records
             return list(data.values())
-        raise ValueError("predictions.json must be a list or dict of prediction entries")
+        raise ValueError(
+            "predictions.json must be a list or dict of prediction entries"
+        )
 
     agent_logs_dir = Path("/logs/agent")
     if agent_logs_dir.exists():
@@ -183,6 +208,7 @@ def load_predictions(predictions_path: Path) -> list[dict[str, Any]]:
 
 
 def main() -> None:
+    """Docstring for main"""
     expected_path = Path("/tests/expected.json")
     predictions_path = Path("/app/output/predictions.json")
     reward_path = Path("/logs/verifier/reward.txt")

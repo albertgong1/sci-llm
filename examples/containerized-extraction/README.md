@@ -28,30 +28,18 @@ The PDF corpus should live under `examples/containerized-extraction/data/Paper_D
 
 This repository generates Harbor-ready tasks (one per paper) into `out/harbor/...`.
 
-### Easy mode (with transcription)
+### Normal mode (PDF-only, no pre-transcription)
 
-Includes a pre-extracted `paper.txt` inside the task environment.
-
-```bash
-uv run python examples/containerized-extraction/prepare_harbor_tasks.py \
-  --task tc --paper-mode easy --write-job-config --force
-```
-
-Tasks are written to `out/harbor/supercon-mini/tc/easy/tasks`, and the job config is
-saved at `out/harbor/supercon-mini/tc/easy/job.yaml`.
-
-### Hard mode (PDF-only, no pre-transcription)
-
-Omits `paper.txt` so the agent must use the PDF directly. The container includes
+The container includes
 `pdftotext` to allow terminal agents to extract text on their own.
 
 ```bash
 uv run python examples/containerized-extraction/prepare_harbor_tasks.py \
-  --task tc --paper-mode hard --write-job-config --force
+  --task tc --write-job-config --force
 ```
 
-Tasks are written to `out/harbor/supercon-mini/tc/hard/tasks`, and the job config is
-saved at `out/harbor/supercon-mini/tc/hard/job.yaml`.
+Tasks are written to `out/harbor/supercon-mini/tc/tasks`, and the job config is
+saved at `out/harbor/supercon-mini/tc/job.yaml`.
 
 ### Build a single paper (optional)
 
@@ -76,45 +64,22 @@ the `gemini-cli` agent automatically attaches the paper content.
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/easy/job.yaml -a oracle
+  -c out/harbor/supercon-mini/tc/job.yaml -a oracle
 ```
 
-- Hard + oracle:
+- Gemini CLI (PDF-only):
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/hard/job.yaml -a oracle
-```
-
-- Easy + Gemini CLI:
-
-```bash
-uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/easy/job.yaml \
+  -c out/harbor/supercon-mini/tc/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash
 ```
 
-- Hard + Gemini CLI (PDF-only):
+- Claude Code (PDF-only):
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/hard/job.yaml \
-  -a gemini-cli -m gemini/gemini-2.5-flash
-```
-
-- Easy + Claude Code:
-
-```bash
-uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/easy/job.yaml \
-  -a claude-code
-```
-
-- Hard + Claude Code (PDF-only):
-
-```bash
-uv run python examples/containerized-extraction/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini/tc/hard/job.yaml \
+  -c out/harbor/supercon-mini/tc/job.yaml \
   -a claude-code
 ```
 
@@ -130,22 +95,14 @@ ls out/harbor/supercon-mini/tc/easy/tasks
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py trials start \
-  -p out/harbor/supercon-mini/tc/easy/tasks/<task-id> -a oracle
-```
-
-- Easy + Gemini CLI:
-
-```bash
-uv run python examples/containerized-extraction/run_harbor.py trials start \
-  -p out/harbor/supercon-mini/tc/easy/tasks/<task-id> \
-  -a gemini-cli -m gemini/gemini-2.5-flash
+  -p out/harbor/supercon-mini/tc/tasks/<task-id> -a oracle
 ```
 
 - Hard + Gemini CLI (PDF-only):
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py trials start \
-  -p out/harbor/supercon-mini/tc/hard/tasks/<task-id> \
+  -p out/harbor/supercon-mini/tc/tasks/<task-id> \
   -a gemini-cli -m gemini/gemini-2.5-flash
 ```
 
@@ -153,15 +110,7 @@ uv run python examples/containerized-extraction/run_harbor.py trials start \
 
 ```bash
 uv run python examples/containerized-extraction/run_harbor.py trials start \
-  -p out/harbor/supercon-mini/tc/easy/tasks/<task-id> \
-  -a claude-code
-```
-
-- Hard + Claude Code (PDF-only):
-
-```bash
-uv run python examples/containerized-extraction/run_harbor.py trials start \
-  -p out/harbor/supercon-mini/tc/hard/tasks/<task-id> \
+  -p out/harbor/supercon-mini/tc/tasks/<task-id> \
   -a claude-code
 ```
 
