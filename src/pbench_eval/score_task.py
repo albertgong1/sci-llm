@@ -181,10 +181,10 @@ def load_all_predictions(
             f"No JSON files found in {preds_dir} matching task={args.task}, split={args.split}, model={args.model_name}"
         )
 
-    print(f"Loading {len(json_files)} JSON file(s) from {preds_dir}...")
+    logger.info(f"Loading {len(json_files)} JSON file(s) from {preds_dir}...")
     dfs = []
     for json_file in json_files:
-        print(f"  Loading {json_file.name}")
+        logger.info(f"  Loading {json_file.name}")
         dfs.append(load_json_predictions(json_file))
 
     return pd.concat(dfs, ignore_index=True)
@@ -225,7 +225,7 @@ def score_predictions(
     # Add scores column and save
     preds_df["score"] = scores
     preds_df.to_csv(output_path, index=False)
-    print(f"Scored predictions saved to: {output_path}")
+    logger.info(f"Scored predictions saved to: {output_path}")
 
     return preds_df
 
@@ -324,9 +324,9 @@ def analyze_scores(df: pd.DataFrame, output_dir: Path) -> None:
     material_df.to_csv(material_csv, index=False)
     property_df.to_csv(property_csv, index=False)
 
-    print("\nAnalysis saved to:")
-    print(f"  - {material_csv}")
-    print(f"  - {property_csv}")
+    logger.info("Analysis saved to:")
+    logger.info(f"  - {material_csv}")
+    logger.info(f"  - {property_csv}")
 
 
 def plot_scores(df: pd.DataFrame, output_dir: Path) -> None:
@@ -381,9 +381,9 @@ def plot_scores(df: pd.DataFrame, output_dir: Path) -> None:
     property_plot_path = output_dir / "scores_by_property.pdf"
     plt.savefig(property_plot_path)
 
-    print("\nPlots saved to:")
-    print(f"  - {material_plot_path}")
-    print(f"  - {property_plot_path}")
+    logger.info("Plots saved to:")
+    logger.info(f"  - {material_plot_path}")
+    logger.info(f"  - {property_plot_path}")
     plt.close()
 
 
@@ -410,7 +410,7 @@ def main() -> None:
 
     # Load predictions
     preds_df = load_all_predictions(args)
-    print(f"Loaded {len(preds_df)} predictions")
+    logger.info(f"Loaded {len(preds_df)} predictions")
 
     # Determine output filename based on task, split, and model (extracted from metadata if not specified)
     if args.task is None and "metadata_task" in preds_df.columns:
