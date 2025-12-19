@@ -95,7 +95,6 @@ def parse_json_response(response_text: str) -> dict | None:
         Parsed JSON dict or None if parsing fails
 
     """
-    print(f"Parsing JSON response: {response_text}")
     # Try direct JSON parsing first
     try:
         return json.loads(response_text)
