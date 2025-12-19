@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
+import fitz  # PyMuPDF
 
 import llm_utils
 from llm_utils.common import Conversation, File, LLMChatResponse, Message
@@ -45,6 +46,43 @@ def load_prompt(prompt_path: Path) -> str:
     """
     with open(prompt_path, "r") as f:
         return f.read()
+
+
+def split_pdf_into_pages(pdf_path: Path, output_dir: Path) -> list[Path]:
+    """Split a PDF into individual page PDFs.
+
+    Args:
+        pdf_path: Path to the source PDF
+        output_dir: Directory to save split PDFs (e.g., <data_dir>/<domain>/Paper_DB_split/<refno>/*)
+
+    Returns:
+        List of paths to individual page PDFs
+
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    page_paths = []
+
+    try:
+        doc = fitz.open(pdf_path)
+        for page_num in range(len(doc)):
+            # Create a new PDF with just this page
+            page_doc = fitz.open()
+            page_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+
+            # Save to file
+            page_path = output_dir / f"page{page_num + 1}.pdf"
+            page_doc.save(page_path)
+            page_doc.close()
+
+            page_paths.append(page_path)
+
+        doc.close()
+        logger.info(f"Split {pdf_path.name} into {len(page_paths)} pages")
+        return page_paths
+
+    except Exception as e:
+        logger.error(f"Failed to split PDF {pdf_path}: {e}")
+        return []
 
 
 def parse_json_response(response_text: str) -> dict | None:
@@ -107,13 +145,10 @@ def map_conditions(json_conditions: dict) -> dict:
 
     # Map orientation to field_orientation
     if orientation := json_conditions.get("orientation", ""):
-        # if "orientation" in json_conditions and json_conditions["orientation"]:
         csv_conditions["conditions.field_orientation"] = orientation
 
     # Map field
     if field_val := json_conditions.get("field", ""):
-        # if "field" in json_conditions and json_conditions["field"]:
-        # field_val = json_conditions["field"]
         csv_conditions["conditions.field"] = field_val
         # Check if it's a range
         if any(indicator in str(field_val) for indicator in ["–", "-", "to", "~"]):
@@ -122,7 +157,6 @@ def map_conditions(json_conditions: dict) -> dict:
 
     # Map temperature
     if temp_val := json_conditions.get("temperature", ""):
-        # if "temperature" in json_conditions and json_conditions["temperature"]:
         csv_conditions["conditions.temperature"] = temp_val
         # Check if it's a range
         if any(
@@ -190,14 +224,16 @@ def process_paper(
     prompt: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
+    paper_split_dir: Path,
 ) -> list[pd.Series]:
-    """Process a single paper and extract all properties.
+    """Process a single paper by splitting into pages and extracting properties.
 
     Args:
         paper_path: Path to the PDF file
         prompt: Extraction prompt text
         llm: LLMChat instance
         inf_gen_config: InferenceGenerationConfig instance
+        paper_split_dir: Directory to save split PDFs (e.g., <data_dir>/<domain>/Paper_DB_split/<refno>/*)
 
     Returns:
         List of pandas Series (one per extracted property)
@@ -205,74 +241,100 @@ def process_paper(
     """
     # Extract refno from filename
     refno = paper_path.stem
-    paper_pdf_path = str(paper_path)
 
-    # Create file object
-    file = File(path=paper_path)
+    # Split PDF into individual pages
+    page_paths = split_pdf_into_pages(paper_path, paper_split_dir)
 
-    # Build conversation
-    # TODO: Maybe process 1 page of the PDF at a time
-    conv = Conversation(
-        messages=[
-            Message(role="user", content=[file, prompt]),
-        ]
+    if not page_paths:
+        logger.error(f"No pages extracted from {refno}")
+        return []
+
+    # Process each page
+    all_rows: list[pd.Series] = []
+    property_counter = 0
+
+    pbar = tqdm(
+        enumerate(page_paths, start=1),
+        total=len(page_paths),
+        desc=f"Processing {refno} pages",
     )
+    for page_num, page_path in pbar:
+        # Create file object for this page
+        file = File(path=page_path)
 
-    try:
-        # Get LLM response
-        response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
+        # Build conversation
+        conv = Conversation(
+            messages=[
+                Message(role="user", content=[file, prompt]),
+            ]
+        )
 
-        # Check for errors
-        if response.error:
-            logger.error(f"LLM error for {refno}: {response.error}")
-            return []
+        try:
+            # Get LLM response
+            response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
 
-        # Parse JSON from response
-        json_data = parse_json_response(response.pred)
-        if json_data is None:
-            logger.error(f"Failed to parse JSON from response for {refno}")
-            logger.debug(f"Response text: {response.pred[:500]}...")
-            return []
-
-        # Check for properties array
-        if "properties" not in json_data:
-            logger.error(f"No 'properties' key in JSON for {refno}")
-            return []
-
-        properties = json_data["properties"]
-        if not isinstance(properties, list):
-            logger.error(f"'properties' is not a list for {refno}")
-            return []
-
-        logger.info(f"Extracted {len(properties)} properties from {refno}")
-
-        # Convert each property to CSV row (pandas Series)
-        rows: list[pd.Series] = []
-        for prop_idx, prop in enumerate(properties):
-            try:
-                row_series: pd.Series = json_property_to_csv_row(prop)
-
-                # Assign metadata and values that will be populated later by the validator app
-                row_series["id"] = f"prop_{prop_idx:03d}"
-                row_series["refno"] = refno
-                row_series["paper_pdf_path"] = paper_pdf_path
-                row_series["validated"] = False
-                row_series["validator_name"] = ""
-                row_series["validation_date"] = ""
-                row_series["flagged"] = False
-
-                rows.append(row_series)
-            except Exception as e:
-                logger.warning(f"Failed to convert property {prop} from {refno}: {e}")
+            # Check for errors
+            if response.error:
+                logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
                 continue
 
-        return rows
+            # Parse JSON from response
+            json_data = parse_json_response(response.pred)
+            if json_data is None:
+                logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
+                continue
 
-    except Exception as e:
-        logger.error(f"Error processing {refno}: {e}")
-        return []
-    finally:
-        llm.delete_file(file)
+            # Check for properties array
+            if "properties" not in json_data:
+                logger.warning(
+                    f"No 'properties' key in JSON for {refno} page {page_num}"
+                )
+                continue
+
+            properties = json_data["properties"]
+            if not isinstance(properties, list):
+                logger.warning(
+                    f"'properties' is not a list for {refno} page {page_num}"
+                )
+                continue
+
+            logger.info(
+                f"Extracted {len(properties)} properties from {refno} page {page_num}"
+            )
+
+            # Convert each property to CSV row (pandas Series)
+            for prop in properties:
+                try:
+                    row_series: pd.Series = json_property_to_csv_row(prop)
+
+                    # Assign metadata
+                    row_series["id"] = f"prop_{property_counter:03d}"
+                    row_series["refno"] = refno
+                    row_series["paper_pdf_path"] = str(paper_path)
+                    row_series["location.page"] = page_num
+                    row_series["validated"] = False
+                    row_series["validator_name"] = ""
+                    row_series["validation_date"] = ""
+                    row_series["flagged"] = False
+
+                    all_rows.append(row_series)
+                    property_counter += 1
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to convert property from {refno} page {page_num}: {e}"
+                    )
+                    continue
+
+        except Exception as e:
+            logger.error(f"Error processing {refno} page {page_num}: {e}")
+            continue
+        finally:
+            # Delete file from LLM server
+            llm.delete_file(file)
+
+    logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
+    return all_rows
 
 
 def main(args: argparse.Namespace) -> None:
@@ -332,8 +394,9 @@ def main(args: argparse.Namespace) -> None:
             )
             continue
 
-        # Process the paper
-        rows = process_paper(pdf_path, prompt, llm, inf_gen_config)
+        # Process the paper (splits into pages internally)
+        paper_split_dir = args.data_dir / args.domain / "Paper_DB_split" / refno
+        rows = process_paper(pdf_path, prompt, llm, inf_gen_config, paper_split_dir)
 
         # Save to CSV
         if len(rows) > 0:
