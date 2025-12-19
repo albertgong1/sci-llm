@@ -2,7 +2,7 @@ r"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
 
 This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
 each with:
-  - `environment/`: Docker build context with the paper (and optional extracted text)
+  - `environment/`: Docker build context with the paper PDF
   - `instruction.md`: a single prompt/instruction file shared across tasks via a template
   - `tests/`: verifier that scores predictions using rubric tolerances
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
@@ -10,13 +10,19 @@ each with:
 The source of truth for the benchmark is the Hugging Face dataset
 `kilian-group/supercon-mini`, grouped by `refno` (one Harbor task per paper).
 
-By default this script writes tasks under `out/harbor/supercon-mini/<task>/<paper-mode>/` so the
+By default this script writes tasks under `out/harbor/supercon-mini/<task>/<template>/` so the
 repository doesn't contain a persistent `harbor/` directory until you build.
 
 Example (from repo root):
-    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --paper-mode easy --force
+    # Default template is `ground-template`.
+    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --force
     uv run python examples/containerized-extraction/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini/tc/easy/job.yaml -a oracle
+      -c out/harbor/supercon-mini/tc/ground-template/job.yaml -a oracle
+
+    # To use the question-based template:
+    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --template prompted-template --force
+    uv run python examples/containerized-extraction/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini/tc/prompted-template/job.yaml -a oracle
 """
 
 from __future__ import annotations
@@ -24,13 +30,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import shutil
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any, Iterable, Mapping, cast
 
-import pdfplumber
 from datasets import load_dataset
 
 
@@ -41,7 +47,10 @@ def repo_root() -> Path:
 
 def templates_dir() -> Path:
     """Return the directory containing files copied into generated Harbor tasks."""
-    return Path(__file__).parent / "ground-template"
+    return Path(__file__).parent / _TEMPLATES_SUBDIR
+
+
+_TEMPLATES_SUBDIR = "ground-template"
 
 
 def read_template(relative_path: str) -> str:
@@ -53,6 +62,47 @@ def copy_template(relative_path: str, dest_path: Path) -> None:
     """Copy a template file relative to `task_templates/` to the destination path."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(templates_dir() / relative_path, dest_path)
+
+
+_LBRACE_SENTINEL = "\0LBRACE\0"
+_RBRACE_SENTINEL = "\0RBRACE\0"
+
+
+def _format_template(template: str, values: Mapping[str, Any]) -> str:
+    """Render a prompt/template with optional placeholders.
+
+    This repository's prompt templates often include JSON examples with `{ ... }`.
+    Using `str.format(...)` on such templates is fragile because unescaped braces in
+    JSON will be interpreted as format placeholders.
+
+    This renderer is intentionally conservative:
+    - Only `{name}` placeholders are substituted, where `name` matches
+      `[A-Za-z_][A-Za-z0-9_]*`.
+    - Missing values do NOT raise; unresolved placeholders are left unchanged.
+    - `{{` and `}}` are treated as escaped literal braces for compatibility with
+      existing `str.format`-style templates.
+
+    Args:
+        template: Raw template string (may contain JSON/LaTeX braces).
+        values: Mapping of placeholder names to values (converted to `str`).
+
+    Returns:
+        Rendered string.
+
+    """
+    protected = template.replace("{{", _LBRACE_SENTINEL).replace("}}", _RBRACE_SENTINEL)
+
+    def replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key not in values:
+            return match.group(0)
+        value = values[key]
+        if value is None:
+            return ""
+        return str(value)
+
+    rendered = re.sub(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", replace, protected)
+    return rendered.replace(_LBRACE_SENTINEL, "{").replace(_RBRACE_SENTINEL, "}")
 
 
 def slugify(value: str) -> str:
@@ -79,30 +129,12 @@ def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
     return mapping
 
 
-def extract_pdf_text(pdf_path: Path) -> str:
-    """Extract a best-effort plain-text representation of a PDF.
-
-    This makes tasks solvable by terminal agents like `gemini-cli` without requiring PDF
-    tooling inside the container. The extracted text is bundled into the task
-    environment as `/app/paper.txt` and can be injected into Gemini CLI prompts via
-    the `@paper.txt` "At command".
-    """
-    pages: list[str] = []
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        for page in pdf.pages:
-            page_text = (page.extract_text() or "").strip()
-            if page_text:
-                pages.append(page_text)
-    return "\n\n".join(pages)
-
-
 def dockerfile_contents() -> str:
     """Render the task environment Dockerfile.
 
     The environment always includes the PDF at `/app/paper.pdf`.
-    - Easy mode includes a pre-extracted `/app/paper.txt`
-    - Hard mode omits `paper.txt` and installs `pdftotext` (poppler-utils) so
-      agents can decide how to extract text themselves.
+    The container includes `pdftotext` (poppler-utils) so agents can extract text
+    from the PDF on their own.
     """
     install_pdf_tools = (
         "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
@@ -111,8 +143,9 @@ def dockerfile_contents() -> str:
         "  && rm -rf /var/lib/apt/lists/*"
     )
 
-    return read_template("environment/Dockerfile").format(
-        install_pdf_tools=install_pdf_tools
+    return _format_template(
+        read_template("environment/Dockerfile"),
+        {"install_pdf_tools": install_pdf_tools},
     )
 
 
@@ -221,18 +254,32 @@ def build_task(
     claude_file_examples = "`/app/paper.pdf`"
 
     instruction_template = read_template("instruction.md.template")
-    instruction = instruction_template.format(
-        refno=refno,
-        meta_path="/app/task_meta.json",
-        predictions_path="/app/output/predictions.json",
-        question_blocks=question_blocks,
-        paper_at_command=paper_at_command,
-        gemini_at_commands=gemini_at_commands,
-        claude_file_examples=claude_file_examples,
-    )
+    instruction_values = {
+        # Identifiers
+        "task": task_name,
+        "task_name": task_name,
+        "task_id": task_dir.name,
+        "refno": refno,
+        # Standard in-container paths
+        "pdf_path": "/app/paper.pdf",
+        "meta_path": "/app/task_meta.json",
+        "predictions_path": "/app/output/predictions.json",
+        # Prompt building blocks (optional; templates may ignore these)
+        "question_blocks": question_blocks,
+        "questions_json": json.dumps(questions, indent=2),
+        "task_meta_json": json.dumps(task_meta, indent=2),
+        # Agent affordances (optional)
+        "paper_at_command": paper_at_command,
+        "gemini_at_commands": gemini_at_commands,
+        "claude_file_examples": claude_file_examples,
+    }
+    instruction = _format_template(instruction_template, instruction_values)
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
 
-    task_toml = read_template("task.toml.template").format(task_name=task_name)
+    task_toml = _format_template(
+        read_template("task.toml.template"),
+        {"task_name": task_name, "task": task_name},
+    )
     (task_dir / "task.toml").write_text(task_toml)
 
     (env_dir / "Dockerfile").write_text(dockerfile_contents())
@@ -265,8 +312,17 @@ EOF
 
 def main() -> None:
     """Generate Harbor tasks for the benchmark."""
+    global _TEMPLATES_SUBDIR
+
     parser = argparse.ArgumentParser(
         description="Generate Harbor tasks for the superconductor extraction benchmark."
+    )
+    parser.add_argument(
+        "--template",
+        type=str,
+        default="ground-template",
+        choices=["ground-template", "prompted-template"],
+        help="Which template bundle to use under examples/containerized-extraction/.",
     )
     parser.add_argument(
         "--task",
@@ -310,10 +366,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    _TEMPLATES_SUBDIR = str(args.template)
+
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
 
-    task_root = args.output_dir / args.task
+    task_root = args.output_dir / args.task / str(args.template)
     tasks_dir = task_root / "tasks"
     if task_root.exists():
         if args.force:

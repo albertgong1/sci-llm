@@ -1,10 +1,8 @@
 """Build and smoke-test Harbor tasks with Gemini and CC agents.
 
 This script is a local verification that:
-1) Task "compilation" (casual use of the word) works for both modes:
-   - easy: includes `/app/paper.txt` (pre-extracted)
-   - hard: PDF-only (no pre-transcription)
-2) Harbor can run a single task with different agents (ex. `gemini-cli` orc`claude-code`).
+1) Task "compilation" (casual use of the word) works for a given prompt template.
+2) Harbor can run a single task with different agents (ex. `gemini-cli` or `claude-code`).
 
 Secrets:
   - Gemini: set `GOOGLE_API_KEY=...` in the repo root `.env`
@@ -12,6 +10,7 @@ Secrets:
 
 Example:
   uv run python examples/containerized-extraction/smoke_harbor.py --task tc --refno PR05001178
+
 """
 
 from __future__ import annotations
@@ -65,6 +64,7 @@ def _parse_dotenv(path: Path) -> dict[str, str]:
 def _run(command: list[str]) -> None:
     subprocess.run(command, check=True, cwd=repo_root())
 
+
 def slugify(value: str) -> str:
     """Normalize strings for file-safe task IDs (mirrors the compiler)."""
     return (
@@ -76,11 +76,16 @@ def slugify(value: str) -> str:
     )
 
 
-def build_tasks(*, task: str, paper_mode: str, refno: str | None, force: bool) -> Path:
+def build_tasks(*, task: str, template: str, refno: str | None, force: bool) -> Path:
     """Compile tasks and return the tasks directory path."""
-    compiler = repo_root() / "examples" / "containerized-extraction" / "prepare_harbor_tasks.py"
+    compiler = (
+        repo_root()
+        / "examples"
+        / "containerized-extraction"
+        / "prepare_harbor_tasks.py"
+    )
     out_dir = repo_root() / "out" / "harbor" / "supercon-mini"
-    task_root = out_dir / task / paper_mode
+    task_root = out_dir / task / template
     tasks_dir = task_root / "tasks"
 
     if tasks_dir.exists() and any(tasks_dir.iterdir()) and not force:
@@ -91,8 +96,8 @@ def build_tasks(*, task: str, paper_mode: str, refno: str | None, force: bool) -
         str(compiler),
         "--task",
         task,
-        "--paper-mode",
-        paper_mode,
+        "--template",
+        template,
         "--output-dir",
         str(out_dir),
         "--write-job-config",
@@ -126,17 +131,26 @@ def run_trial(*, task_path: Path, agent: str, model: str | None) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Smoke test Harbor task variants + agents.")
-    parser.add_argument("--task", default="tc", help="HF config name (e.g. tc, rawmat, ...).")
+    """Docstring for main
+
+    :return: Description
+    :rtype: int
+    """
+    parser = argparse.ArgumentParser(
+        description="Smoke test Harbor task variants + agents."
+    )
+    parser.add_argument(
+        "--task", default="tc", help="HF config name (e.g. tc, rawmat, ...)."
+    )
     parser.add_argument(
         "--refno",
         default="PR05001178",
         help="Which refno to test (must exist in PDFs + HF split).",
     )
     parser.add_argument(
-        "--paper-modes",
-        default="easy,hard",
-        help="Comma-separated list: easy,hard (default: easy,hard).",
+        "--templates",
+        default="ground-template",
+        help="Comma-separated list: ground-template,prompted-template,... (default: ground-template).",
     )
     parser.add_argument(
         "--agents",
@@ -163,16 +177,13 @@ def main() -> int:
     dotenv = _parse_dotenv(repo_root() / ".env")
     merged_env = {**dotenv, **os.environ}
 
-    paper_modes = [m.strip() for m in str(args.paper_modes).split(",") if m.strip()]
+    templates = [t.strip() for t in str(args.templates).split(",") if t.strip()]
     agents = [a.strip() for a in str(args.agents).split(",") if a.strip()]
 
-    for paper_mode in paper_modes:
-        if paper_mode not in {"easy", "hard"}:
-            raise ValueError(f"Unknown paper mode: {paper_mode}")
-
+    for template in templates:
         tasks_dir = build_tasks(
             task=str(args.task),
-            paper_mode=paper_mode,
+            template=template,
             refno=str(args.refno) if args.refno else None,
             force=bool(args.force),
         )
@@ -183,10 +194,16 @@ def main() -> int:
 
         for agent in agents:
             if agent == "gemini-cli":
-                if not (merged_env.get("GOOGLE_API_KEY") or merged_env.get("GEMINI_API_KEY")):
-                    print("Skipping gemini-cli: missing GOOGLE_API_KEY/GEMINI_API_KEY in env/.env")
+                if not (
+                    merged_env.get("GOOGLE_API_KEY") or merged_env.get("GEMINI_API_KEY")
+                ):
+                    print(
+                        "Skipping gemini-cli: missing GOOGLE_API_KEY/GEMINI_API_KEY in env/.env"
+                    )
                     continue
-                run_trial(task_path=task_path, agent=agent, model=str(args.gemini_model))
+                run_trial(
+                    task_path=task_path, agent=agent, model=str(args.gemini_model)
+                )
                 continue
 
             if agent == "claude-code":

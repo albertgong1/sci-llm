@@ -228,7 +228,11 @@ arxiv/credentials.json
 arxiv/token.json
 
 *jobs*/
-# Harbor related
+
+# Harbor task gen related
 out/
 jobs/
 trials/
+
+# Arjun (sorry I keep a knowledgebase file with sensitive info like keys, etc.)
+knowledgebase.md
