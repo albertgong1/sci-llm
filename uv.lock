@@ -1685,6 +1685,7 @@ dependencies = [
     { name = "pdfplumber" },
     { name = "pydantic" },
     { name = "pymatgen" },
+    { name = "pymupdf" },
     { name = "tqdm" },
 ]
 
@@ -1709,6 +1710,7 @@ requires-dist = [
     { name = "pdfplumber" },
     { name = "pydantic" },
     { name = "pymatgen" },
+    { name = "pymupdf" },
     { name = "tqdm" },
 ]
 

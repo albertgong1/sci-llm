@@ -27,6 +27,7 @@ dependencies = [
     "tqdm",
     "google-genai",
     "openai",
+    "pymupdf",
 ]
 
 [dependency-groups]
