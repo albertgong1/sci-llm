@@ -6,17 +6,19 @@ definitions, and saves the mapping to a JSON file.
 
 Example usage:
     python examples/extraction/cluster_properties.py
-    python examples/extraction/cluster_properties.py --output property_clusters.json
+    python examples/extraction/cluster_properties.py --model gemini-2.5-flash
+    python examples/extraction/cluster_properties.py --model gemini-3-pro --output property_clusters.json
     python examples/extraction/cluster_properties.py \
         --unique_values assets/SuperCon Property Extraction Dataset - Unique Property Values.csv \
         --glossary assets/SuperCon Property Extraction Dataset - Glossary.csv \
-        --output property_clusters.json
+        --model gemini-3-pro-preview
 """
 
 import os
 import json
 import pandas as pd
-import google.generativeai as genai
+# import google.generativeai as genai
+import google.genai as genai
 from typing import Dict, List
 import time
 import logging
@@ -29,9 +31,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Defaults (can be overridden by CLI args)
 DEFAULT_DATA_DIR = os.path.join(os.path.dirname(__file__), "assets")
 DEFAULT_UNIQUE_VALUES_CSV = os.path.join(DEFAULT_DATA_DIR, "SuperCon Property Extraction Dataset - Unique Property Values.csv")
-DEFAULT_OUTPUT_FILE = os.path.join(DEFAULT_DATA_DIR, "property_clusters.json")
-DEFAULT_KEYS_FILE = os.path.join(DEFAULT_DATA_DIR, "property_cluster_keys.json")
 DEFAULT_GLOSSARY_FILE = os.path.join(DEFAULT_DATA_DIR, "SuperCon Property Extraction Dataset - Glossary.csv")
+DEFAULT_MODEL = "gemini-3-pro-preview"
 
 # Target Properties to Cluster (using exact names from CSV)
 TARGET_PROPERTIES = [
@@ -62,13 +63,13 @@ def load_glossary_definitions(glossary_path: str) -> Dict[str, str]:
              definitions[row['label'].strip()] = row['definition']
     return definitions
 
-def cluster_values_with_gemini(property_name: str, values: List[str], definition: str) -> Dict[str, str]:
+def cluster_values_with_gemini(property_name: str, values: List[str], definition: str, model_name: str) -> Dict[str, str]:
     """
     Uses Gemini to cluster a list of property values into canonical categories.
     Returns a dictionary mapping original value -> canonical category.
     """
     logging.info(f"Clustering {len(values)} values for property: {property_name}")
-    
+
     if not values:
         return {}
 
@@ -77,8 +78,8 @@ def cluster_values_with_gemini(property_name: str, values: List[str], definition
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable not set.")
     genai.configure(api_key=api_key)
-    
-    model = genai.GenerativeModel('gemini-2.5-flash')
+
+    model = genai.GenerativeModel(model_name)
 
     prompt = f"""
     You are an expert materials scientist assisting with data standardization.
@@ -86,14 +87,23 @@ def cluster_values_with_gemini(property_name: str, values: List[str], definition
     Task: Group the following raw values for the property '{property_name}' into canonical categories.
     Definition of property: {definition}
     
-    The raw values are often extracted from different papers and may vary in phrasing.
-    Map each raw value to a concise, standard, canonical equivalent.
+    The raw values contain specific experimental details (temperature, field strength, criteria) which are scientifically important.
     
-    Rules:
-    1. Output a VALID JSON object where keys are the raw values provided in the input list, and values are the canonical category.
-    2. Attempt to normalize synonyms, typos, and variations.
-    3. If a value is unreadable or clearly garbage, map it to "Unknown" or null.
-    4. Do not drop any values from the input list.
+    GOAL: standardize the Phrasing of these details while preserving the physical Meaning.
+    
+    Rules for Canonicalization:
+    1.  **Preserve Physics**: distinctive conditions like "H//c" (field parallel to c-axis) or "0.5Rn" (resistivity criterion) MUST be kept.
+    2.  **Normalize Phrasing**: multiple ways of writing the same thing should map to ONE standard string.
+        *   "H//c", "H parallel c", "H || c", "field along c" -> "H//c"
+        *   "0.5Rn", "50% Rn", "R=0.5Rn", "midpoint" -> "Resistivity (0.5Rn)"
+        *   "onset", "R_onset", "onset of transition" -> "Resistivity (onset)"
+        *   "zero resistance", "R=0", "zero offset" -> "Resistivity (zero)"
+        *   "M-H", "M vs H", "Magnetization curve" -> "Magnetization"
+    3.  **Generalize where appropriate**: If no specific parameters are given, map to the broad method.
+    
+    Output Format:
+    Return a VALID JSON object where keys are the raw values and values are the canonical category.
+    Map unreadable/garbage values to "Unknown".
     
     Input Values:
     {json.dumps(values)}
@@ -147,22 +157,30 @@ def main():
         help="Path to the CSV file containing property definitions (glossary)."
     )
     parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"Gemini model name to use for clustering (default: {DEFAULT_MODEL})."
+    )
+    parser.add_argument(
         "--output",
-        default=DEFAULT_OUTPUT_FILE,
-        help="Path to save the output JSON."
+        default=None,
+        help="Path to save the output JSON. If not specified, uses property_clusters_<MODEL_NAME>.json"
     )
     parser.add_argument(
         "--output_keys",
-        default=DEFAULT_KEYS_FILE,
-        help="Path to save the cluster keys summary JSON."
+        default=None,
+        help="Path to save the cluster keys summary JSON. If not specified, uses property_cluster_keys_<MODEL_NAME>.json"
     )
-    
+
     args = parser.parse_args()
-    
+
     unique_values_csv = args.unique_values
     glossary_file = args.glossary
-    output_file = args.output
-    output_keys_file = args.output_keys
+    model_name = args.model
+
+    # Generate output filenames based on model name if not provided
+    output_file = args.output or os.path.join(DEFAULT_DATA_DIR, f"property_clusters_{model_name}.json")
+    output_keys_file = args.output_keys or os.path.join(DEFAULT_DATA_DIR, f"property_cluster_keys_{model_name}.json")
 
     if not os.path.exists(unique_values_csv):
         raise FileNotFoundError(f"Unique values CSV not found at {unique_values_csv}")
@@ -195,7 +213,7 @@ def main():
             logging.warning(f"Definition for '{prop_name}' not found in glossary.")
         
         # Cluster
-        clusters = cluster_values_with_gemini(prop_name, unique_vals, definition)
+        clusters = cluster_values_with_gemini(prop_name, unique_vals, definition, model_name)
         all_clusters[prop_name] = clusters
         
         # Rate limiting (for Gemini)
