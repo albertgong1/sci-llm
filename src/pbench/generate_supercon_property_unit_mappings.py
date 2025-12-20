@@ -18,6 +18,7 @@ Example usage:
 import csv
 import re
 import logging
+from pathlib import Path
 
 import pbench
 
@@ -83,6 +84,13 @@ def is_related_property(unit_row, property_row, property_names_from_unit) -> boo
         return False
 
     prop_db = property_row.get("db", "").lower()
+
+    # Skip method properties - they should not have units/values associated
+    # Methods are the values in PROPERTY_METHOD_MAPPINGS (e.g., mhc1, mhc2, gap, mdebye)
+    method_properties = set(PROPERTY_METHOD_MAPPINGS.values())
+    if prop_db in method_properties:
+        return False
+
     prop_label = property_row.get("label", "").lower()
     prop_desc = property_row.get("description", "").lower()
 
@@ -100,9 +108,76 @@ def is_related_property(unit_row, property_row, property_names_from_unit) -> boo
     return False
 
 
+# Define property-to-temperature-condition mappings
+PROPERTY_TEMPERATURE_CONDITIONS = {
+    "phc1t": "tempc2",
+    "nhc1t": "tempc2",
+    "hc2t": "tempc2",
+    "phc2t": "tempc2",
+    "nhc2t": "tempc2",
+    "resn": "nort",
+    "abresn": "nort",
+    "cresn": "nort",
+}
+
+# Define property-to-field-condition mappings
+PROPERTY_FIELD_CONDITIONS = {
+    "rh300": "field",
+    "rh300n": "field",
+    "rh300p": "field",
+    "rhn": "field",
+}
+
+# Define property-to-method mappings
+PROPERTY_METHOD_MAPPINGS = {
+    "hc1zero": "mhc1",
+    "phc1zero": "mhc1",
+    "nhc1zero": "mhc1",
+    "hc1t": "mhc1",
+    "phc1t": "mhc1",
+    "nhc1t": "mhc1",
+    "hc2zero": "mhc2",
+    "phc2zeron": "mhc2",
+    "nhc2zero": "mhc2",
+    "hc2t": "mhc2",
+    "phc2t": "mhc2",
+    "nhc2t": "mhc2",
+    "dhc2dt": "mdhc2dt",
+    "pdhc2dt": "mdhc2dt",
+    "ndhc2dt": "mdhc2dt",
+    "cohere": "mcohere",
+    "pcohere": "mcohere",
+    "ncohere": "mcohere",
+    "penet": "mpenet",
+    "ppenet": "mpenet",
+    "npenet": "mpenet",
+    "gapene": "gap",
+    "gapmeth": "gap",
+    "debyet": "mdebye",
+}
+
+# Define property-to-figure/table mappings
+PROPERTY_FIGURE_MAPPINGS = {
+    "thc300": "thcfig",
+    "thc300n": "thcfig",
+    "thc300p": "thcfig",
+    "tp300": "tpfig",
+    "tp300n": "tpfig",
+    "tp300p": "tpfig",
+    "rh300": "hallfig",
+    "rh300n": "hallfig",
+    "rh300p": "hallfig",
+    "rhn": "hallfig",
+}
+
+
 # Read the CSV file
 input_file = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
-output_file = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
+if False:
+    output_file = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
+else:
+    output_file = Path("out-1219/property_unit_mappings.csv")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
 
 mappings = []
 
@@ -139,6 +214,15 @@ while i < len(rows):
 
         # Add mappings for all found properties
         for prop_db in found_properties:
+            # Get temperature condition if it exists
+            temp_condition = PROPERTY_TEMPERATURE_CONDITIONS.get(prop_db.lower(), "")
+            # Get field condition if it exists
+            field_condition = PROPERTY_FIELD_CONDITIONS.get(prop_db.lower(), "")
+            # Get method if it exists
+            method = PROPERTY_METHOD_MAPPINGS.get(prop_db.lower(), "")
+            # Get figure/table location if it exists
+            figure_location = PROPERTY_FIGURE_MAPPINGS.get(prop_db.lower(), "")
+
             mappings.append(
                 {
                     "property": prop_db,
@@ -149,33 +233,29 @@ while i < len(rows):
                     if prop_db
                     else "",
                     "unit_label": row.get("label", ""),
+                    "conditions.temperature": temp_condition,
+                    "conditions.field": field_condition,
+                    "methods": method,
+                    "location.figure_or_table": figure_location,
                 }
             )
 
     i += 1
 
-# hard code some mappings that aren't captured by the programmatic approach above
-mappings.append(
-    {
-        "property": "nort",
-        "unit": "utc",
-        "property_label": "normal temperature",
-        "unit_label": "unit of Tc",
-    }
-)
-mappings.append(
-    {
-        "property": "tempc1",
-        "unit": "utc",
-        "property_label": "measuring temperature",
-        "unit_label": "unit of Tc",
-    }
-)
-
 # Write the mappings to a CSV file
 with open(output_file, "w", newline="", encoding="utf-8") as f:
     writer = csv.DictWriter(
-        f, fieldnames=["property", "unit", "property_label", "unit_label"]
+        f,
+        fieldnames=[
+            "property",
+            "unit",
+            "property_label",
+            "unit_label",
+            "conditions.temperature",
+            "conditions.field",
+            "methods",
+            "location.figure_or_table",
+        ],
     )
     writer.writeheader()
     writer.writerows(mappings)

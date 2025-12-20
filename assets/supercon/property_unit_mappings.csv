@@ -1,77 +1,74 @@
-property,unit,property_label,unit_label
-kaizero,ukai,temperature independent term in susceptibility,unit of KAIZERO
-curiec,ucc,Curie constant,unit of CURIEC
-moment,umoment,magnetic moment per formula,unit of MOMENT
-hv300,uhv,hardness at 300 K,unit of hardness
-yehe,uye,Young's modulus at 4.2 K,unit of Young's modulus
-ye300,uye,Young's modulus at 300 K,unit of Young's modulus
-ghe,ug,shear modulus at 4.2 K,unit of shear modulus
-g300,ug,shear modulus at 300 K,unit of shear modulus
-svhe,usv,sound velocity at 4.2 K,unit of sound velocity
-sv300,usv,sound velocity at 300 K,unit of sound velocity
-lata,ulat,lattice constant a,unit of lattice constant
-latb,ulat,lattice constant b,unit of lattice constant
-latc,ulat,lattice constant c,unit of lattice constant
-dadt,udldt,temperature dependence of LATA,unit of D(L)DT
-dbdt,udldt,temperature dependence of LATB,unit of D(L)DT
-dcdt,udldt,temperature dependence of LATC,unit of D(L)DT
-dadp,udldp,pressure dependence of LATA,unit of D(L)DP
-dbdp,udldp,pressure dependence of LATB,unit of D(L)DP
-dcdp,udldp,pressure dependence of LATC,unit of D(L)DP
-t1,utc,transition temperature (R = 0),unit of Tc
-t2,utc,transition temperature (mid point),unit of Tc
-t3,utc,transition temperature (R = 100%),unit of Tc
-tcsus,utc,Tc from susceptibility measurement,unit of Tc
-tcn,utc,lowest temperature for measurement (not superconducting),unit of Tc
-tcwidth,utc,transition width for resistive transition,unit of Tc
-tc,utc,Tc (of this sample) recommended,unit of Tc
-dtcdp,udtcdp,slope at P = 0 in Tc vs P plot,unit of DTCDP
-hc1zero,uhc1,Hc1 at 0 K for poly crystal,unit of Hc1
-phc1zero,uhc1,Hc1 at 0 K for single crystal for H //ab-plane,unit of Hc1
-nhc1zero,uhc1,Hc1 at 0 K for single crystal for H //c-axis,unit of Hc1
-hc1t,uhc1,Hc1 at given temperature for poly crystal,unit of Hc1
-phc1t,uhc1,Hc1 at given temperature for single crystal H//ab-plane,unit of Hc1
-nhc1t,uhc1,Hc1 at given temperature for single crystal H//c-axis,unit of Hc1
-hc2zero,uhc2,Hc2 at 0 K for poly crystal,unit of Hc2
-phc2zero,uhc2,Hc2 at 0 K for single crystal for H //ab-plane,unit of Hc2
-nhc2zero,uhc2,Hc2 at 0 K for single crystal for H //c-axis,unit of Hc2
-hc2t,uhc2,Hc2 at given temperature for poly crystal,unit of Hc2
-phc2t,uhc2,Hc2 at given temperature for single crystal H//ab-plane,unit of Hc2
-nhc2t,uhc2,Hc2 at given temperature for single crystal H//c-axis,unit of Hc2
-pdhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,unit of dHc2/dT
-ndhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,unit of dHc2/dT
-cohere,ucohere,coherence length at 0 K for poly crystal,unit of COHERE
-pcohere,ucohere,coherence length at 0 K for single crystal for H //ab-plane,unit of COHERE
-ncohere,ucohere,coherence length at 0 K for single crystal for H ⊥ab-plane,unit of COHERE
-penet,upenet,penetration depth at 0 K for poly crystal,unit of PENET
-ppenet,upenet,penetration depth at 0 K for single crystal for H //ab-plane,unit of PENET
-npenet,upenet,penetration depth at 0 K for single crystal for H⊥ab-plane,unit of PENET
-gap,ugap,"energy gap at 0 K , delta(0)",unit of energy gap
-gapene,ugap,"normarized energy gap at 0 K , 2delta(0)/kTc",unit of energy gap
-jche,ugap,"Jc at 4.2 K, H = 0 T",unit of energy gap
-spjump,ujump,specific heat jump at Tc (delta-C),unit of SPJUMP
-gamma,ugamma,coefficient of electronic specific heat,unit of GAMMA
-thc300,uthc,thermal conductivity at 300 K,unit of thermal conductivity
-thc300n,uthc,thermal conductivity at 300 K for heat flow//c-axis,unit of thermal conductivity
-thc300p,uthc,thermal conductivity at 300 K for heat flow//ab-plane,unit of thermal conductivity
-tp300,utp,thermopower at 300 K,unit of thermopower
-tp300n,utp,thermopower at 300 K for normal to ab-plane,unit of thermopower
-tp300p,utp,thermopower at 300 K for parallel to ab-plane,unit of thermopower
-reshe,ures,resistivity at 4.2 K for poly crystal,unit of resistivity
-abreshe,ures,resistivity at 4.2 K for single crystal for J//ab-plane,unit of resistivity
-creshe,ures,resistivity at 4.2 K for single crystal for J//c-axis,unit of resistivity
-res77,ures,resistivity at 77 K for poly crystal,unit of resistivity
-abres77,ures,resistivity at 77 K for single crystal for J//ab-plane,unit of resistivity
-cres77,ures,resistivity at 77 K for single crystal for J//c-axis,unit of resistivity
-resn,ures,resistivity at normal-T for poly crystal,unit of resistivity
-abresn,ures,resistivity at normal-T for single crystal for J//ab-plane,unit of resistivity
-cresn,ures,resistivity at normal-T for single crystal for J//c-axis,unit of resistivity
-resrt,ures,resistivity at RT for poly crystal,unit of resistivity
-abresrt,ures,resistivity at RT for single crystal for J//ab-plane,unit of resistivity
-cresrt,ures,resistivity at RT for single crystal for J//c-axis,unit of resistivity
-rh300,uhall,Hall coefficient at 300 K,unit of RH300
-rh300n,uhall,"Hall coefficient at 300 K for single, H//c-axis",unit of RH300
-rh300p,uhall,"Hall coefficient at 300 K for single, H//ab-plane",unit of RH300
-carrier,ucarr,carrier density at 300 K,unit of carrier density
-nort,utc,normal temperature,unit of Tc
-tempc1,utc,measuring temperature,unit of Tc
+property,unit,property_label,unit_label,conditions.temperature,conditions.field,methods,location.figure_or_table
+kaizero,ukai,temperature independent term in susceptibility,unit of KAIZERO,,,,
+curiec,ucc,Curie constant,unit of CURIEC,,,,
+moment,umoment,magnetic moment per formula,unit of MOMENT,,,,
+hv300,uhv,hardness at 300 K,unit of hardness,,,,
+yehe,uye,Young's modulus at 4.2 K,unit of Young's modulus,,,,
+ye300,uye,Young's modulus at 300 K,unit of Young's modulus,,,,
+ghe,ug,shear modulus at 4.2 K,unit of shear modulus,,,,
+g300,ug,shear modulus at 300 K,unit of shear modulus,,,,
+svhe,usv,sound velocity at 4.2 K,unit of sound velocity,,,,
+sv300,usv,sound velocity at 300 K,unit of sound velocity,,,,
+lata,ulat,lattice constant a,unit of lattice constant,,,,
+latb,ulat,lattice constant b,unit of lattice constant,,,,
+latc,ulat,lattice constant c,unit of lattice constant,,,,
+dadt,udldt,temperature dependence of LATA,unit of D(L)DT,,,,
+dbdt,udldt,temperature dependence of LATB,unit of D(L)DT,,,,
+dcdt,udldt,temperature dependence of LATC,unit of D(L)DT,,,,
+dadp,udldp,pressure dependence of LATA,unit of D(L)DP,,,,
+dbdp,udldp,pressure dependence of LATB,unit of D(L)DP,,,,
+dcdp,udldp,pressure dependence of LATC,unit of D(L)DP,,,,
+t1,utc,transition temperature (R = 0),unit of Tc,,,,
+t2,utc,transition temperature (mid point),unit of Tc,,,,
+t3,utc,transition temperature (R = 100%),unit of Tc,,,,
+tcsus,utc,Tc from susceptibility measurement,unit of Tc,,,,
+tcn,utc,lowest temperature for measurement (not superconducting),unit of Tc,,,,
+tcwidth,utc,transition width for resistive transition,unit of Tc,,,,
+tc,utc,Tc (of this sample) recommended,unit of Tc,,,,
+dtcdp,udtcdp,slope at P = 0 in Tc vs P plot,unit of DTCDP,,,,
+hc1zero,uhc1,Hc1 at 0 K for poly crystal,unit of Hc1,,,mhc1,
+phc1zero,uhc1,Hc1 at 0 K for single crystal for H //ab-plane,unit of Hc1,,,mhc1,
+nhc1zero,uhc1,Hc1 at 0 K for single crystal for H //c-axis,unit of Hc1,,,mhc1,
+hc1t,uhc1,Hc1 at given temperature for poly crystal,unit of Hc1,,,mhc1,
+phc1t,uhc1,Hc1 at given temperature for single crystal H//ab-plane,unit of Hc1,tempc2,,mhc1,
+nhc1t,uhc1,Hc1 at given temperature for single crystal H//c-axis,unit of Hc1,tempc2,,mhc1,
+hc2zero,uhc2,Hc2 at 0 K for poly crystal,unit of Hc2,,,mhc2,
+phc2zero,uhc2,Hc2 at 0 K for single crystal for H //ab-plane,unit of Hc2,,,,
+nhc2zero,uhc2,Hc2 at 0 K for single crystal for H //c-axis,unit of Hc2,,,mhc2,
+hc2t,uhc2,Hc2 at given temperature for poly crystal,unit of Hc2,tempc2,,mhc2,
+phc2t,uhc2,Hc2 at given temperature for single crystal H//ab-plane,unit of Hc2,tempc2,,mhc2,
+nhc2t,uhc2,Hc2 at given temperature for single crystal H//c-axis,unit of Hc2,tempc2,,mhc2,
+pdhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,unit of dHc2/dT,,,mdhc2dt,
+ndhc2dt,udhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,unit of dHc2/dT,,,mdhc2dt,
+cohere,ucohere,coherence length at 0 K for poly crystal,unit of COHERE,,,mcohere,
+pcohere,ucohere,coherence length at 0 K for single crystal for H //ab-plane,unit of COHERE,,,mcohere,
+ncohere,ucohere,coherence length at 0 K for single crystal for H ⊥ab-plane,unit of COHERE,,,mcohere,
+penet,upenet,penetration depth at 0 K for poly crystal,unit of PENET,,,mpenet,
+ppenet,upenet,penetration depth at 0 K for single crystal for H //ab-plane,unit of PENET,,,mpenet,
+npenet,upenet,penetration depth at 0 K for single crystal for H⊥ab-plane,unit of PENET,,,mpenet,
+gapene,ugap,"normarized energy gap at 0 K , 2delta(0)/kTc",unit of energy gap,,,gap,
+jche,ugap,"Jc at 4.2 K, H = 0 T",unit of energy gap,,,,
+spjump,ujump,specific heat jump at Tc (delta-C),unit of SPJUMP,,,,
+gamma,ugamma,coefficient of electronic specific heat,unit of GAMMA,,,,
+thc300,uthc,thermal conductivity at 300 K,unit of thermal conductivity,,,,thcfig
+thc300n,uthc,thermal conductivity at 300 K for heat flow//c-axis,unit of thermal conductivity,,,,thcfig
+thc300p,uthc,thermal conductivity at 300 K for heat flow//ab-plane,unit of thermal conductivity,,,,thcfig
+tp300,utp,thermopower at 300 K,unit of thermopower,,,,tpfig
+tp300n,utp,thermopower at 300 K for normal to ab-plane,unit of thermopower,,,,tpfig
+tp300p,utp,thermopower at 300 K for parallel to ab-plane,unit of thermopower,,,,tpfig
+reshe,ures,resistivity at 4.2 K for poly crystal,unit of resistivity,,,,
+abreshe,ures,resistivity at 4.2 K for single crystal for J//ab-plane,unit of resistivity,,,,
+creshe,ures,resistivity at 4.2 K for single crystal for J//c-axis,unit of resistivity,,,,
+res77,ures,resistivity at 77 K for poly crystal,unit of resistivity,,,,
+abres77,ures,resistivity at 77 K for single crystal for J//ab-plane,unit of resistivity,,,,
+cres77,ures,resistivity at 77 K for single crystal for J//c-axis,unit of resistivity,,,,
+resn,ures,resistivity at normal-T for poly crystal,unit of resistivity,nort,,,
+abresn,ures,resistivity at normal-T for single crystal for J//ab-plane,unit of resistivity,nort,,,
+cresn,ures,resistivity at normal-T for single crystal for J//c-axis,unit of resistivity,nort,,,
+resrt,ures,resistivity at RT for poly crystal,unit of resistivity,,,,
+abresrt,ures,resistivity at RT for single crystal for J//ab-plane,unit of resistivity,,,,
+cresrt,ures,resistivity at RT for single crystal for J//c-axis,unit of resistivity,,,,
+rh300,uhall,Hall coefficient at 300 K,unit of RH300,,field,,hallfig
+rh300n,uhall,"Hall coefficient at 300 K for single, H//c-axis",unit of RH300,,field,,hallfig
+rh300p,uhall,"Hall coefficient at 300 K for single, H//ab-plane",unit of RH300,,field,,hallfig
+carrier,ucarr,carrier density at 300 K,unit of carrier density,,,,
