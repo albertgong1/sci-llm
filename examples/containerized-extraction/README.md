@@ -204,9 +204,9 @@ Then upload (this will also compile if you pass `--run-dir`):
 # Demo: run one paper with Gemini 2.5 Flash, then upload the full artifacts bundle.
 uv sync --extra dev
 
-  uv run python examples/containerized-extraction/prepare_harbor_tasks.py \
-    --task tc --template ground-template --refno PR05001178 \
-    --write-job-config --force
+uv run python examples/containerized-extraction/prepare_harbor_tasks.py \
+  --task tc --template ground-template --refno PR05001178 \
+  --write-job-config --force
 
 uv run python examples/containerized-extraction/run_harbor.py trials start \
   -p out/harbor/supercon-mini/tc/ground-template/tasks/pr05001178--tc \
