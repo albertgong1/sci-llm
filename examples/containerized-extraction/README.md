@@ -164,3 +164,92 @@ uv run python examples/containerized-extraction/smoke_harbor.py --task tc --refn
 - Agent logs:
   - Gemini CLI: `trials/<trial-name>/agent/gemini-cli.txt`
   - Claude Code: `trials/<trial-name>/agent/claude-code.txt`
+
+## Publish Runs to Hugging Face
+
+This directory includes two helper scripts to bundle a Harbor run directory and upload it
+to a Hugging Face dataset repo without dropping any files.
+
+### 1) Compile a run bundle (lossless)
+
+Compiles the latest run under `jobs/` or `trials/` into `out/harbor-runs/<run-name>/`:
+
+```bash
+uv run python examples/containerized-extraction/compile_harbor_run.py
+```
+
+Or specify a run directory explicitly:
+
+```bash
+uv run python examples/containerized-extraction/compile_harbor_run.py \
+  --run-dir jobs/<job-name>
+```
+
+The bundle contains:
+- `harbor/<run-name>/...` (full copied Harbor run directory)
+- `index/trials.jsonl` (one line per trial; easy to query)
+- `index/files.jsonl` (sha256 manifest of every uploaded file)
+
+### 2) Push to HF
+
+Authenticate with either `hf auth login` or by exporting a token:
+
+```bash
+export HF_TOKEN="..."
+```
+
+Then upload (this will also compile if you pass `--run-dir`):
+
+```bash
+# Demo: run one paper with Gemini 2.5 Flash, then upload the full artifacts bundle.
+uv sync --extra dev
+
+  uv run python examples/containerized-extraction/prepare_harbor_tasks.py \
+    --task tc --template ground-template --refno PR05001178 \
+    --write-job-config --force
+
+uv run python examples/containerized-extraction/run_harbor.py trials start \
+  -p out/harbor/supercon-mini/tc/ground-template/tasks/pr05001178--tc \
+  -a gemini-cli -m gemini/gemini-2.5-flash
+
+TRIAL_DIR=$(ls -td trials/* | head -1)
+BUNDLE=$(uv run python examples/containerized-extraction/compile_harbor_run.py --run-dir "$TRIAL_DIR")
+
+uv run python examples/containerized-extraction/push_harbor_run_to_hf.py \
+  --repo-id kilian-group/foolmetwice-testing \
+  --bundle-dir "$BUNDLE" \
+  --write-root-readme
+```
+
+By default, each run is uploaded under `runs/<run-name>/` in the HF repo.
+
+### 3) Query on the other end (example)
+
+```python
+from huggingface_hub import snapshot_download
+from pathlib import Path
+import json
+
+repo_id = "kilian-group/foolmetwice-testing"
+local = Path(snapshot_download(repo_id=repo_id, repo_type="dataset"))
+
+run = local / "runs" / "<run-name>"
+trials = [json.loads(line) for line in (run / "index" / "trials.jsonl").read_text().splitlines()]
+
+failures = [t for t in trials if (t.get("reward") or 0.0) < 1.0 or t.get("exception_type")]
+print("n_trials:", len(trials))
+print("n_failures:", len(failures))
+
+if failures:
+    t = failures[0]
+    print("trial:", t["trial_name"])
+    print("agent logs:", t["paths"]["agent_logs"])
+    print("verifier details:", t["paths"]["verifier_details"])
+```
+
+### Notes on preserving outputs
+
+The template verifier entrypoint (`tests/test.sh`) copies `/app/output/` into the persisted
+`/logs/verifier/app_output/` directory **even when the verifier fails**, so agent-written
+artifacts (like `predictions.json`) survive Harbor's container cleanup. Rebuild tasks with
+`prepare_harbor_tasks.py --force` to apply template changes to generated tasks.
