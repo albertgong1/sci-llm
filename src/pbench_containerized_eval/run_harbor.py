@@ -1,4 +1,4 @@
-"""Run Harbor with secrets loaded from the repo's `.env`.
+r"""Run Harbor with secrets loaded from the repo's `.env`.
 
 Harbor agents (including `gemini-cli`) read API keys from environment variables in the
 *host* process and forward them into the container. `uv run harbor ...` does not load
@@ -15,6 +15,7 @@ Example:
     uv run python examples/containerized-extraction/run_harbor.py trials start \\
       -p out/harbor/supercon-mini/tc/easy/tasks/jac2980051--tc \\
       -a gemini-cli -m gemini/gemini-2.5-flash
+
 """
 
 from __future__ import annotations
@@ -72,6 +73,11 @@ def _parse_dotenv(path: Path) -> dict[str, str]:
 
 
 def main() -> int:
+    """Docstring for main
+
+    :return: Description
+    :rtype: int
+    """
     argv = sys.argv[1:]
     if not argv:
         print("Usage: run_harbor.py <harbor args...>", file=sys.stderr)
