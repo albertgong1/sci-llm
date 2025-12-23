@@ -1,3 +1,4 @@
+#! /usr/bin/env -S uv run --env-file=.env -- python
 # ---
 # jupyter:
 #   jupytext:
@@ -18,6 +19,7 @@
 """Script to create a HuggingFace dataset from the SuperCon dataset.
 
 NOTE: we deduplicates rows that have the same material, property_name, property_value, and property_unit.
+NOTE: skip the --repo_name argument if you don't want to push to HuggingFace Hub.
 
 Each row contains the following information:
 - paper (PDFplumber object): the PDF file of the paper (or path to the PDF file).
@@ -27,13 +29,18 @@ Each row contains the following information:
 - property_unit (string): the unit of the property
 - definition (string): the definition of the property
 
-Example usage:
+Usage:
 ```bash
-# To filter out rows where paper PDF is not found at data_dir/Paper_DB
-python create_huggingface_dataset.py --repo_name REPO_NAME --filter_pdf
+# To filter out rows where paper PDF is not found at data_dir/supercon/Paper_DB
+./src/pbench/create_supercon_hf_dataset.py \
+    --data_dir data \
+    --repo_name REPO_NAME \
+    --filter_pdf
 
-# To use all rows (including rows where paper PDF is not found at data_dir/Paper_DB)
-python create_huggingface_dataset.py --repo_name REPO_NAME
+# To use all rows (including rows where paper PDF is not found at data_dir/supercon/Paper_DB)
+./src/pbench/create_supercon_hf_dataset.py \
+    --data_dir data \
+    --repo_name REPO_NAME
 ```
 """
 
@@ -43,20 +50,17 @@ from pathlib import Path
 from datasets import Dataset, load_from_disk
 from argparse import ArgumentParser
 import logging
-import os
 from joblib import Parallel, delayed
 
-logging.basicConfig(level=logging.INFO)
+import pbench
+
 logger = logging.getLogger(__name__)
 
 # %%
-parser = ArgumentParser()
-parser.add_argument(
-    "--data_dir",
-    type=str,
-    default="data",
-    help="Directory containing the papers and properties",
+parser = ArgumentParser(
+    description="Create a HuggingFace dataset from the SuperCon dataset."
 )
+parser = pbench.add_base_args(parser)
 parser.add_argument(
     "--repo_name",
     type=str,
@@ -64,29 +68,18 @@ parser.add_argument(
     help="Name of the HuggingFace repository to push to",
 )
 parser.add_argument(
-    "--output_dir",
-    "-od",
-    type=str,
-    default="out",
-    help="Directory to save the dataset csv file",
-)
-parser.add_argument(
     "--filter_pdf",
     action="store_true",
     help="If true, filter out rows where paper PDF is not found at data_dir/Paper_DB",
 )
 args = parser.parse_args()
+pbench.setup_logging(args.log_level)
 
-data_dir = args.data_dir
-paper_dir = Path(data_dir) / "Paper_DB"
-repo_name = args.repo_name
-output_dir = args.output_dir
-filter_pdf = args.filter_pdf
-
-os.makedirs(output_dir, exist_ok=True)
+paper_dir = args.data_dir / "supercon" / "Paper_DB"
+args.output_dir.mkdir(parents=True, exist_ok=True)
 
 # Load the glossary of properties
-glossary_path = "properties-oxide-metal-glossary.csv"
+glossary_path = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
 df_glossary = pd.read_csv(
     glossary_path,
     index_col=0,
@@ -95,16 +88,16 @@ df_glossary = pd.read_csv(
 df_glossary = df_glossary.reset_index(names="order").set_index("db")
 # import pdb; pdb.set_trace()
 # load units
-units_path = "property_unit_mappings.csv"
+units_path = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
 df_units = pd.read_csv(units_path, index_col=0)
 # import pdb; pdb.set_trace()
 
 # %%
-data_path = Path(data_dir) / "SuperCon.csv"
-print(f"Loading dataset from {data_path}...")
+data_path = args.data_dir / "supercon" / "SuperCon.csv"
+logger.info(f"Loading dataset from {data_path}...")
 # Use the second row as the header
 df = pd.read_csv(data_path, header=2, dtype=str)
-print(f"Loaded {len(df)} rows")
+logger.info(f"Loaded {len(df)} rows")
 # drop "year.1" as it's duplicates of "year"
 df = df.drop(columns=["year.1"])
 
@@ -174,12 +167,12 @@ df = df.drop_duplicates(
 # we will use the original property_name as the task in Harbor and the config in HuggingFace
 df = df.rename(columns={"property_name": "task", "label": "property_name"})
 
-if filter_pdf:
-    print("Filtering out rows where paper PDF is not found")
+if args.filter_pdf:
+    logger.info("Filtering out rows where paper PDF is not found")
     df = df[df["refno"].apply(lambda x: Path(paper_dir / f"{x}.pdf").exists())]
-    print(f"{len(df)} rows have paper PDF")
+    logger.info(f"{len(df)} rows have paper PDF")
 
-print("Saving dataset to CSV...")
+logger.info("Saving dataset to CSV...")
 df_copy = (
     df.copy()
     .sort_values(["refno", "material", "order"], kind="stable")
@@ -195,12 +188,12 @@ df_copy = (
         ]
     ]
 )
-save_path = Path(output_dir) / "dataset.csv"
+save_path = args.output_dir / "supercon" / "property_extraction_dataset" / "dataset.csv"
 df_copy.to_csv(save_path, index=False)
-print(f"Dataset saved to {save_path}")
+logger.info(f"Dataset saved to {save_path}")
 
 # %%
-print("Creating HuggingFace dataset...")
+logger.info("Creating HuggingFace dataset...")
 # Group by task and create separate configs for each task
 COLUMNS = [
     "refno",
@@ -216,9 +209,9 @@ COLUMNS = [
 
 # Group dataframe by task
 grouped_by_task = df[COLUMNS].groupby("task")
-print(f"\nFound {len(grouped_by_task)} unique tasks:")
+logger.info(f"Found {len(grouped_by_task)} unique tasks:")
 for task_name, task_df in grouped_by_task:
-    print(f"  - {task_name}: {len(task_df)} examples")
+    logger.info(f"  - {task_name}: {len(task_df)} examples")
 
 # %%
 # Create and save datasets for each task
@@ -228,14 +221,18 @@ for task_name, task_df in grouped_by_task:
     datasets_dict[task_name] = task_dataset
 
     # Save each task config locally
-    task_dataset_path = Path(output_dir) / "property_extraction_dataset" / task_name
+    task_dataset_path = (
+        args.output_dir / "supercon" / "property_extraction_dataset" / task_name
+    )
     task_dataset.save_to_disk(task_dataset_path)
-    print(f"Saved {task_name} config to {task_dataset_path}")
+    logger.info(f"Saved {task_name} config to {task_dataset_path}")
 
 # %%
 # Load one dataset back to verify it works
 first_task = list(datasets_dict.keys())[0]
-first_task_path = Path(output_dir) / "property_extraction_dataset" / first_task
+first_task_path = (
+    args.output_dir / "supercon" / "property_extraction_dataset" / first_task
+)
 loaded_dataset = load_from_disk(first_task_path)
 
 print(f"\n✓ Dataset loaded successfully (task: {first_task})!")
@@ -251,18 +248,18 @@ print(f"  refno: {loaded_dataset[0]['refno']}")
 # %%
 # Push to HuggingFace Hub (requires authentication)
 # Make sure you're logged in: hf auth login
-if repo_name is not None:
-    print(f"\nPushing dataset to HuggingFace Hub: {repo_name}")
-    print(f"Uploading {len(datasets_dict)} configs...")
+if args.repo_name is not None:
+    logger.info(f"Pushing dataset to HuggingFace Hub: {args.repo_name}")
+    logger.info(f"Uploading {len(datasets_dict)} configs...")
 
     for task_name, task_dataset in datasets_dict.items():
-        print(f"  Pushing config: {task_name} ({len(task_dataset)} examples)")
+        logger.info(f"  Pushing config: {task_name} ({len(task_dataset)} examples)")
         task_dataset.push_to_hub(
-            repo_name,
+            args.repo_name,
             config_name=task_name,
             private=True,  # Set to True if you want a private dataset
             split="test",
         )
-        print(f"  ✓ Config {task_name} pushed successfully")
+        logger.info(f"  ✓ Config {task_name} pushed successfully")
 
-    print(f"\n✓ All {len(datasets_dict)} configs pushed to {repo_name}")
+    logger.info(f"✓ All {len(datasets_dict)} configs pushed to {args.repo_name}")

@@ -217,7 +217,10 @@ __marimo__/
 
 *.DS_Store
 *data/
+*.tar
+*.zip
 !arxiv/tests/test_data/
+.claude/
 
 *out*/
 
