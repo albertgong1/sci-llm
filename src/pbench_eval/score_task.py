@@ -23,9 +23,9 @@ import argparse
 import json
 import re
 from pathlib import Path
-import matplotlib.pyplot as plt
 import logging
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tabulate import tabulate
@@ -34,6 +34,21 @@ import pbench
 from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si
 
 logger = logging.getLogger(__name__)
+
+# Load clusters globally for the categorical scorer (clusters of "method of X" properties)
+# This script utilizes `property_clusters.json` (if present) to map values in
+# "method of X" properties to canonical categories.
+CLUSTER_FILE = Path(__file__).parent / "assets" / "property_clusters.json"
+CLUSTERS = {}
+if CLUSTER_FILE.exists():
+    try:
+        with open(CLUSTER_FILE, "r") as f:
+            CLUSTERS = json.load(f)
+        logger.info(f"Loaded property clusters from {CLUSTER_FILE}")
+    except Exception as e:
+        logger.warning(f"Failed to load property clusters: {e}")
+else:
+    logger.warning(f"Property clusters file not found at {CLUSTER_FILE}")
 
 
 def parse_numeric_value(value: str) -> float | None:
@@ -72,7 +87,9 @@ def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
     return dict(zip(rubric_df["property_name"], rubric_df["rubric"]))
 
 
-def score_row(pred_value: str, answer_value: str, rubric: str) -> bool | None:
+def score_row(
+    pred_value: str, answer_value: str, rubric: str, property_name: str | None = None
+) -> bool | None:
     """Score a single prediction based on the rubric.
 
     Returns:
@@ -96,7 +113,10 @@ def score_row(pred_value: str, answer_value: str, rubric: str) -> bool | None:
     elif rubric == "categorical":
         if pd.isna(pred_value) or pd.isna(answer_value):
             return None
-        return scorer_categorical(str(pred_value), str(answer_value))
+
+        # Get specific mapping for this property if available
+        mapping = CLUSTERS.get(property_name, None) if property_name else None
+        return scorer_categorical(str(pred_value), str(answer_value), mapping=mapping)
 
     else:
         # Unknown rubric
@@ -219,7 +239,7 @@ def score_predictions(
         pred_value = str(row["pred_value"])
         answer_value = str(row["property_value"])
 
-        score = score_row(pred_value, answer_value, rubric)
+        score = score_row(pred_value, answer_value, rubric, property_name=property_name)
         scores.append(score)
 
     # Add scores column and save
@@ -465,4 +485,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Configure logging only when run as a script
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        force=True,
+    )
     main()
