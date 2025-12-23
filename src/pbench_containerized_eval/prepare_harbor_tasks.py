@@ -384,7 +384,7 @@ def main() -> None:
 
     rubric_mapping = load_rubric_mapping(Path(__file__).parent / "rubric.csv")
 
-    dataset = load_dataset("kilian-group/supercon-mini", name=args.task, split="test")
+    dataset = load_dataset("kilian-group/supercon-mini-v2", split="test")
     grouped = group_rows(cast(Iterable[dict[str, Any]], dataset))
 
     refnos = list(grouped.keys())
