@@ -16,6 +16,7 @@ async def _fetch(
     header: dict[str, str] | None,
     cookie: dict[str, str] | None,
     download_to_folder: Path | None,
+    timeout_sec: int = 120,
 ) -> str:
     args = {"allow_redirects": allow_redirects}
 
@@ -27,13 +28,16 @@ async def _fetch(
     if cookie:
         args["cookies"] = cookie
 
+    timeout = aiohttp.ClientTimeout(total=timeout_sec)
+    args["timeout"] = timeout
+
     if download_to_folder is not None:
         assert download_to_folder.exists()
         assert download_to_folder.is_dir(follow_symlinks=False), "No symlinks!"
         assert url
 
         # downloading a file
-        async with session.get(url) as response:
+        async with session.get(url, timeout=timeout) as response:
             content_type: str = response.content_type
             sp = url.split("/")[-1]
             if not sp:
@@ -58,12 +62,18 @@ async def _fetch(
                         ):
                             # ok, just stop pulling
                             is_incomplete = True
+                            break
                         else:
                             # some other error, throw it
                             raise
+                    except asyncio.TimeoutError:
+                        is_incomplete = True
+                        break
 
             if is_incomplete:
-                save_to_path.rename(save_to_path.stem + "_incomplete" + f_ext)
+                save_to_path = save_to_path.parent / (
+                    save_to_path.stem + "_incomplete" + f_ext
+                )
 
             return str(save_to_path.absolute())
     else:
@@ -82,10 +92,18 @@ async def _bound_fetch(
     header: dict[str, str] | None,
     cookie: dict[str, str] | None,
     download_to_folder: Path | None,
+    timeout_sec: int = 120,
 ) -> str:
     async with sem:
         return await _fetch(
-            url, session, allow_redirects, param, header, cookie, download_to_folder
+            url,
+            session,
+            allow_redirects,
+            param,
+            header,
+            cookie,
+            download_to_folder,
+            timeout_sec,
         )
 
 
@@ -97,6 +115,7 @@ async def _run(
     headers: list[dict[str, str] | None],
     cookies: list[dict[str, str] | None],
     download_to_folder: Path | None,
+    timeout_sec: int = 120,
 ) -> list[str]:
     sem = asyncio.Semaphore(max_concurrent_coro)
     async with ClientSession() as session:
@@ -110,6 +129,7 @@ async def _run(
                 header,
                 cookie,
                 download_to_folder,
+                timeout_sec,
             )
             for url, param, header, cookie in zip(urls, params, headers, cookies)
         ]
@@ -126,6 +146,7 @@ def get_responses(
     allow_redirects: bool = True,
     # download options
     download_to_folder: Path | None = None,
+    timeout_sec: int = 120,
 ) -> list[str]:
     """Make several async requests at once.
 
@@ -142,6 +163,8 @@ def get_responses(
     :param allow_redirects: Whether to follow redirects on http 30X
     :param download_to_folder: if provided, a subfolder to where to save files. If this is non-null,
         then the response will be streamed in smaller chunks and saved to disk.
+    :param timeout_sec: The number of seconds to allow any single request to hang before
+        cutting it off.
     :return: text of the http response or the path to the file saved on download.
     """
     params = params or ([None] * len(urls))
@@ -151,7 +174,7 @@ def get_responses(
 
     if download_to_folder is not None:
         # better for downloading
-        max_concurrent_coro = min(max_concurrent_coro, 150)
+        max_concurrent_coro = min(max_concurrent_coro, 75)
 
     return asyncio.run(
         _run(
@@ -162,5 +185,6 @@ def get_responses(
             headers,
             cookies,
             download_to_folder,
+            timeout_sec,
         )
     )
