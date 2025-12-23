@@ -1,0 +1,147 @@
+id,material_or_system,sample_label,property_name,category,value_string,value_number,units,method,notes,location.page,location.section,location.source_type,location.evidence,conditions.field_orientation,location.figure_or_table,conditions.current_direction,conditions.field,conditions.temperature,conditions.field_range,conditions.temperature_range,paper_pdf_path,validated,validator_name,validation_date,flagged
+prop_001,Ru7B3,single crystal,structure prototype,structural,Th7Fe3-type structure,,,powder X-ray diffraction,Hexagonal; noncentrosymmetric.,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_002,Ru7B3,single crystal,space group,structural,P63mc,,,powder X-ray diffraction,Noncentrosymmetric; lacks inversion symmetry along c-axis.,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_003,Ru7B3,,upper critical field Hc2(0),superconducting,,17.2,kOe,magnetization in magnetic fields,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_004,Ru7B3,,upper critical field Hc2(0),superconducting,,15.8,kOe,magnetization in magnetic fields,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_005,Ru7B3,,coherence length ξ_GL(0),superconducting,,144.0,Å,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_006,Ru7B3,,penetration depth λ_GL(0),superconducting,,3110.0,Å,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_007,Ru7B3,,Ginzburg–Landau parameter κ_GL(0),superconducting,,21.6,,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_008,Ru7B3,,coherence length ξ_GL(0),superconducting,,138.0,Å,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_009,Ru7B3,,penetration depth λ_GL(0),superconducting,,3520.0,Å,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_010,Ru7B3,,Ginzburg–Landau parameter κ_GL(0),superconducting,,25.5,,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_011,Ru7B3,,superconducting gap isotropy,classification,isotropic superconducting gap,,,specific heat measurements,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_012,Ru7B3,,superconductivity type,classification,type-II superconductor,,,magnetic field measurements,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_013,CePt3Si,,superconductivity classification,classification,heavy-fermion superconductor,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_014,CePt3Si,,centrosymmetry,structural,noncentrosymmetric,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_015,noncentrosymmetric heavy-fermion superconductors,,superconductivity classification,classification,unconventional behavior around magnetic quantum critical point,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_016,noncentrosymmetric heavy-fermion superconductors,,coexistence phenomena,classification,coexisting superconductivity and magnetic ordering,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_017,"Li2T3B (T = Pd, Pt)",,centrosymmetry,structural,noncentrosymmetric,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_018,Mg10Ir19B16,,centrosymmetry,structural,noncentrosymmetric,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_019,"T2Ga9 (T = Rh, Ir)",,centrosymmetry,structural,noncentrosymmetric,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_020,noncentrosymmetric superconductors,,spin–orbit coupling type,electronic,asymmetric spin–orbit coupling (ASOC),,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_021,T7B3 (T: transition metal),,space group,structural,P63mc,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_022,Ru7B3,,crystallographic class,structural,C6v,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_023,Ru7B3,,superconducting transition temperature Tc,superconducting,2.58–3.38 K,,,,reported previously for polycrystalline samples,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_024,Ru7B3,polycrystal,purity of Ru powder,chemical,,99.9,%,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_025,Ru7B3,polycrystal,purity of B powder,chemical,,99.5,%,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_026,Ru7B3,polycrystal,nominal composition ratio,chemical,Ru/B = 2.0,,,,included excess B due to low B vapor pressure,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_027,Ru7B3,single crystal,growth atmosphere,experimental_condition,Ar atmosphere,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_028,Ru7B3,single crystal,crystal growth rate,experimental_condition,,10.0,mm/h,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_029,Ru7B3,single crystal,crystallinity determination method,experimental_condition,X-ray Laue method,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_030,Ru7B3,,X-ray radiation type,experimental_condition,Cu Kα,,,powder X-ray diffraction,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_031,Ru7B3,,SQUID measurement temperature range,experimental_condition,1.8–4.0 K,,,SQUID magnetometer (Quantum Design MPMSR2),,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_032,Ru7B3,,electrical resistivity measurement temperature range,experimental_condition,2.0–300 K,,,DC four-probe method,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_033,Ru7B3,,specific heat measurement temperature range,experimental_condition,0.5–4.0 K,,,PPMS system with 3He refrigerator,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_034,Ru7B3,,specific heat measurement field conditions,experimental_condition,zero and various magnetic fields,,,specific heat (PPMS),,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_035,Ru7B3,,space group,structural,P63mc,,,powder X-ray diffraction,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_036,Ru7B3,single crystal,lattice constant a,structural,,7.441,Å,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_037,Ru7B3,single crystal,lattice constant c,structural,,4.7,Å,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_038,Ru7B3,polycrystal,lattice constant a,structural,,7.467,Å,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_039,Ru7B3,polycrystal,lattice constant c,structural,,4.713,Å,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_040,Th7Fe3-type structure,,atomic coordinate,structural,"Th1 at (x=1/3, y=2/3, z=0.06)",,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_041,Th7Fe3-type structure,,atomic coordinate,structural,"Th2 at (x=0.126, y=0.874, z=0.250)",,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_042,Th7Fe3-type structure,,atomic coordinate,structural,"Th3 at (x=0.544, y=0.456, z=0.03)",,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_043,Th7Fe3-type structure,,atomic coordinate,structural,"B at (x=0.815, y=0.185, z=0.31)",,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_044,Ru7B3,,structure type,structural,hexagonal structure,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_045,Ru7B3,,space group,structural,P63mc,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_046,Ru7B3,,crystallographic class,structural,C6v,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_047,Ru7B3,,inversion symmetry,classification,no inversion symmetry along c-axis,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_048,Ru7B3,,boron atomic arrangement,structural,B atoms form isolated triangles in different planes,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_049,Ru7B3,,Rashba-type ASOC expectation,classification,expected unusual superconductivity due to ASOC,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_050,Ru7B3,single crystal,superconducting transition temperature Tonset,superconducting,,2.8,K,dc magnetic susceptibility,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_051,Ru7B3,polycrystal,superconducting transition temperature Tonset,superconducting,,3.3,K,dc magnetic susceptibility,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_052,Ru7B3,,lattice constant contraction,structural,single crystals have slightly narrower lattice constants than polycrystals,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_053,Ru7B3,,superconductivity type,classification,type-II superconducting behavior,,,magnetization M(H),,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_054,Ru7B3,,lower critical field Hc1(0) definition,superconducting,defined as the field for deviating from the linear line for the initial slope,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_055,Ru7B3,,superconducting transition onset temperature,superconducting,,2.95,K,electrical resistivity,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_056,Ru7B3,,zero resistivity temperature,superconducting,,2.8,K,electrical resistivity,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_057,Ru7B3,,superconducting transition width,superconducting,,0.1,K,electrical resistivity,defined between 10% and 90% of the transition,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_058,Ru7B3,,room temperature resistivity ρ(300K),transport,,97.0,μΩ·cm,,,,,text,,,,[100],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_059,Ru7B3,,residual resistivity ρ(res),transport,,26.0,μΩ·cm,,,,,text,,,,[100],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_060,Ru7B3,,residual resistivity ratio RRR,transport,,3.7,,,,,,text,,,,[100],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_061,Ru7B3,,room temperature resistivity ρ(300K),transport,,55.0,μΩ·cm,,,,,text,,,,[001],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_062,Ru7B3,,residual resistivity ρ(res),transport,,14.0,μΩ·cm,,,,,text,,,,[001],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_063,Ru7B3,,residual resistivity ratio RRR,transport,,3.9,,,,,,text,,,,[001],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_064,Ru7B3,,phonon excitation energy E1,thermal,,10.0,meV,fitting to modified parallel resistor model,,,,text,,,,[001],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_065,Ru7B3,,phonon excitation energy E2,thermal,,10.0,meV,fitting to modified parallel resistor model,,,,text,,,,[001],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_066,Ru7B3,,phonon excitation energy range,thermal,11–12 meV,,,fitting to modified parallel resistor model,,,,text,,,,[100],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_067,Ru7B3,,phonon excitation energy range (duplicate E2),thermal,11–12 meV,,,fitting to modified parallel resistor model,,,,text,,,,[100],,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_068,Ru7B3,,Debye temperature ΘD,thermal,,640.0,K,,Referenced for comparison,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_069,Ru7B3,,specific heat model expression,thermal,C(T) = γT + βT^3,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_070,Ru7B3,,Sommerfeld constant γ,thermal,,43.7,mJ/(K^2 mol),,,,,text,,,,,20 kOe,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_071,Ru7B3,,Debye temperature ΘD,thermal,,640.0,K,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_072,Ru7B3,,β coefficient,thermal,,0.147,mJ/(K^4 mol),,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_073,Ru7B3,,superconducting transition temperature Tc,superconducting,,2.8,K,specific heat,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_074,Ru7B3,,superconducting energy gap Δ(0),superconducting,,0.38,meV,fitting Ce(T) ∝ exp[-Δ(0)/kBT],,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_075,Ru7B3,,specific heat jump ΔCe/(γ Tc),superconducting,,1.4,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_076,Ru7B3,,BCS gap ratio 2Δ(0)/(kB Tc),superconducting,,3.3,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_077,Ru7B3,,superconducting gap symmetry,classification,isotropic fully-gapped s-wave,,,field dependence of γ(H),,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_078,Ru7B3,,Sommerfeld parameter γ(H) field dependence,electronic,γ(H) ∝ H,,,,,,,figure,,,,,,0.45 K,0–14 kOe,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_079,Ru7B3,,lower critical field Hc1(0),superconducting,,53.0,Oe,M–H measurements; fit to Hc1(T)=Hc1(0)[1−(T/Tc)²],,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_080,Ru7B3,,lower critical field Hc1(0),superconducting,,68.0,Oe,M–H measurements; fit to Hc1(T)=Hc1(0)[1−(T/Tc)²],,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_081,Ru7B3,,upper critical field Hc2(0) (GL),superconducting,,17.2,kOe,Ginzburg–Landau theory fit,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_082,Ru7B3,,upper critical field Hc2(0) (GL),superconducting,,15.8,kOe,Ginzburg–Landau theory fit,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_083,Ru7B3,,dHc2/dT slope,superconducting,,-7.82,kOe/K,,,,,text,,[001],,,,,,T/Tc < 0.5,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_084,Ru7B3,,dHc2/dT slope,superconducting,,-7.07,kOe/K,,,,,text,,[100],,,,,,T/Tc < 0.5,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_085,Ru7B3,,upper critical field Hc2(0) (WHH),superconducting,,15.2,kOe,Werthamer–Helfand–Hohenberg (WHH) theory,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_086,Ru7B3,,upper critical field Hc2(0) (WHH),superconducting,,13.7,kOe,WHH theory,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_087,Ru7B3,,Hc2(0) increase over WHH,superconducting,,2.0,kOe,,,,,text,,[100] & [001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_088,Ru7B3,,coherence length ξ_GL(0),superconducting,,144.0,Å,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_089,Ru7B3,,penetration depth λ_GL(0),superconducting,,3110.0,Å,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_090,Ru7B3,,Ginzburg–Landau parameter κ(0),superconducting,,21.6,,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_091,Ru7B3,,coherence length ξ_GL(0),superconducting,,138.0,Å,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_092,Ru7B3,,penetration depth λ_GL(0),superconducting,,3520.0,Å,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_093,Ru7B3,,Ginzburg–Landau parameter κ(0),superconducting,,25.5,,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_094,Ru7B3,,thermodynamic critical field Hc(0),superconducting,,480.0,Oe,,,,,text,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_095,Ru7B3,,thermodynamic critical field Hc(0),superconducting,,520.0,Oe,,,,,text,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_096,Ru7B3,,noncentrosymmetric effect on superconductivity,classification,no detectable effect on superconducting properties,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_097,Ru7B3,,electron correlation strength (Ru 4d),electronic,weak electron correlation,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_098,Li2Pt3B,,band splitting at Fermi surface,electronic,,200.0,meV,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_099,Li2Pd3B,,band splitting at Fermi surface,electronic,20–50 meV,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_100,Re7B3,,superconductivity classification,classification,possible unconventional superconductivity,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_101,Re7B3,,spin–orbit interaction strength,electronic,much stronger (5d electron),,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_102,Re7B3,,crystal growth difficulty,experimental_condition,very difficult due to many phases in Re–B system,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_103,"T2Ga9 (T = Rh, Ir)",,Fermi surface contribution,electronic,mostly s- or p-electrons of Ga sites,,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_104,Ru7B3,,superconductivity type,classification,type-II superconductor,,,"magnetic susceptibility, resistivity, and magnetization",,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_105,Ru7B3,,crystal structure,structural,"hexagonal structure, space group P63mc",,,,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_106,Ru7B3,,superconducting gap symmetry,classification,isotropic s-wave,,,temperature dependence of Cel below Tc,,,,text,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_001,Ru7B3,,superconducting transition temperature Tc,superconducting,,2.8,K,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_002,Ru7B3,,thermodynamic critical field Hc(0),superconducting,,520.0,Oe,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_003,Ru7B3,,thermodynamic critical field Hc(0),superconducting,,480.0,Oe,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_004,Ru7B3,,lower critical field Hc1(0),superconducting,,68.0,Oe,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_005,Ru7B3,,lower critical field Hc1(0),superconducting,,53.0,Oe,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_006,Ru7B3,,upper critical field Hc2(0),superconducting,,15.8,kOe,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_007,Ru7B3,,upper critical field Hc2(0),superconducting,,17.2,kOe,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_008,Ru7B3,,penetration depth λ(0),superconducting,,3110.0,Å,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_009,Ru7B3,,penetration depth λ(0),superconducting,,3520.0,Å,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_010,Ru7B3,,coherence length ξ(0),superconducting,,144.0,Å,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_011,Ru7B3,,coherence length ξ(0),superconducting,,138.0,Å,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_012,Ru7B3,,Ginzburg–Landau parameter κ(0),superconducting,,21.6,,,,,,table,,[100],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_013,Ru7B3,,Ginzburg–Landau parameter κ(0),superconducting,,25.5,,,,,,table,,[001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_014,Ru7B3,,Sommerfeld coefficient γ,thermal,,43.7,mJ/(K^2 mol),,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_015,Ru7B3,,Debye temperature ΘD,thermal,,640.0,K,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_016,Ru7B3,,superconducting energy gap Δ(0),superconducting,,0.38,meV,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_017,Ru7B3,,specific heat jump ΔCe/(γTc),superconducting,,1.4,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_T2_018,Ru7B3,,gap ratio 2Δ(0)/(kB Tc),superconducting,,3.3,,,,,,table,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F1_001,Ru7B3,,space group,structural,P63mc,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F1_002,Ru7B3,,crystal structure,structural,hexagonal unit cell,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F1_003,Ru7B3,,atom type of large spheres,structural,Ru atoms,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F1_004,Ru7B3,,atom type of small spheres,structural,B atoms,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F2_001,Ru7B3,polycrystal,applied magnetic field,experimental_condition,,10.0,Oe,dc magnetic susceptibility,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F2_002,Ru7B3,single crystal,applied magnetic field,experimental_condition,,10.0,Oe,dc magnetic susceptibility,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F2_003,Ru7B3,polycrystal,normalization temperature,experimental_condition,,1.8,K,dc magnetic susceptibility,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F2_004,Ru7B3,single crystal,normalization temperature,experimental_condition,,1.8,K,dc magnetic susceptibility,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F3_001,Ru7B3,,field orientation,experimental_condition,H ∥ [001],,,magnetization M(H),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F3_002,Ru7B3,,field orientation,experimental_condition,H ∥ [100],,,magnetization M(H),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F4_001,Ru7B3,,resistivity measurement temperature range,experimental_condition,2.0–300 K,,,electrical resistivity ρ(T),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F4_002,Ru7B3,,resistivity fit description,transport,solid lines are fitting results of eqs. (1) and (2),,,fit to modified parallel resistor model,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F5_001,Ru7B3,,specific heat measurement field,experimental_condition,,0.0,kOe,specific heat C(T),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F5_002,Ru7B3,,specific heat measurement field,experimental_condition,,20.0,kOe,specific heat C(T),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F5_003,Ru7B3,,specific heat representation,thermal,Ce/T vs T for Ru7B3 with comparison to weak-coupling BCS theory,,,specific heat Ce/T,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F6_001,Ru7B3,,measurement temperature,experimental_condition,,0.45,K,γ(H) from specific heat,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F6_002,Ru7B3,,γ(H) comparison models,electronic,linear γ(H) ∝ H and nonlinear γ(H) ∝ H^{1/2} compared,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F6_003,Ru7B3,,field range for C/T vs T^2,experimental_condition,0–14 kOe,,,C/T vs T^2,,,,figure,,H ∥ [001],,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F6_004,Ru7B3,,field orientation,experimental_condition,H ∥ [001],,,C/T vs T^2,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F7_001,Ru7B3,,specific heat measurement description,thermal,C/T measured under several magnetic fields,,,,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F8_001,Ru7B3,,Hc1(T) fit function,superconducting,Hc1(T) = Hc1(0)[1 − (T/Tc)^2],,,fit of Hc1 data,,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
+prop_F8_002,Ru7B3,,Hc2(T) fit description,superconducting,Hc2(T) fitted by GL theory and compared with WHH prediction,,,fit of upper critical field Hc2(T),,,,figure,,,,,,,,,examples/extraction/assets/Paper_DB/Paper_1.pdf,,,,False
