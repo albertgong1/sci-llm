@@ -2,78 +2,69 @@
 
 ## Setup Instructions
 
-For first time setup, run the following script to create a conda environment `scillm` with python dependencies and packages.
+1. For first time setup, run the following script to create a conda environment `scillm` with python dependencies and packages.
 
 ```bash
 ./scripts/setup_conda_environment.sh
 ```
 
-Update the packages with:
+2. Update the packages with:
 
 ```bash
 uv sync --all-groups
 ```
 
-## Run Property Extraction Experiments
-
-Set your API keys in a file named `.env` in the root directory and add
+3. Set your API keys in a file named `.env` in the root directory and add
 
 ```bash
 GOOGLE_API_KEY=xxxxx
 OPENAI_API_KEY=xxxxx
 ```
 
-### SuperCon Domain
+## Dataset Construction
 
 1. Download files:
-    1. [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/supercon/`.
 
-    2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `data/supercon/SuperCon.csv`.
+<details>
+    <summary>SuperCon</summary>
+
+1. [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data/supercon/`.
+2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `data/supercon/SuperCon.csv`.
 
 ```bash
 # Assumes Paper_DB.tar is in the current directory
 mkdir -p data/supercon && tar -xvf Paper_DB.tar -C data/supercon/
 ```
 
-2. Generate a CSV of SuperCon properties, and optionally upload to a huggingface repo:
+</details>
+
+2. Extract all properties from the papers:
+
+```bash
+./src/pbench/mass_extract_properties_from_llm.py --domain supercon --model_name gemini-3-pro
+# Move the outputs to `assets/supercon/validate_csv/*.csv`
+```
+
+3. Follow the instructions in [VALIDATOR_GUIDE.md](docs/VALIDATOR_GUIDE.md).
+
+4. Share the dataset to HuggingFace using the following command:
 
 ```bash
 ./src/pbench/create_supercon_hf_dataset.py \
-    --domain supercon \
+    --data_dir data/ \
     --output_dir out/ \
     --repo_name <repo_name> \
     --filter_pdf
 ```
 
-3. Mass-extract properties on supercon papers with an LLM and validate with the app:
+## Harbor Evaluation
+
+## Standalone LLM Evaluation (for debugging)
+
+1. Extract all properties from each paper:
 
 ```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --model_name gemini-2.5-flash
+./src/pbench/mass_extract_properties_from_llm.py --domain supercon --model_name gemini-3-flash
 ```
 
 Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
-Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-Then run the validator app with instructions in `docs/VALIDATOR_GUIDE.md`.
-
-4. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task.
-This uses the existing huggingface repo https://huggingface.co/datasets/kilian-group/supercon-mini.
-
-Outputs are stored at `out/supercon/preds/*.json`.
-
-```bash
-./src/pbench_eval/extract_properties.py \
-    --domain supercon \
-    --task tc \
-    --server gemini \
-    --model_name gemini-2.5-flash \
-    -od out/
-```
-
-5. Compute the accuracy of the extracted information:
-
-```bash
-./src/pbench_eval/score_task.py \
-    --domain supercon \
-    --task tc \
-    -od out/
-```
