@@ -10,13 +10,14 @@ import unicodedata
 from google import genai
 from google.genai import types
 import json
+import numpy as np
 
 # Property Validator App
 #
 # A Streamlit application for validating extracted property data from scientific papers against their source PDFs.
 #
 # Usage:
-#     streamlit run validator_app.py
+#     streamlit run app.py
 #
 # CLI Arguments:
 #     --csv_path (str): Path to the initial CSV file to validate.
@@ -24,18 +25,68 @@ import json
 #     --csv_folder (str): Folder containing validation CSVs (for the dropdown).
 #
 # Example:
-#     streamlit run validator_app.py -- --csv_path "data/my_properties.csv"/extraction/assets/validate_csv/Ru7B3_full_properties_rearraged.csv"
+#     streamlit run app.py --csv_path "mycsv.csv" --pdf_path "mypdf.pdf" --csv_folder "mycsvs"
 
 # Page configuration
 st.set_page_config(layout="wide", page_title="Property Validator")
+
+from pathlib import Path
+
+# Robustly determine the paths to assets, handling script relocation
+def find_repo_root(start_path: Path) -> Path:
+    """Finds the git repository root by walking up directories."""
+    current_path = start_path.resolve()
+    # Walk up at most 10 levels
+    for _ in range(10):
+        if (current_path / ".git").exists():
+            return current_path
+        parent = current_path.parent
+        if parent == current_path: # Reached filesystem root
+            break
+        current_path = parent
+    return None
+
+def get_asset_paths():
+    """Returns (csv_folder, paper_folder) based on discovered assets directory."""
+    script_path = Path(__file__).resolve()
+    script_dir = script_path.parent
+    
+    # Potential locations for the 'assets' folder
+    # 1. Relative to script (if assets folder was moved with script)
+    # 2. Original absolute location in repo structure (examples/extraction/assets)
+    # 3. Root level assets folder
+    
+    candidates = [
+        script_dir / "assets",
+    ]
+    
+    repo_root = find_repo_root(script_dir)
+    if repo_root:
+        candidates.append(repo_root / "examples" / "extraction" / "assets")
+        candidates.append(repo_root / "assets")
+        
+    for asset_dir in candidates:
+        if asset_dir.exists():
+            return (
+                str(asset_dir / "validate_csv"),
+                str(asset_dir / "Paper_DB")
+            )
+            
+    # Fallback to local 'assets' even if it doesn't exist
+    return (
+        str(script_dir / "assets" / "validate_csv"),
+        str(script_dir / "assets" / "Paper_DB")
+    )
+
+default_csv_folder, default_paper_folder = get_asset_paths()
 
 # Parse command line arguments
 try:
     parser = argparse.ArgumentParser(description="Validator App Configuration")
     parser.add_argument("--csv_path", type=str, default=None, help="Path to the initial CSV file")
     parser.add_argument("--pdf_path", type=str, default=None, help="Optional initial PDF path override.")
-    parser.add_argument("--csv_folder", type=str, default="examples/extraction/assets/validate_csv/", help="Folder containing validation CSVs")
-    parser.add_argument("--paper_folder", type=str, default="examples/extraction/assets/Paper_DB/", help="Folder containing PDFs")
+    parser.add_argument("--csv_folder", type=str, default=default_csv_folder, help="Folder containing validation CSVs")
+    parser.add_argument("--paper_folder", type=str, default=default_paper_folder, help="Folder containing PDFs")
     
     args, unknown = parser.parse_known_args()
     
@@ -50,8 +101,8 @@ except Exception as e:
     # Fallback to no defaults
     CSV_PATH = None
     INITIAL_PDF_PATH = None
-    CSV_FOLDER = "examples/extraction/assets/validate_csv/"
-    PAPER_FOLDER = "examples/extraction/assets/Paper_DB/" 
+    CSV_FOLDER = default_csv_folder
+    PAPER_FOLDER = default_paper_folder 
 
 # --- AI Finder (For when we don't have "property evidence" from CSV) ---
 def search_with_ai(pdf_path, value, prop_name, unit="", material_or_system=""):
@@ -955,6 +1006,15 @@ def main():
                 df.at[selected_index, "validated"] = True
                 df.at[selected_index, "validator_name"] = st.session_state.validator_name
                 df.at[selected_index, "validation_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # Auto-advance if filter preserves the item (All, Flagged, etc)
+                if filter_status in ["All", "Flagged"]:
+                     current_pos = st.session_state.current_property_index
+                     for i in range(current_pos + 1, len(filtered_indices)):
+                         idx = filtered_indices[i]
+                         if pd.isna(df.at[idx, "validated"]):
+                             st.session_state.current_property_index = i
+                             break
+
                 save_data(df)
                 st.session_state.df = df
                 st.rerun()
@@ -968,6 +1028,15 @@ def main():
                 # Also clear pending AI match if invalidated? Maybe user rejected the AI suggestion implicitly.
                 if 'pending_ai_match' in st.session_state and st.session_state.pending_ai_match.get('index') == selected_index:
                     del st.session_state.pending_ai_match
+
+                # Auto-advance if filter preserves the item (All, Flagged, etc)
+                if filter_status in ["All", "Flagged"]:
+                     current_pos = st.session_state.current_property_index
+                     for i in range(current_pos + 1, len(filtered_indices)):
+                         idx = filtered_indices[i]
+                         if pd.isna(df.at[idx, "validated"]):
+                             st.session_state.current_property_index = i
+                             break
 
                 save_data(df)
                 st.session_state.df = df
@@ -1053,22 +1122,79 @@ def main():
                 st.session_state.df = df
                 st.toast("Note saved!")
 
-        # Bottom Left: Full Data Table (Read-only view of context)
-        st.subheader("Property List")
-        # Highlight currently selected row
-        def highlight_selected(r):
-            if r.name == selected_index:
-                return ['background-color: #ffffb3'] * len(r)
-            return [''] * len(r)
-
-        # Show a subset of columns
-        display_cols = ["id", "property_name", "value_string", "validated"]
-        st.dataframe(
-            df[display_cols].loc[filtered_indices], # Only show filtered
-            width="stretch",
+        # Prepare display dataframe (just for data access)
+        # 1. Start index at 1
+        # display_df = df[display_cols].loc[filtered_indices].copy()
+        
+        # DataFrame Implementation with Sticky "Status | ID"
+        
+        # Create a display copy to manipulate
+        display_df = df.loc[filtered_indices].copy()
+        
+        # 1. Helper to get icons
+        def get_status_icon(val):
+            if val is True: return "✅"
+            if val is False: return "❌"
+            return "❓"
+            
+        # 2. Create Merged "Status | ID" column
+        # e.g. "✅ prop_001"
+        display_df["status_icon"] = display_df["validated"].apply(get_status_icon)
+        display_df["flag_icon"] = display_df["flagged"].apply(lambda x: "🚩 " if x else "")
+        
+        display_df["status_id"] = display_df["flag_icon"] + display_df["status_icon"] + " " + display_df["id"].astype(str)
+        
+        # 3. Select Columns to Display
+        cols_to_show = ["status_id", "material_or_system", "property_name", "value_string", "value_number", "units"]
+        final_display_df = display_df[cols_to_show].copy()
+        
+        # Back to Dataframe: Best option for "Row = 1 Click" + "Spreadsheet Layout" + "Small Text"
+        
+        # 4. 0-Based RangeIndex for Display
+        # This aligns Row 0 with Index 0, avoiding off-by-one confusion if IDs are 0-based
+        final_display_df.index = range(0, len(final_display_df))
+        
+        event = st.dataframe(
+            final_display_df,
+            column_config={
+                "status_id": st.column_config.TextColumn(
+                    "Status | ID",
+                    help="Validation Status and Property ID",
+                    width="stretch",
+                    pinned=True
+                ),
+                "material_or_system": st.column_config.TextColumn("Material/System", width="stretch"),
+                "property_name": st.column_config.TextColumn("Property", width="medium"),
+                "value_string": st.column_config.TextColumn("Value String", width="medium"),
+                "value_number": st.column_config.TextColumn("Value Num", width="small"),
+                "units": st.column_config.TextColumn("Unit", width="small"),
+            },
+            width="stretch", 
             height=400,
-            hide_index=False
+            hide_index=False, # Show the 0-based index
+            on_select="rerun",
+            selection_mode="single-row"
         )
+
+        if len(event.selection.rows):
+            # With RangeIndex(0..N), selection returns the integer label
+            selected_idx_label = event.selection.rows[0]
+            # print(f"DEBUG: Selected Label: {selected_idx_label}")
+            
+            # Simple math: 0-based numeric label -> 0-based list index
+            # Label 0 -> Index 0
+            if isinstance(selected_idx_label, int):
+                selected_list_position = selected_idx_label
+                
+                # Check bounds just in case
+                if 0 <= selected_list_position < len(filtered_indices):
+                    # Update state only if changed
+                    if st.session_state.current_property_index != selected_list_position:
+                        st.session_state.current_property_index = selected_list_position
+                        st.rerun()
+            else:
+                 # Fallback if something weird happens (e.g. string label)
+                 pass
 
     with col2:
         # Right Panel: PDF Viewer
