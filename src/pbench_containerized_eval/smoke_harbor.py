@@ -9,7 +9,7 @@ Secrets:
   - Claude Code: set `ANTHROPIC_API_KEY=...` or `CLAUDE_CODE_OAUTH_TOKEN=...` in `.env`
 
 Example:
-  uv run python examples/containerized-extraction/smoke_harbor.py --task tc --refno PR05001178
+  uv run python src/pbench_containerized_eval/smoke_harbor.py --refno PR05001178
 
 """
 
@@ -76,16 +76,15 @@ def slugify(value: str) -> str:
     )
 
 
-def build_tasks(*, task: str, template: str, refno: str | None, force: bool) -> Path:
+def build_tasks(
+    *, task: str | None, template: str, refno: str | None, force: bool
+) -> Path:
     """Compile tasks and return the tasks directory path."""
     compiler = (
-        repo_root()
-        / "examples"
-        / "containerized-extraction"
-        / "prepare_harbor_tasks.py"
+        repo_root() / "src" / "pbench_containerized_eval" / "prepare_harbor_tasks.py"
     )
-    out_dir = repo_root() / "out" / "harbor" / "supercon-mini"
-    task_root = out_dir / task / template
+    out_dir = repo_root() / "out" / "harbor" / "supercon-mini-v2"
+    task_root = out_dir / template if task is None else out_dir / task / template
     tasks_dir = task_root / "tasks"
 
     if tasks_dir.exists() and any(tasks_dir.iterdir()) and not force:
@@ -94,14 +93,14 @@ def build_tasks(*, task: str, template: str, refno: str | None, force: bool) -> 
     cmd = [
         sys.executable,
         str(compiler),
-        "--task",
-        task,
         "--template",
         template,
         "--output-dir",
         str(out_dir),
         "--write-job-config",
     ]
+    if task:
+        cmd.extend(["--task", task])
     if refno:
         cmd.extend(["--refno", refno])
     if force:
@@ -113,7 +112,7 @@ def build_tasks(*, task: str, template: str, refno: str | None, force: bool) -> 
 
 def run_trial(*, task_path: Path, agent: str, model: str | None) -> None:
     """Run a Harbor trial for a single local task directory."""
-    runner = repo_root() / "examples" / "containerized-extraction" / "run_harbor.py"
+    runner = repo_root() / "src" / "pbench_containerized_eval" / "run_harbor.py"
 
     cmd = [
         sys.executable,
@@ -140,7 +139,9 @@ def main() -> int:
         description="Smoke test Harbor task variants + agents."
     )
     parser.add_argument(
-        "--task", default="tc", help="HF config name (e.g. tc, rawmat, ...)."
+        "--task",
+        default=None,
+        help="Optional task alias to filter properties (e.g., tc). Omit to include all.",
     )
     parser.add_argument(
         "--refno",
@@ -182,12 +183,13 @@ def main() -> int:
 
     for template in templates:
         tasks_dir = build_tasks(
-            task=str(args.task),
+            task=str(args.task) if args.task else None,
             template=template,
             refno=str(args.refno) if args.refno else None,
             force=bool(args.force),
         )
-        task_id = f"{slugify(str(args.refno))}--{slugify(str(args.task))}"
+        task_suffix = f"--{slugify(str(args.task))}" if args.task else ""
+        task_id = f"{slugify(str(args.refno))}{task_suffix}"
         task_path = tasks_dir / task_id
         if not task_path.exists():
             raise FileNotFoundError(f"Expected task directory missing: {task_path}")

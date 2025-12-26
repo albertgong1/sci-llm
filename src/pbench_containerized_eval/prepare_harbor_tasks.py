@@ -8,21 +8,21 @@ each with:
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
 
 The source of truth for the benchmark is the Hugging Face dataset
-`kilian-group/supercon-mini`, grouped by `refno` (one Harbor task per paper).
+`kilian-group/supercon-mini-v2`, grouped by `refno` (one Harbor task per paper).
 
-By default this script writes tasks under `out/harbor/supercon-mini/<task>/<template>/` so the
+By default this script writes tasks under `out/harbor/supercon-mini-v2/<task>/<template>/` so the
 repository doesn't contain a persistent `harbor/` directory until you build.
 
 Example (from repo root):
     # Default template is `ground-template`.
-    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --force
-    uv run python examples/containerized-extraction/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini/tc/ground-template/job.yaml -a oracle
+    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --force
+    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
 
     # To use the question-based template:
-    uv run python examples/containerized-extraction/prepare_harbor_tasks.py --task tc --template prompted-template --force
-    uv run python examples/containerized-extraction/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini/tc/prompted-template/job.yaml -a oracle
+    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --template prompted-template --force
+    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini-v2/prompted-template/job.yaml -a oracle
 """
 
 from __future__ import annotations
@@ -51,6 +51,11 @@ def templates_dir() -> Path:
 
 
 _TEMPLATES_SUBDIR = "ground-template"
+
+_TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
+    # Default task: superconducting critical temperature recommended for the sample.
+    "tc": {"Tc (of this sample) recommended"},
+}
 
 
 def read_template(relative_path: str) -> str:
@@ -129,6 +134,19 @@ def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
     return mapping
 
 
+def load_definitions(rubric_path: Path) -> dict[str, str]:
+    """Load property_name -> definition mapping from the rubric CSV (if present)."""
+    definitions: dict[str, str] = {}
+    with rubric_path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            property_name = row.get("property_name")
+            definition = row.get("definition") or ""
+            if property_name:
+                definitions[property_name] = definition
+    return definitions
+
+
 def dockerfile_contents() -> str:
     """Render the task environment Dockerfile.
 
@@ -149,11 +167,50 @@ def dockerfile_contents() -> str:
     )
 
 
-def group_rows(dataset: Iterable[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    """Group dataset rows by `refno` to build one Harbor task per paper."""
+def resolve_property_filter(task: str | None) -> set[str] | None:
+    """Return the set of property_names to keep for a given task alias (or None for all)."""
+    if task is None:
+        return None
+    return _TASK_PROPERTY_FILTERS.get(task.strip().lower())
+
+
+def flatten_dataset(
+    dataset: Iterable[dict[str, Any]],
+    *,
+    definitions: Mapping[str, str],
+    property_filter: set[str] | None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Flatten HF rows (refno + properties list) into per-property rows grouped by refno."""
     grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
+
     for row in dataset:
-        grouped[row["refno"]].append(row)
+        refno = str(row.get("refno") or "").strip()
+        if not refno:
+            continue
+
+        props = row.get("properties") or []
+        if not isinstance(props, list):
+            continue
+
+        for prop in props:
+            if not isinstance(prop, dict):
+                continue
+            prop_name = str(prop.get("property_name") or "").strip()
+            if not prop_name:
+                continue
+            if property_filter and prop_name not in property_filter:
+                continue
+
+            grouped[refno].append(
+                {
+                    "material": str(prop.get("material_or_system") or ""),
+                    "property_name": prop_name,
+                    # value_string already contains any unit; keep unit empty to avoid double-parsing.
+                    "property_value": str(prop.get("value_string") or ""),
+                    "property_unit": "",
+                    "definition": definitions.get(prop_name, ""),
+                }
+            )
     return grouped
 
 
@@ -322,13 +379,13 @@ def main() -> None:
         type=str,
         default="ground-template",
         choices=["ground-template", "prompted-template"],
-        help="Which template bundle to use under examples/containerized-extraction/.",
+        help="Which template bundle to use under src/pbench_containerized_eval/.",
     )
     parser.add_argument(
         "--task",
         type=str,
-        default="tc",
-        help="Dataset configuration to load from kilian-group/supercon-mini (default: tc)",
+        default=None,
+        help="Task alias for filtering property_names (e.g., tc). If omitted, include all properties.",
     )
     parser.add_argument(
         "--pdf-dir",
@@ -339,8 +396,8 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=repo_root() / "out" / "harbor" / "supercon-mini",
-        help="Where to write generated Harbor tasks (default: out/harbor/supercon-mini).",
+        default=repo_root() / "out" / "harbor" / "supercon-mini-v2",
+        help="Where to write generated Harbor tasks (default: out/harbor/supercon-mini-v2).",
     )
     parser.add_argument(
         "--limit",
@@ -371,7 +428,13 @@ def main() -> None:
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
 
-    task_root = args.output_dir / args.task / str(args.template)
+    task_label = (args.task or "all").strip() or "all"
+    # If no task alias is specified, drop the task segment to keep a flat layout.
+    task_root = (
+        args.output_dir / str(args.template)
+        if args.task is None
+        else args.output_dir / task_label / str(args.template)
+    )
     tasks_dir = task_root / "tasks"
     if task_root.exists():
         if args.force:
@@ -382,10 +445,17 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_mapping = load_rubric_mapping(Path(__file__).parent / "rubric.csv")
+    rubric_path = Path(__file__).parent / "rubric.csv"
+    rubric_mapping = load_rubric_mapping(rubric_path)
+    definitions = load_definitions(rubric_path)
 
     dataset = load_dataset("kilian-group/supercon-mini-v2", split="test")
-    grouped = group_rows(cast(Iterable[dict[str, Any]], dataset))
+    property_filter = resolve_property_filter(args.task)
+    grouped = flatten_dataset(
+        cast(Iterable[dict[str, Any]], dataset),
+        definitions=definitions,
+        property_filter=property_filter,
+    )
 
     refnos = list(grouped.keys())
     if args.refno:
@@ -402,16 +472,25 @@ def main() -> None:
         if not pdf_path.exists():
             raise FileNotFoundError(f"Missing PDF for refno {refno} at {pdf_path}")
 
-        task_id = f"{slugify(refno)}--{slugify(args.task)}"
+        task_id = (
+            f"{slugify(refno)}--{slugify(task_label)}"
+            if args.task is not None
+            else slugify(refno)
+        )
         task_dir = tasks_dir / task_id
         task_dir.mkdir(parents=True, exist_ok=True)
+
+        rows = grouped.get(refno, [])
+        if not rows:
+            print(f"Skipping {refno}: no properties matched task '{args.task}'.")
+            continue
 
         build_task(
             task_dir,
             pdf_path=pdf_path,
-            task_name=args.task,
+            task_name=task_label,
             refno=refno,
-            rows=grouped[refno],
+            rows=rows,
             rubric_mapping=rubric_mapping,
         )
         print(f"Wrote task {task_id} -> {task_dir.relative_to(repo_root())}")

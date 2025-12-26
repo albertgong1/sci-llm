@@ -3,7 +3,7 @@
 This is intended to be run *after* a Harbor job/trial completes.
 
 Example:
-  uv run python examples/containerized-extraction/push_harbor_run_to_hf.py \
+  uv run python src/pbench_containerized_eval/push_harbor_run_to_hf.py \
     --repo-id YOUR_ORG/sci-llm-harbor-runs \
     --run-dir jobs/2025-12-18__15-40-56
 
@@ -59,7 +59,7 @@ def _maybe_upload_root_readme(
     readme = """\
 # Harbor run artifacts
 
-This dataset repository stores **Harbor job/trial artifacts** for the `examples/containerized-extraction` benchmark.
+This dataset repository stores Harbor job/trial artifacts for the `src/pbench_containerized_eval` benchmark.
 
 ## Layout
 

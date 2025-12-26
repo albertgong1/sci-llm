@@ -12,8 +12,8 @@ This helper:
 4) Delegates to Harbor's CLI entrypoint.
 
 Example:
-    uv run python examples/containerized-extraction/run_harbor.py trials start \\
-      -p out/harbor/supercon-mini/tc/easy/tasks/jac2980051--tc \\
+    uv run python src/pbench_containerized_eval/run_harbor.py trials start \\
+      -p out/harbor/supercon-mini-v2/ground-template/tasks/jac2980051 \\
       -a gemini-cli -m gemini/gemini-2.5-flash
 
 """
