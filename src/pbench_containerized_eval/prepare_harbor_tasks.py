@@ -156,6 +156,7 @@ def dockerfile_contents() -> str:
     """
     install_pdf_tools = (
         "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+        "    ca-certificates \\\n"
         "    poppler-utils \\\n"
         "    procps \\\n"
         "  && rm -rf /var/lib/apt/lists/*"
@@ -449,7 +450,9 @@ def main() -> None:
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
-    dataset = load_dataset("kilian-group/supercon-mini-v2", split="test")
+    dataset = load_dataset(
+        "kilian-group/supercon-mini-v2", split="test", revision="v2.0.1"
+    )
     property_filter = resolve_property_filter(args.task)
     grouped = flatten_dataset(
         cast(Iterable[dict[str, Any]], dataset),

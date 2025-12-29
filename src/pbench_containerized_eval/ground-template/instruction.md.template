@@ -119,6 +119,18 @@ For atomic sites in tables:
   pressures, or orientations, create separate entries. •
   Include properties from text, tables, figures, and captions.
 
+## REQUIRED PROPERTIES (MUST BE ANSWERED)
+
+You MUST extract and return every required property listed in the task metadata. Use the
+exact `property_name` strings and materials shown below. If a required property truly is
+not stated in the paper, include an entry with `pred_value` = `NOT_FOUND`.
+
+{question_blocks}
+
+The full JSON metadata is available at `{meta_path}` if you need to double-check names.
+You may add extra properties beyond this list, but missing any required item will lose
+points.
+
 ## OUTPUT FORMAT (WRITE TO {predictions_path})
 
 Return a SINGLE valid JSON payload containing an array of properties. Either of these

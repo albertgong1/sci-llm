@@ -12,3 +12,8 @@ timeout_sec = 1200.0
 
 [agent]
 timeout_sec = 1200.0
+
+[environment]
+cpus = 1
+memory_mb = 1024
+storage_mb = 1024

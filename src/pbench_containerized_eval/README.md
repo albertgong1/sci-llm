@@ -35,6 +35,9 @@ uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
 ```
 Outputs go to `out/harbor/supercon-mini-v2/ground-template/` with a `job.yaml`.
 
+If you want to filter to a task alias (e.g., only Tc rows), pass `--task tc`. This
+changes the output path to `out/harbor/supercon-mini-v2/tc/<template>/`.
+
 Prompted template:
 ```bash
 uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
@@ -58,6 +61,57 @@ uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
 
 Always use `run_harbor.py` so `.env` is loaded and keys are mapped.
 Templates start with `@paper.pdf`, so `gemini-cli` auto-attaches the PDF.
+Parallelism for jobs is set with `--n-concurrent` (or edit `job.yaml`).
+Results are written locally under `jobs/` or `trials/`, even when using Daytona.
+
+### Run Harbor on Daytona (native)
+Harbor supports Daytona as an environment backend. Ensure `DAYTONA_API_KEY` is in `.env`.
+Use `--env daytona` (or the convenience wrapper `run_harbor_daytona.py`, which appends it).
+`run_harbor.py` also enables a Daytona network allowlist patch; by default it sets
+`PBENCH_DAYTONA_NETWORK_ALLOW_LIST=0.0.0.0/0` unless you override it.
+```bash
+uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --env daytona --n-concurrent 4
+```
+or
+```bash
+uv run python src/pbench_containerized_eval/run_harbor_daytona.py \
+  jobs start -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --n-concurrent 4
+```
+
+Single-task trial on Daytona:
+```bash
+uv run python src/pbench_containerized_eval/run_harbor.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --env daytona
+```
+If Daytona hits disk or memory limits, lower resources with:
+`--override-storage-mb 1024` and/or `--override-memory-mb 1024`, or rebuild tasks after
+adjusting `[environment]` in `task.toml.template`.
+If Gemini cannot reach the API (connection reset), try a custom allowlist:
+```bash
+PBENCH_DAYTONA_NETWORK_ALLOW_LIST="0.0.0.0/0" \
+uv run python src/pbench_containerized_eval/run_harbor.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05515300 \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --env daytona --override-memory-mb 1024 --override-storage-mb 1024
+```
+`run_harbor.py` defaults to a host-side Gemini fallback on Daytona. To force the
+containerized Gemini CLI instead, set `PBENCH_GEMINI_HOST_AUTO=0`.
+
+### Export traces to HF (built-in Harbor)
+```bash
+uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --env daytona --n-concurrent 4 \
+  --export-traces --export-push --export-repo your-org/your-traces-dataset
+```
 
 ### Full jobs (ground-template)
 - Oracle:
@@ -121,8 +175,15 @@ uv run python src/pbench_containerized_eval/smoke_harbor.py --refno PR05001178 \
 - Trials: `trials/<trial-name>/verifier/reward.txt`
 - Debug: `trials/<trial-name>/verifier/details.json`
 - Agent logs: `trials/<trial-name>/agent/{gemini-cli|claude-code}.txt`
+- Gemini CLI diagnostics: `trials/<trial-name>/agent/gemini-cli-network.txt` and `trials/<trial-name>/agent/gemini-cli.error.json`
 
 ## Publish Runs to Hugging Face
+
+### 0) Export traces for a single trial (built-in Harbor)
+```bash
+uv run python -m harbor.cli.main traces export \
+  -p trials/<trial-name> --push --repo your-org/your-traces-dataset
+```
 
 ### 1) Compile a run bundle (lossless)
 Latest run under `jobs/` or `trials/` → `out/harbor-runs/<run-name>/`:
@@ -143,7 +204,7 @@ export HF_TOKEN="..."
 uv sync --extra dev
 
 uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
-  --task tc --template ground-template --refno PR05001178 \
+  --template ground-template --refno PR05001178 \
   --write-job-config --force
 
 uv run python src/pbench_containerized_eval/run_harbor.py trials start \
