@@ -15,12 +15,18 @@
 #SBATCH --time=1-00:00:00                    # maximum walltime (HH:MM:SS)
 #SBATCH --partition=kilian                    # partition (queue)
 
-OUTPUT_DIR=$1
+INPUT=$1
+OUTPUT_DIR=$2
+
+if [ -z "$INPUT" ]; then
+    echo "ERROR: INPUT is not set"
+    exit 1
+fi
+
 if [ -z "$OUTPUT_DIR" ]; then
     echo "ERROR: OUTPUT_DIR is not set"
     exit 1
 fi
-
 # Print job information
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job Name: $SLURM_JOB_NAME"
@@ -51,7 +57,7 @@ echo "Starting Edison query..."
 echo "Command: python query_materials_with_edison.py -od $OUTPUT_DIR"
 echo ""
 
-python query_materials_with_edison.py -bs 10 -od $OUTPUT_DIR --input data/cleaned_stoic_filtered_downfolded_dataset.csv --verbose
+uv run python query_materials_with_edison.py -bs 10 -od $OUTPUT_DIR --input $INPUT --verbose
 
 # Check exit status
 EXIT_CODE=$?
