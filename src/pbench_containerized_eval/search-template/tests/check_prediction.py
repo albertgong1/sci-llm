@@ -11,6 +11,15 @@ from pathlib import Path
 from typing import Any
 
 
+try:
+    from pbench_eval_utils import score_value, normalize_unicode, normalize_ws
+except ImportError:
+    # During dev/testing, if simple python execution is tried without the copies
+    import sys
+    sys.path.append(str(Path(__file__).parents[3] / "pbench_eval"))
+    from utils import score_value, normalize_unicode, normalize_ws
+
+
 @dataclass(frozen=True)
 class RowKey:
     """Key used to group ground-truth rows by (material, property_name)."""
@@ -27,207 +36,10 @@ class RowKey:
         )
 
 
-_SUPERSCRIPT_MAP = str.maketrans(
-    {
-        "⁰": "0",
-        "¹": "1",
-        "²": "2",
-        "³": "3",
-        "⁴": "4",
-        "⁵": "5",
-        "⁶": "6",
-        "⁷": "7",
-        "⁸": "8",
-        "⁹": "9",
-        "⁺": "+",
-        "⁻": "-",
-    }
-)
-
-
-def _normalize_ws(text: str) -> str:
-    """Collapse whitespace for more robust string matching."""
-    return re.sub(r"\s+", " ", str(text or "")).strip()
-
-
-def _normalize_unicode(text: str) -> str:
-    """Normalize common unicode variants (dashes, superscripts, delta)."""
-    s = str(text or "")
-    s = (
-        s.replace("\u2010", "-")
-        .replace("\u2011", "-")
-        .replace("\u2012", "-")
-        .replace("\u2013", "-")
-        .replace("\u2014", "-")
-        .replace("\u2212", "-")
-    )
-    s = s.replace("δ", "d").replace("Δ", "d")
-    s = s.translate(_SUPERSCRIPT_MAP)
-    return s
-
-
-def _normalize_categorical(value: str) -> str:
-    """Normalize a categorical string for comparison."""
-    return _normalize_unicode(_normalize_ws(value)).lower()
-
-
 def _load_json(path: Path) -> Any:
     """Load JSON from disk."""
     with path.open() as f:
         return json.load(f)
-
-
-def parse_numeric_candidates(value: str) -> list[float]:
-    """Extract numeric candidates from a free-form value string (units allowed)."""
-    if value is None:
-        return []
-
-    value_str = _normalize_unicode(str(value)).strip()
-    if value_str.upper() == "NOT_FOUND" or value_str == "":
-        return []
-
-    value_str = re.sub(r"\(\d+\)", "", value_str)
-
-    candidates: list[float] = []
-
-    sci_pattern = re.compile(
-        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:x|×)\s*10(?:\s*\^)?\s*(?P<exp>[-+]?\d+)",
-        re.IGNORECASE,
-    )
-    for match in sci_pattern.finditer(value_str):
-        try:
-            base = float(match.group("base"))
-            exp = int(match.group("exp"))
-            candidates.append(base * (10**exp))
-        except Exception:
-            continue
-
-    num_pattern = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
-    for match in num_pattern.finditer(value_str):
-        try:
-            candidates.append(float(match.group(0)))
-        except Exception:
-            continue
-
-    seen: set[str] = set()
-    unique: list[float] = []
-    for num in candidates:
-        key = f"{num:.12g}"
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(num)
-
-    return unique
-
-
-def _si_match(
-    pred_num: float, answer_num: float, *, rel_tol: float = 0.001
-) -> tuple[float, float]:
-    """Return (score, rel_error) for a numeric match under relative tolerance."""
-    if answer_num == 0:
-        return (1.0, 0.0) if pred_num == 0 else (0.0, float("inf"))
-    rel_err = abs(pred_num - answer_num) / abs(answer_num)
-    return (1.0, rel_err) if rel_err <= rel_tol else (0.0, rel_err)
-
-
-def _strip_purity_annotations(text: str) -> str:
-    """Strip purity suffixes like '(4N)' from element tokens."""
-    return re.sub(r"\(\s*\d+\s*N\s*\)", "", text, flags=re.IGNORECASE).strip()
-
-
-def _parse_simple_formula(formula: str) -> dict[str, float] | None:
-    """Parse a simple chemical formula into element->count (conservative)."""
-    cleaned = _normalize_unicode(formula).strip()
-    cleaned = _strip_purity_annotations(cleaned)
-    cleaned = cleaned.replace(" ", "")
-    if not cleaned:
-        return None
-    if "," in cleaned or "(" in cleaned or ")" in cleaned:
-        return None
-
-    pos = 0
-    comp: dict[str, float] = {}
-    token = re.compile(r"([A-Z][a-z]?)(\d*\.?\d*)")
-    while pos < len(cleaned):
-        match = token.match(cleaned, pos)
-        if not match:
-            return None
-        element = match.group(1)
-        count_str = match.group(2)
-        count = float(count_str) if count_str else 1.0
-        comp[element] = comp.get(element, 0.0) + count
-        pos = match.end()
-    return comp
-
-
-def _normalize_formula(formula: str) -> str | None:
-    """Convert a parsed formula into a canonical alphabetical string."""
-    comp = _parse_simple_formula(formula)
-    if comp is None:
-        return None
-    parts: list[str] = []
-    for element in sorted(comp.keys()):
-        count = comp[element]
-        if abs(count - 1.0) < 1e-12:
-            parts.append(element)
-        elif abs(count - round(count)) < 1e-12:
-            parts.append(f"{element}{int(round(count))}")
-        else:
-            parts.append(f"{element}{count:g}")
-    return "".join(parts)
-
-
-def _normalize_formula_set(value: str) -> set[str] | None:
-    """Normalize a single formula or a delimiter-separated list of formulas."""
-    raw = _normalize_unicode(_normalize_ws(value))
-    raw = _strip_purity_annotations(raw)
-    if not raw:
-        return None
-
-    parts = [p.strip() for p in re.split(r"[;,]", raw) if p.strip()]
-    if not parts:
-        return None
-
-    normalized: set[str] = set()
-    for part in parts:
-        norm = _normalize_formula(part)
-        if norm is None:
-            return None
-        normalized.add(norm)
-    return normalized
-
-
-def score_value(pred_value: str, answer_value: str, rubric: str | None) -> float:
-    """Score one predicted value against one ground-truth value using a rubric."""
-    if rubric == "0.1% SI":
-        answer_nums = parse_numeric_candidates(answer_value)
-        if not answer_nums:
-            return 0.0
-        answer_num = answer_nums[0]
-        for num in parse_numeric_candidates(pred_value):
-            score, _ = _si_match(num, answer_num)
-            if score == 1.0:
-                return 1.0
-        return 0.0
-
-    if rubric == "pymatgen":
-        pred_norm = _normalize_formula_set(pred_value)
-        ans_norm = _normalize_formula_set(answer_value)
-        if pred_norm is not None and ans_norm is not None:
-            return 1.0 if pred_norm == ans_norm else 0.0
-        return (
-            1.0
-            if _normalize_categorical(pred_value)
-            == _normalize_categorical(answer_value)
-            else 0.0
-        )
-
-    return (
-        1.0
-        if _normalize_categorical(pred_value) == _normalize_categorical(answer_value)
-        else 0.0
-    )
 
 
 def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
@@ -453,9 +265,12 @@ _STOPWORDS = {
 
 def _tokens(text: str) -> set[str]:
     """Tokenize text for fuzzy property-name matching."""
+    # Use normalize_categorical from utils/local for consistency if needed, 
+    # but since this is just internal fuzzy matching, lower() is fine or we use normalize_unicode
+    # Let's rely on standard logic
     return {
         t
-        for t in re.findall(r"[a-z0-9]+", _normalize_categorical(text))
+        for t in re.findall(r"[a-z0-9]+", normalize_unicode(normalize_ws(text)).lower())
         if t not in _STOPWORDS
     }
 
@@ -472,8 +287,9 @@ def _property_name_match(
     *, truth_property_name: str, pred_property_name: str, task_name: str | None
 ) -> bool:
     """Return True if a prediction's property_name matches the ground-truth name."""
-    truth_norm = _normalize_categorical(truth_property_name)
-    pred_norm = _normalize_categorical(pred_property_name)
+    """Return True if a prediction's property_name matches the ground-truth name."""
+    truth_norm = normalize_unicode(normalize_ws(truth_property_name)).lower()
+    pred_norm = normalize_unicode(normalize_ws(pred_property_name)).lower()
     if not pred_norm:
         return False
 
@@ -508,7 +324,7 @@ def _property_name_match(
 
 def _normalize_material(material: str) -> str:
     """Normalize a material/system string for loose matching."""
-    s = _normalize_unicode(_normalize_ws(material)).lower()
+    s = normalize_unicode(normalize_ws(material)).lower()
     s = s.replace(" ", "")
     s = re.sub(r"([a-z\)])1(?=([a-z\(\)\-]|$))", r"\1", s)
     return s
@@ -606,20 +422,10 @@ def main() -> None:
             ]
 
             pool: list[dict[str, Any]] = []
-            if rubric == "0.1% SI":
-                for pred in candidate_preds:
-                    for num in parse_numeric_candidates(pred.pred_value):
-                        pool.append({"pred": pred, "num": num})
-            elif rubric == "pymatgen":
-                for pred in candidate_preds:
-                    pool.append(
-                        {"pred": pred, "norm": _normalize_formula_set(pred.pred_value)}
-                    )
-            else:
-                for pred in candidate_preds:
-                    pool.append(
-                        {"pred": pred, "norm": _normalize_categorical(pred.pred_value)}
-                    )
+            # We don't need to pool specific parsed values anymore, 
+            # just the prediction objects, because score_value handles the parsing
+            for pred in candidate_preds:
+                pool.append({"pred": pred})
 
             for truth in truths:
                 answer_value = str(truth.get("property_value") or "")
@@ -632,66 +438,22 @@ def main() -> None:
 
                 best_idx: int | None = None
                 best_score = -1.0
-                best_tie: float = float("inf")
 
-                if rubric_row == "0.1% SI":
-                    answer_nums = parse_numeric_candidates(answer_value)
-                    answer_num = answer_nums[0] if answer_nums else None
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_num = item.get("num")
-                        if answer_num is None or pred_num is None:
-                            continue
-                        score, tie = _si_match(float(pred_num), float(answer_num))
-                        if score > best_score or (
-                            score == best_score and tie < best_tie
-                        ):
-                            best_score = score
-                            best_tie = tie
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = str(pred_num)
-                            chosen_score = float(score)
-                            if best_score == 1.0 and best_tie == 0.0:
-                                break
-                elif rubric_row == "pymatgen":
-                    ans_norm = _normalize_formula_set(answer_value)
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_norm = item.get("norm")
-                        score = 0.0
-                        if pred_norm is not None and ans_norm is not None:
-                            score = 1.0 if pred_norm == ans_norm else 0.0
-                        else:
-                            score = (
-                                1.0
-                                if _normalize_categorical(pred.pred_value)
-                                == _normalize_categorical(answer_value)
-                                else 0.0
-                            )
-                        if score > best_score:
-                            best_score = score
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = pred.pred_value
-                            chosen_score = float(score)
-                            if best_score == 1.0:
-                                break
-                else:
-                    ans_norm = _normalize_categorical(answer_value)
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_norm = item.get("norm")
-                        score = 1.0 if pred_norm == ans_norm else 0.0
-                        if score > best_score:
-                            best_score = score
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = pred.pred_value
-                            chosen_score = float(score)
-                            if best_score == 1.0:
-                                break
-
+                # Simple greedy match logic reusing the robust score_value
+                for idx, item in enumerate(pool):
+                    pred = item["pred"]
+                    score = score_value(pred.pred_value, answer_value, rubric_row)
+                    
+                    # If perfect score, take it immediately (break early optimization)
+                    if score > best_score:
+                        best_score = score
+                        best_idx = idx
+                        chosen_pred = pred
+                        chosen_value = pred.pred_value
+                        chosen_score = float(score)
+                        if best_score == 1.0:
+                            break
+                        
                 if best_idx is not None and chosen_score == 1.0:
                     pool.pop(best_idx)
 

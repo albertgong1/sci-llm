@@ -13,6 +13,9 @@ def repo_root() -> Path:
 def templates_dir() -> Path:
     return Path(__file__).parent / "search-template"
 
+def pbench_eval_dir() -> Path:
+    return repo_root() / "src/pbench_eval"
+
 def read_template(relative_path: str) -> str:
     return (templates_dir() / relative_path).read_text()
 
@@ -101,6 +104,9 @@ def build_task(task_dir: Path, row: dict[str, str], task_name: str) -> None:
     (env_dir / "Dockerfile").write_text(dockerfile_contents())
     copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
     copy_template("tests/test.sh", tests_dir / "test.sh")
+
+    # Copy shared scoring utils
+    shutil.copy2(pbench_eval_dir() / "utils.py", tests_dir / "pbench_eval_utils.py")
     
     # 7. Oracle Solution (solve.sh)
     # We construct a prediction matching the expected rows exactly

@@ -31,7 +31,7 @@ import pandas as pd
 from tabulate import tabulate
 
 import pbench
-from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si
+from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si, score_value
 
 logger = logging.getLogger(__name__)
 
@@ -51,76 +51,24 @@ else:
     logger.warning(f"Property clusters file not found at {CLUSTER_FILE}")
 
 
-def parse_numeric_value(value: str) -> float | None:
-    """Parse a numeric value from a string, handling scientific notation and parenthetical uncertainties.
-
-    Examples:
-        >>> parse_numeric_value("7.441(5)")
-        7.441
-        >>> parse_numeric_value("3.00E+22")
-        3e+22
-        >>> parse_numeric_value("2.8")
-        2.8
-
-    """
-    if value is None or pd.isna(value):
-        return None
-
-    value_str = str(value).strip()
-
-    # Handle NOT_FOUND or empty strings
-    if value_str.upper() == "NOT_FOUND" or value_str == "":
-        return None
-
-    # Remove parenthetical uncertainty, e.g., "7.441(5)" -> "7.441"
-    value_str = re.sub(r"\(\d+\)", "", value_str)
-
-    try:
-        return float(value_str)
-    except ValueError:
-        return None
-
-
-def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
-    """Load the property_name -> rubric mapping from the rubric CSV."""
-    rubric_df = pd.read_csv(rubric_path)
-    return dict(zip(rubric_df["property_name"], rubric_df["rubric"]))
-
-
 def score_row(
     pred_value: str, answer_value: str, rubric: str, property_name: str | None = None
-) -> bool | None:
+) -> float | None:
     """Score a single prediction based on the rubric.
 
     Returns:
-        True if prediction matches answer according to rubric.
-        False if prediction does not match.
-        None if scoring could not be performed (e.g., parse error, unknown rubric).
-
+        1.0 if prediction matches answer according to rubric (0.0 otherwise).
+        None if scoring could not be performed (e.g., missing values).
     """
-    if rubric == "0.1% SI":
-        pred_num = parse_numeric_value(pred_value)
-        answer_num = parse_numeric_value(answer_value)
-        if pred_num is None or answer_num is None:
-            return None
-        return scorer_si(pred_num, answer_num)
-
-    elif rubric == "pymatgen":
-        if pd.isna(pred_value) or pd.isna(answer_value):
-            return None
-        return scorer_pymatgen(str(pred_value), str(answer_value))
-
-    elif rubric == "categorical":
-        if pd.isna(pred_value) or pd.isna(answer_value):
-            return None
-
-        # Get specific mapping for this property if available
-        mapping = CLUSTERS.get(property_name, None) if property_name else None
-        return scorer_categorical(str(pred_value), str(answer_value), mapping=mapping)
-
-    else:
-        # Unknown rubric
+    if pd.isna(pred_value) or pd.isna(answer_value):
         return None
+
+    # Get specific mapping for this property if available
+    mapping = CLUSTERS.get(property_name, None) if property_name else None
+    
+    return score_value(
+        str(pred_value), str(answer_value), rubric=rubric, mapping=mapping
+    )
 
 
 def load_json_predictions(json_path: Path) -> pd.DataFrame:
@@ -149,6 +97,7 @@ def load_json_predictions(json_path: Path) -> pd.DataFrame:
             "pred_value": record["pred"]["value"],
             "pred_unit": record["pred"]["unit"],
             "response": record["response"]["pred"],
+            "rubric": record.get("rubric"),  # Extract rubric if present
         }
         # Add metadata fields
         if "metadata" in record:
@@ -210,6 +159,27 @@ def load_all_predictions(
     return pd.concat(dfs, ignore_index=True)
 
 
+def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
+    """Load the rubric mapping from a CSV file.
+
+    Args:
+        rubric_path: Path to the rubric CSV file.
+
+    Returns:
+        Dictionary mapping property name to rubric name.
+
+    """
+    if not rubric_path.exists():
+        raise FileNotFoundError(f"Rubric file not found at {rubric_path}")
+
+    df = pd.read_csv(rubric_path)
+    if "property_name" not in df.columns or "rubric" not in df.columns:
+        raise ValueError(
+            f"Rubric CSV at {rubric_path} must contain 'property_name' and 'rubric' columns."
+        )
+
+    return dict(zip(df["property_name"], df["rubric"]))
+
 def score_predictions(
     preds_df: pd.DataFrame, rubric_path: Path, output_path: Path
 ) -> pd.DataFrame:
@@ -232,7 +202,10 @@ def score_predictions(
         property_name = str(row["property_name"])
         rubric = rubric_mapping.get(property_name)
 
-        if rubric is None:
+        if rubric is None and "rubric" in row:
+             rubric = row["rubric"]
+
+        if rubric is None or pd.isna(rubric):
             scores.append(None)
             continue
 
