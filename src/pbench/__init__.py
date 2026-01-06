@@ -8,8 +8,8 @@ import llm_utils
 
 # NOTE: Assets are in the root directory of the project, change the path
 # if the project structure changes.
-ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
+# ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
+# DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
 
@@ -24,7 +24,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--domain",
         type=str,
-        required=True,
+        # required=True,
         choices=SUPPORTED_DOMAINS,
         help="Material science domain",
     )
@@ -46,7 +46,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--data_dir",
         "-dd",
         type=Path,
-        default=DATA_DIR,
+        default="data",
         help="Directory containing the papers and properties",
     )
     parser.add_argument(
