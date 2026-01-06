@@ -79,6 +79,7 @@ from datasets import Dataset
 from argparse import ArgumentParser
 import logging
 from joblib import Parallel, delayed
+import huggingface_hub
 
 import pbench
 
@@ -94,6 +95,12 @@ parser.add_argument(
     type=str,
     default=None,
     help="Name of the HuggingFace repository to push to",
+)
+parser.add_argument(
+    "--tag_name",
+    type=str,
+    default=None,
+    help="Name of the tag to apply to the dataset",
 )
 parser.add_argument(
     "--filter_pdf",
@@ -114,13 +121,10 @@ df_glossary = pd.read_csv(
 )
 # set index to db and rename index to "order"
 df_glossary = df_glossary.reset_index(names="order").set_index("db")
-# create a lookup table for whether a property is physically relevant
-# Maps property name (db column) -> boolean (True if physically relevant, False otherwise)
-physically_relevant_lookup = df_glossary["Physically_Relevant"].to_dict()
 # create a lookup table for db -> property name
 db_to_property_name_lookup = df_glossary["label"].to_dict()
-# import pdb; pdb.set_trace()
-# load units
+# load unit mappings
+# NOTE: this file also includes unitless properties
 units_path = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
 df_units = pd.read_csv(units_path, index_col=0)
 # import pdb; pdb.set_trace()
@@ -155,57 +159,49 @@ def process_row(row: pd.Series) -> pd.Series:
             # Skip properties that are units
             continue
         # Skip properties that are not physically relevant
-        if not physically_relevant_lookup.get(col, False):
+        if col not in df_units.index:
             continue
         if pd.isna(value := row[col]):
             continue
         # get the unit for the property
-        if col in df_units.index:
-            unit_key = df_units.loc[col, "unit"]
-            unit_value = row[unit_key]
+        if pd.notna(df_units.loc[col, "unit"]):
+            unit_value = row[df_units.loc[col, "unit"]]
             value_string = f"{value} {unit_value}"
         else:
-            value_string = str(value)
+            value_string = str(value) if pd.notna(value) else None
 
         # Build conditions dict
         conditions = {}
-        if col in df_units.index:
-            # Get temperature condition
-            temp_col = df_units.loc[col, "conditions.temperature"]
-            if pd.notna(temp_col) and temp_col in row.index and pd.notna(row[temp_col]):
-                conditions["temperature"] = str(row[temp_col])
+        # Get temperature condition
+        temp_col = df_units.loc[col, "conditions.temperature"]
+        if pd.notna(temp_col) and temp_col in row.index and pd.notna(row[temp_col]):
+            conditions["temperature"] = str(row[temp_col])
 
-            # Get field condition
-            field_col = df_units.loc[col, "conditions.field"]
-            if (
-                pd.notna(field_col)
-                and field_col in row.index
-                and pd.notna(row[field_col])
-            ):
-                conditions["field"] = str(row[field_col])
+        # Get field condition
+        field_col = df_units.loc[col, "conditions.field"]
+        if pd.notna(field_col) and field_col in row.index and pd.notna(row[field_col]):
+            conditions["field"] = str(row[field_col])
 
         # Build location dict
         location = {}
-        if col in df_units.index:
-            # Get figure or table reference
-            fig_table_col = df_units.loc[col, "location.figure_or_table"]
-            if (
-                pd.notna(fig_table_col)
-                and fig_table_col in row.index
-                and pd.notna(row[fig_table_col])
-            ):
-                location["figure_or_table"] = str(row[fig_table_col])
+        # Get figure or table reference
+        fig_table_col = df_units.loc[col, "location.figure_or_table"]
+        if (
+            pd.notna(fig_table_col)
+            and fig_table_col in row.index
+            and pd.notna(row[fig_table_col])
+        ):
+            location["figure_or_table"] = str(row[fig_table_col])
 
         # Get method
         method = None
-        if col in df_units.index:
-            method_col = df_units.loc[col, "methods"]
-            if (
-                pd.notna(method_col)
-                and method_col in row.index
-                and pd.notna(row[method_col])
-            ):
-                method = str(row[method_col])
+        method_col = df_units.loc[col, "methods"]
+        if (
+            pd.notna(method_col)
+            and method_col in row.index
+            and pd.notna(row[method_col])
+        ):
+            method = str(row[method_col])
 
         properties.append(
             {
@@ -281,3 +277,11 @@ if args.repo_name is not None:
     dataset = Dataset.from_pandas(df)
     dataset.push_to_hub(args.repo_name, private=True, split="test")
     logger.info(f"✓ All {len(df)} rows pushed to {args.repo_name}")
+
+    # Tag the dataset so that we can easily refer to different versions of the dataset
+    # Ref: https://github.com/huggingface/datasets/discussions/5370
+    if args.tag_name is not None:
+        huggingface_hub.create_tag(
+            args.repo_name, tag=args.tag_name, repo_type="dataset"
+        )
+        logger.info(f"✓ Dataset tagged with {args.tag_name}")
