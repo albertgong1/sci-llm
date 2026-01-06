@@ -28,7 +28,6 @@ dependencies = [
     "google-genai",
     "openai",
     "pymupdf",
-    "daytona>=0.128.1",
 ]
 
 [dependency-groups]

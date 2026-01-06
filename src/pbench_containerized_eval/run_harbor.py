@@ -82,6 +82,9 @@ def main() -> int:
         print("Example: run_harbor.py trials start -p <task> -a gemini-cli -m ...")
         return 2
 
+    if _reject_daytona(argv):
+        return 2
+
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
         os.environ.setdefault(key, value)
@@ -109,8 +112,8 @@ def main() -> int:
         os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = os.environ["CLAUDE_CODE_API_TOKEN"]
 
     argv = _rewrite_override_storage(argv)
+    argv = _rewrite_gemini_model(argv)
     argv = _rewrite_env_flag(argv)
-    argv = _rewrite_gemini_agent(argv)
 
     env = os.environ.copy()
     src_path = str(_repo_root() / "src")
@@ -121,16 +124,7 @@ def main() -> int:
             if existing_pythonpath
             else src_path
         )
-    env["PBENCH_PATCH_HARBOR_DAYTONA"] = "1"
-    if _uses_daytona(argv) and "PBENCH_DAYTONA_NETWORK_ALLOW_LIST" not in env:
-        env["PBENCH_DAYTONA_NETWORK_ALLOW_LIST"] = "0.0.0.0/0"
-
-    command = [
-        sys.executable,
-        "-m",
-        "pbench_containerized_eval.harbor_entrypoint",
-        *argv,
-    ]
+    command = [sys.executable, "-m", "harbor.cli.main", *argv]
     result = subprocess.run(command, check=False, cwd=_repo_root(), env=env)
     if result.returncode != 0:
         _summarize_failure(argv, repo=_repo_root())
@@ -184,88 +178,70 @@ def _rewrite_env_flag(argv: list[str]) -> list[str]:
     return rewritten
 
 
-def _uses_daytona(argv: list[str]) -> bool:
+def _reject_daytona(argv: list[str]) -> bool:
+    """Block Daytona env usage now that Modal is the only supported backend."""
+
+    def _is_daytona(value: str) -> bool:
+        return value.strip().lower() == "daytona"
+
     for idx, arg in enumerate(argv):
-        if arg in {"--env", "--environment-type"} and idx + 1 < len(argv):
-            if argv[idx + 1].lower() == "daytona":
-                return True
-        if arg.startswith("--env=") and arg.split("=", 1)[1].lower() == "daytona":
-            return True
+        if arg == "--env" and idx + 1 < len(argv) and _is_daytona(argv[idx + 1]):
+            break
+        if arg.startswith("--env=") and _is_daytona(arg.split("=", 1)[1]):
+            break
         if (
-            arg.startswith("--environment-type=")
-            and arg.split("=", 1)[1].lower() == "daytona"
+            arg == "--environment-type"
+            and idx + 1 < len(argv)
+            and _is_daytona(argv[idx + 1])
         ):
-            return True
-    return False
+            break
+        if arg.startswith("--environment-type=") and _is_daytona(arg.split("=", 1)[1]):
+            break
+    else:
+        return False
+
+    print(
+        "Daytona support has been removed. Use `--env modal` "
+        "(or `run_harbor_modal.py`).",
+        file=sys.stderr,
+    )
+    return True
 
 
-def _has_agent_import_path(argv: list[str]) -> bool:
-    for idx, arg in enumerate(argv):
-        if arg == "--agent-import-path":
-            return True
-        if arg.startswith("--agent-import-path="):
-            return True
-    return False
+def _rewrite_gemini_model(argv: list[str]) -> list[str]:
+    """Ensure Gemini model names include the provider prefix."""
 
-
-def _rewrite_gemini_agent(argv: list[str]) -> list[str]:
-    """Swap gemini-cli for the patched agent unless explicitly disabled."""
-    if os.environ.get("PBENCH_USE_STOCK_GEMINI_CLI", "").lower() in {"1", "true"}:
-        return argv
-
-    if _has_agent_import_path(argv):
-        return argv
-
-    target_import_path = _select_gemini_agent(argv)
-    if not target_import_path:
-        return argv
+    def _fix(value: str) -> str:
+        if "/" in value:
+            return value
+        if value.startswith("gemini-"):
+            return f"gemini/{value}"
+        return value
 
     rewritten: list[str] = []
     skip_next = False
-    patched = False
-
     for idx, arg in enumerate(argv):
         if skip_next:
             skip_next = False
             continue
 
-        if arg in {"-a", "--agent"}:
+        if arg in {"-m", "--model", "--model-name"}:
+            rewritten.append(arg)
             if idx + 1 < len(argv):
-                agent_name = argv[idx + 1]
-                if agent_name in {"gemini-cli", "gemini_cli"}:
-                    patched = True
-                    skip_next = True
-                    continue
-        elif arg.startswith("--agent="):
-            agent_name = arg.split("=", 1)[1]
-            if agent_name in {"gemini-cli", "gemini_cli"}:
-                patched = True
-                continue
+                rewritten.append(_fix(argv[idx + 1]))
+            skip_next = True
+            continue
+
+        if arg.startswith("--model="):
+            rewritten.append(f"--model={_fix(arg.split('=', 1)[1])}")
+            continue
+        if arg.startswith("--model-name="):
+            rewritten.append(f"--model-name={_fix(arg.split('=', 1)[1])}")
+            continue
 
         rewritten.append(arg)
 
-    if patched:
-        rewritten.extend(
-            [
-                "--agent-import-path",
-                target_import_path,
-            ]
-        )
-
     return rewritten
-
-
-def _select_gemini_agent(argv: list[str]) -> str | None:
-    use_host = os.environ.get("PBENCH_GEMINI_HOST", "").lower() in {"1", "true"}
-    auto_host = os.environ.get("PBENCH_GEMINI_HOST_AUTO", "1").lower() not in {
-        "0",
-        "false",
-    }
-
-    if use_host or (auto_host and _uses_daytona(argv)):
-        return "pbench_containerized_eval.agents.gemini_host:HostGeminiCli"
-
-    return "pbench_containerized_eval.agents.gemini_cli:PatchedGeminiCli"
 
 
 def _load_json(path: Path) -> dict[str, Any] | None:
@@ -320,13 +296,13 @@ def _summarize_failure(argv: list[str], repo: Path) -> None:
                         )
                         if "Total disk limit exceeded" in exc_text:
                             print(
-                                "Hint: Daytona disk quota exceeded. Lower --override-storage-mb "
+                                "Hint: Disk quota exceeded. Lower --override-storage-mb "
                                 "or delete old sandboxes.",
                                 file=sys.stderr,
                             )
                         if "Total memory limit exceeded" in exc_text:
                             print(
-                                "Hint: Daytona memory quota exceeded. Lower --override-memory-mb "
+                                "Hint: Memory quota exceeded. Lower --override-memory-mb "
                                 "or reduce --n-concurrent.",
                                 file=sys.stderr,
                             )

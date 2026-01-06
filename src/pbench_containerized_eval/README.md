@@ -17,6 +17,8 @@ uv sync --extra dev
 ```bash
 export GOOGLE_API_KEY="..."
 export ANTHROPIC_API_KEY="..."
+export MODAL_TOKEN_ID="ak-..."
+export MODAL_TOKEN_SECRET="as-..."
 ```
 Claude Code also supports `CLAUDE_CODE_OAUTH_TOKEN=...`.
 
@@ -57,59 +59,67 @@ uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
 `{claude_file_examples}`, `{question_blocks}`, `{questions_json}`,
 `{task_meta_json}`.
 
-## Run Harbor Locally
+## Run Harbor
 
 Always use `run_harbor.py` so `.env` is loaded and keys are mapped.
 Templates start with `@paper.pdf`, so `gemini-cli` auto-attaches the PDF.
 Parallelism for jobs is set with `--n-concurrent` (or edit `job.yaml`).
-Results are written locally under `jobs/` or `trials/`, even when using Daytona.
+Results are written locally under `jobs/` or `trials/`, even when using Modal.
+If you pass `-m gemini-2.5-flash`, the wrapper normalizes it to
+`gemini/gemini-2.5-flash` automatically.
 
-### Run Harbor on Daytona (native)
-Harbor supports Daytona as an environment backend. Ensure `DAYTONA_API_KEY` is in `.env`.
-Use `--env daytona` (or the convenience wrapper `run_harbor_daytona.py`, which appends it).
-`run_harbor.py` also enables a Daytona network allowlist patch; by default it sets
-`PBENCH_DAYTONA_NETWORK_ALLOW_LIST=0.0.0.0/0` unless you override it.
+When you use Modal (`--env modal` or `run_harbor_modal.py`), the agent runs inside a
+remote Modal sandbox. Your machine just builds the task bundle, uploads it, and
+streams logs/results back. Scaling is limited by Modal quotas and budget, plus network
+latency.
+
+### Run Harbor on Modal (native)
+Harbor supports Modal as an environment backend. Ensure `MODAL_TOKEN_ID` and
+`MODAL_TOKEN_SECRET` are in `.env` (or run `modal token set`).
+Example: `modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET"`.
+Use `--env modal` (or the convenience wrapper `run_harbor_modal.py`, which appends it).
+Modal environments are deleted after each run by default (`--delete`); pass
+`--no-delete` only when you want to keep a sandbox for debugging.
 ```bash
 uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env daytona --n-concurrent 4
+  --env modal --n-concurrent 4
 ```
 or
 ```bash
-uv run python src/pbench_containerized_eval/run_harbor_daytona.py \
+uv run python src/pbench_containerized_eval/run_harbor_modal.py \
   jobs start -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
   --n-concurrent 4
 ```
 
-Single-task trial on Daytona:
+Single-task trial on Modal:
 ```bash
 uv run python src/pbench_containerized_eval/run_harbor.py trials start \
   -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env daytona
+  --env modal
 ```
-If Daytona hits disk or memory limits, lower resources with:
+If Modal hits resource limits, lower resources with:
 `--override-storage-mb 1024` and/or `--override-memory-mb 1024`, or rebuild tasks after
 adjusting `[environment]` in `task.toml.template`.
-If Gemini cannot reach the API (connection reset), try a custom allowlist:
+
+Quick single-task test (Modal + overrides):
 ```bash
-PBENCH_DAYTONA_NETWORK_ALLOW_LIST="0.0.0.0/0" \
-uv run python src/pbench_containerized_eval/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05515300 \
+uv run python src/pbench_containerized_eval/run_harbor_modal.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env daytona --override-memory-mb 1024 --override-storage-mb 1024
+  --override-storage-mb 1024 --override-memory-mb 1024
 ```
-`run_harbor.py` defaults to a host-side Gemini fallback on Daytona. To force the
-containerized Gemini CLI instead, set `PBENCH_GEMINI_HOST_AUTO=0`.
+Concurrency for jobs is controlled with `--n-concurrent` (example above).
 
 ### Export traces to HF (built-in Harbor)
 ```bash
 uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env daytona --n-concurrent 4 \
+  --env modal --n-concurrent 4 \
   --export-traces --export-push --export-repo your-org/your-traces-dataset
 ```
 
@@ -159,23 +169,11 @@ uv run python src/pbench_containerized_eval/run_harbor.py trials start \
   -a claude-code
 ```
 
-## Smoke Test (build + one trial)
-Build one paper and run a single trial per agent (skips agents without keys):
-```bash
-uv run python src/pbench_containerized_eval/smoke_harbor.py --refno PR05001178
-```
-To smoke-test the prompted template:
-```bash
-uv run python src/pbench_containerized_eval/smoke_harbor.py --refno PR05001178 \
-  --templates prompted-template
-```
-
 ## Where Results Go
 - Jobs: `jobs/<timestamp>/result.json`
 - Trials: `trials/<trial-name>/verifier/reward.txt`
 - Debug: `trials/<trial-name>/verifier/details.json`
 - Agent logs: `trials/<trial-name>/agent/{gemini-cli|claude-code}.txt`
-- Gemini CLI diagnostics: `trials/<trial-name>/agent/gemini-cli-network.txt` and `trials/<trial-name>/agent/gemini-cli.error.json`
 
 ## Publish Runs to Hugging Face
 
