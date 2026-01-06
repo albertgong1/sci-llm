@@ -1,12 +1,13 @@
 """Helper functions"""
 
-import json
 import re
 from pathlib import Path
 from pymatgen.core import Composition
 
 # Load normalized space groups
 try:
+    import json
+
     # Assuming this file is in the same directory as this script (examples/extraction)
     # and assets is a subdirectory (examples/extraction/assets)
     ASSETS_DIR = Path(__file__).parent / "assets"
@@ -14,9 +15,95 @@ try:
 
     with open(SPACE_GROUPS_PATH, "r") as f:
         SPACE_GROUPS = json.load(f)
-except Exception as e:
-    print(f"Warning: Could not load space_groups_normalized.json: {e}")
+except Exception:
+    # It is okay if this fails in the containerized environment if we don't need space groups
     SPACE_GROUPS = {}
+
+
+_SUPERSCRIPT_MAP = str.maketrans(
+    {
+        "⁰": "0",
+        "¹": "1",
+        "²": "2",
+        "³": "3",
+        "⁴": "4",
+        "⁵": "5",
+        "⁶": "6",
+        "⁷": "7",
+        "⁸": "8",
+        "⁹": "9",
+        "⁺": "+",
+        "⁻": "-",
+    }
+)
+
+
+def normalize_ws(text: str) -> str:
+    """Collapse whitespace for more robust string matching."""
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+def normalize_unicode(text: str) -> str:
+    """Normalize common unicode variants (dashes, superscripts, delta)."""
+    s = str(text or "")
+    s = (
+        s.replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+        .replace("\u2212", "-")
+    )
+    s = s.replace("δ", "d").replace("Δ", "d")
+    s = s.translate(_SUPERSCRIPT_MAP)
+    return s
+
+
+def parse_numeric_candidates(value: str) -> list[float]:
+    """Extract numeric candidates from a free-form value string (units allowed)."""
+    if value is None:
+        return []
+
+    value_str = normalize_unicode(str(value)).strip()
+    if value_str.upper() == "NOT_FOUND" or value_str == "":
+        return []
+
+    value_str = re.sub(r"\(\d+\)", "", value_str)
+
+    candidates: list[float] = []
+
+    # Scientific notation: 1.2 x 10^3
+    sci_pattern = re.compile(
+        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:x|×)\s*10(?:\s*\^)?\s*(?P<exp>[-+]?\d+)",
+        re.IGNORECASE,
+    )
+    for match in sci_pattern.finditer(value_str):
+        try:
+            base = float(match.group("base"))
+            exp = int(match.group("exp"))
+            candidates.append(base * (10**exp))
+        except Exception:
+            continue
+
+    # Standard float/int: 12.34, .5, 1e5
+    num_pattern = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+    for match in num_pattern.finditer(value_str):
+        try:
+            candidates.append(float(match.group(0)))
+        except Exception:
+            continue
+
+    # Deduplicate preserving order
+    seen: set[str] = set()
+    unique: list[float] = []
+    for num in candidates:
+        key = f"{num:.12g}"
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(num)
+
+    return unique
 
 
 def normalize_formula(formula: str) -> str:
@@ -138,3 +225,47 @@ def scorer_categorical(
         return True
 
     return False
+
+
+def score_value(
+    pred_value: str,
+    answer_value: str,
+    rubric: str,
+    mapping: dict[str, str] | None = None,
+) -> float:
+    """Master scoring function (0.0 to 1.0).
+
+    Args:
+        pred_value: The predicted string.
+        answer_value: The ground truth string.
+        rubric: "0.1% SI", "pymatgen", or "categorical".
+        mapping: Optional mapping for categorical clustering.
+
+    """
+    if rubric == "0.1% SI":
+        # Check if ANY predicted candidate matches the first answer candidate
+        answer_nums = parse_numeric_candidates(answer_value)
+        if not answer_nums:
+            return 0.0
+        # Strict: The ground truth should be unambiguous, so we take the first number found.
+        answer_num = answer_nums[0]
+        for num in parse_numeric_candidates(pred_value):
+            if scorer_si(num, answer_num):
+                return 1.0
+        return 0.0
+
+    elif rubric == "pymatgen":
+        # Clean inputs before pymatgen parsing if needed?
+        # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
+        # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
+        pv = normalize_unicode(pred_value).strip()
+        av = normalize_unicode(answer_value).strip()
+        return 1.0 if scorer_pymatgen(pv, av) else 0.0
+
+    else:
+        # Default to categorical
+        return (
+            1.0
+            if scorer_categorical(pred_value, answer_value, mapping=mapping)
+            else 0.0
+        )

@@ -2,8 +2,21 @@
 
 ## Setup Instructions
 
+1. For first time setup, run the following script to create a conda environment `scillm` with python dependencies and packages.
+
 ```bash
-conda create -n sci-llm python=3.13
-pip install uv
-uv pip install -e .
+./scripts/setup_conda_environment.sh
+```
+
+2. Update the packages with:
+
+```bash
+uv sync --all-groups
+```
+
+3. Set your API keys in a file named `.env` in the root directory and add
+
+```bash
+GOOGLE_API_KEY=xxxxx
+OPENAI_API_KEY=xxxxx
 ```
