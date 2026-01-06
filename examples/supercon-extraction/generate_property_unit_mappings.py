@@ -17,10 +17,8 @@ Example usage:
 
 import re
 import logging
-from pathlib import Path
 
 import pandas as pd
-import pbench
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -196,12 +194,8 @@ EXPLICIT_PROPERTY_UNIT_MAPPINGS = {
 
 
 # Read the CSV file
-input_file = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
-if False:
-    output_file = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
-else:
-    output_file = Path("out-1228/property_unit_mappings.csv")
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+input_file = "properties-oxide-metal-glossary.csv"
+output_file = "property_unit_mappings.csv"
 
 mappings = []
 

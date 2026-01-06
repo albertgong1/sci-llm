@@ -110,11 +110,11 @@ parser.add_argument(
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 
-paper_dir = args.data_dir / "supercon" / "Paper_DB"
+paper_dir = args.data_dir / "Paper_DB"
 args.output_dir.mkdir(parents=True, exist_ok=True)
 
 # Load the glossary of properties
-glossary_path = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
+glossary_path = "properties-oxide-metal-glossary.csv"
 df_glossary = pd.read_csv(
     glossary_path,
     index_col=0,
@@ -123,14 +123,14 @@ df_glossary = pd.read_csv(
 df_glossary = df_glossary.reset_index(names="order").set_index("db")
 # create a lookup table for db -> property name
 db_to_property_name_lookup = df_glossary["label"].to_dict()
-# load unit mappings
-# NOTE: this file also includes unitless properties
-units_path = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
+# import pdb; pdb.set_trace()
+# load units
+units_path = "property_unit_mappings.csv"
 df_units = pd.read_csv(units_path, index_col=0)
 # import pdb; pdb.set_trace()
 
 # %%
-data_path = args.data_dir / "supercon" / "SuperCon.csv"
+data_path = args.data_dir / "SuperCon.csv"
 logger.info(f"Loading dataset from {data_path}...")
 # Use the second row as the header
 df = pd.read_csv(data_path, header=2, dtype=str)

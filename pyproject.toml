@@ -32,6 +32,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "harbor>=0.1.23",
     "pre-commit",
     "ruff",
 ]

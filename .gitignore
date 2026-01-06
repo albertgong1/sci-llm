@@ -220,6 +220,7 @@ __marimo__/
 *.tar
 *.zip
 !arxiv/tests/test_data/
+.claude/
 
 *out*/
 
@@ -229,4 +230,14 @@ arxiv/artifacts
 arxiv/credentials.json
 arxiv/token.json
 
-.claude/
+*jobs*/
+
+# Harbor task gen related
+out/
+jobs/
+trials/
+
+# Arjun (sorry I keep a knowledgebase file with sensitive info like keys, etc.)
+knowledgebase.md
+
+*logs*/
