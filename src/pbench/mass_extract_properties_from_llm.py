@@ -400,6 +400,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
 
-    assert args.domain == "supercon", "Only supercon domain is supported for now"
+    # assert args.domain == "supercon", "Only supercon domain is supported for now"
 
     main(args)

@@ -11,7 +11,7 @@ import llm_utils
 ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
-SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
+SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search", "biosurfactants"]
 
 DOMAIN2HF_DATASET_NAME: dict[str, str] = {
     "supercon": "kilian-group/supercon-mini",
