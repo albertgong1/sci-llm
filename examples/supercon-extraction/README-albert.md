@@ -1,5 +1,9 @@
 # SuperCon Property Extraction
 
+> \[!NOTE\]
+> We only need to construct the dataset following [Construct the Dataset from Scratch](#constructing-the-dataset-from-scratch) once.
+> For now, we will use the orignal SuperCon dataset as the ground-truth.
+
 ## Experiments
 
 1. Run the tasks using Harbor/Modal:
@@ -37,10 +41,44 @@ Outputs are stored at `out/supercon/preds/*.json`.
     -od out/
 ```
 
-## Constructing the Dataset
+## Constructing the Dataset from Scratch
 
-> \[!NOTE\]
-> This only needs to be done once.
+1. Mass-extract properties on supercon papers with an LLM:
+
+```bash
+./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
+```
+
+Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
+Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
+
+2. Run the validator app with the following:
+
+```bash
+./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
+```
+
+It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
+There are more instructions in `docs/VALIDATOR_GUIDE.md`.
+
+### Validating the dataset construction (SuperCon only)
+
+1. To compute recall w.r.t. the SuperCon dataset, please run the following command:
+
+```bash
+```
+
+2. To compute precision w.r.t. the human annotations, please run the following command:
+
+```bash
+```
+
+3. To compute inter-annotator agreement, please run the following command:
+
+```bash
+```
+
+## Constructing the Dataset from SuperCon original
 
 1. Download files [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data`.
 
@@ -66,41 +104,7 @@ uv run python create_huggingface_dataset.py \
     --filter_pdf
 ```
 
-4. Mass-extract properties on supercon papers with an LLM and validate with the app:
-
-```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
-```
-
-Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
-Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-Then run the validator app with the following:
-
-```bash
-./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
-```
-
-It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
-There are more instructions in `docs/VALIDATOR_GUIDE.md`.
-
-5. Generate Harbor tasks:
-
-```bash
-```
-
-### Validating the Dataset
-
-1. To compute recall w.r.t. the SuperCon dataset, please run the following command:
-
-```bash
-```
-
-2. To compute precision w.r.t. the human annotations, please run the following command:
-
-```bash
-```
-
-3. To compute inter-annotator agreement, please run the following command:
+4. Generate Harbor tasks:
 
 ```bash
 ```
