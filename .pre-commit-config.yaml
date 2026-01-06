@@ -1,23 +1,8 @@
-# To use:
-#
-#     pre-commit run -a
-#
-# Or:
-#
-#     pre-commit install  # (runs every time you commit in git)
-#
-# To update this file:
-#
-#     pre-commit autoupdate
-#
-# See https://github.com/pre-commit/pre-commit
-
 repos:
   # Standard hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-      - id: check-added-large-files
       - id: check-case-conflict
       - id: check-docstring-first
       - id: check-merge-conflict
@@ -34,11 +19,6 @@ repos:
       # Run the linter.
       - id: ruff
         args: [ --fix ]
+        exclude: ^examples/harbor/hello-world/
       # Run the formatter.
       - id: ruff-format
-
-  # - repo: https://github.com/RobertCraigie/pyright-python
-  #   rev: v1.1.394
-  #   hooks:
-  #     - id: pyright
-  #       args: [ "--project", "." ]
