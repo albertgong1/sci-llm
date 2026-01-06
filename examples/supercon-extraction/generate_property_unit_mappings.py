@@ -19,8 +19,9 @@ import csv
 import re
 import logging
 
-import pbench
-
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -66,8 +67,8 @@ def is_related_property(unit_row, property_row, property_name_from_unit) -> bool
 
 
 # Read the CSV file
-input_file = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
-output_file = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
+input_file = "properties-oxide-metal-glossary.csv"
+output_file = "property_unit_mappings.csv"
 
 mappings = []
 

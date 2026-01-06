@@ -75,11 +75,11 @@ parser.add_argument(
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 
-paper_dir = args.data_dir / "supercon" / "Paper_DB"
+paper_dir = args.data_dir / "Paper_DB"
 args.output_dir.mkdir(parents=True, exist_ok=True)
 
 # Load the glossary of properties
-glossary_path = pbench.ASSETS_DIR / "supercon" / "properties-oxide-metal-glossary.csv"
+glossary_path = "properties-oxide-metal-glossary.csv"
 df_glossary = pd.read_csv(
     glossary_path,
     index_col=0,
@@ -88,12 +88,12 @@ df_glossary = pd.read_csv(
 df_glossary = df_glossary.reset_index(names="order").set_index("db")
 # import pdb; pdb.set_trace()
 # load units
-units_path = pbench.ASSETS_DIR / "supercon" / "property_unit_mappings.csv"
+units_path = "property_unit_mappings.csv"
 df_units = pd.read_csv(units_path, index_col=0)
 # import pdb; pdb.set_trace()
 
 # %%
-data_path = args.data_dir / "supercon" / "SuperCon.csv"
+data_path = args.data_dir / "SuperCon.csv"
 logger.info(f"Loading dataset from {data_path}...")
 # Use the second row as the header
 df = pd.read_csv(data_path, header=2, dtype=str)
@@ -188,7 +188,8 @@ df_copy = (
         ]
     ]
 )
-save_path = args.output_dir / "supercon" / "property_extraction_dataset" / "dataset.csv"
+save_path = args.output_dir / "property_extraction_dataset" / "dataset.csv"
+save_path.parent.mkdir(parents=True, exist_ok=True)
 df_copy.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
@@ -221,18 +222,14 @@ for task_name, task_df in grouped_by_task:
     datasets_dict[task_name] = task_dataset
 
     # Save each task config locally
-    task_dataset_path = (
-        args.output_dir / "supercon" / "property_extraction_dataset" / task_name
-    )
+    task_dataset_path = args.output_dir / "property_extraction_dataset" / task_name
     task_dataset.save_to_disk(task_dataset_path)
     logger.info(f"Saved {task_name} config to {task_dataset_path}")
 
 # %%
 # Load one dataset back to verify it works
 first_task = list(datasets_dict.keys())[0]
-first_task_path = (
-    args.output_dir / "supercon" / "property_extraction_dataset" / first_task
-)
+first_task_path = args.output_dir / "property_extraction_dataset" / first_task
 loaded_dataset = load_from_disk(first_task_path)
 
 print(f"\n✓ Dataset loaded successfully (task: {first_task})!")
