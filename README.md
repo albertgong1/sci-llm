@@ -48,12 +48,19 @@ mkdir -p data/supercon && tar -xvf Paper_DB.tar -C data/supercon/
 3. Mass-extract properties on supercon papers with an LLM and validate with the app:
 
 ```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --model_name gemini-2.5-flash
+./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
 ```
 
 Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
 Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-Then run the validator app with instructions in `docs/VALIDATOR_GUIDE.md`.
+Then run the validator app with the following:
+
+```bash
+./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
+```
+
+It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
+There are more instructions in `docs/VALIDATOR_GUIDE.md`.
 
 4. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task.
 This uses the existing huggingface repo https://huggingface.co/datasets/kilian-group/supercon-mini.
