@@ -247,17 +247,17 @@ if args.filter_pdf:
     logger.info(f"{len(df)} rows have paper PDF")
 
 logger.info("Saving dataset to CSV...")
-save_path = args.output_dir / "supercon" / "dataset.csv"
+save_path = args.output_dir / "dataset.csv"
 save_path.parent.mkdir(parents=True, exist_ok=True)
 df.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
 dataset = Dataset.from_pandas(df)
-dataset.save_to_disk(save_path.parent / "dataset")
-logger.info(f"Dataset saved to {save_path.parent / 'dataset'}")
+dataset.save_to_disk(args.output_dir / "dataset")
+logger.info(f"Dataset saved to {args.output_dir / 'dataset'}")
 
 # Load the dataset from disk and print the first row
-loaded_dataset = Dataset.load_from_disk(save_path.parent / "dataset")
+loaded_dataset = Dataset.load_from_disk(args.output_dir / "dataset")
 logger.info("Loading first row from saved dataset:")
 first_row = loaded_dataset[0]
 print("\n" + "=" * 80)
