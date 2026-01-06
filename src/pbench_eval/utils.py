@@ -1,6 +1,7 @@
 """Helper functions"""
 
 import json
+import re
 from pathlib import Path
 from pymatgen.core import Composition
 
@@ -65,6 +66,43 @@ def scorer_si(pred: float, answer: float, rel_tol: float = 0.001) -> bool:
     if answer == 0:
         return pred == 0
     return abs(pred - answer) / abs(answer) <= rel_tol
+
+
+def scorer_space_group(pred: str, answer: str) -> bool:
+    """Score space group predictions.
+    The space group alphabet is {letters, numbers, /, -}.
+
+    1. Clean input (keep only {letters, numbers, /, -} and lowercase).
+    2. Map to ID.
+    3. Compare IDs.
+    """
+    if not SPACE_GROUPS:
+        return False
+
+    def get_norm_and_id(val: str) -> tuple[str, str | None]:
+        if not isinstance(val, str):
+            val = str(val)
+        cleaned = re.sub(r"[^a-zA-Z0-9/\-]", "", val)
+        norm = cleaned.lower()
+        return norm, SPACE_GROUPS.get(norm)
+
+    pred_norm, pred_id = get_norm_and_id(pred)
+    answer_norm, answer_id = get_norm_and_id(answer)
+
+    # Adding these two checks in case there's some alias we missed or haven't heard of
+    if pred_id is None:
+        print(
+            f"Warning: Predicted space group '{pred}' (clean: '{pred_norm}') not found in allowed keys."
+        )
+        return False
+
+    if answer_id is None:
+        print(
+            f"Warning: Answer space group '{answer}' (clean: '{answer_norm}') not found in allowed keys."
+        )
+        return False
+
+    return pred_id == answer_id
 
 
 def scorer_categorical(

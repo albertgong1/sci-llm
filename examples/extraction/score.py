@@ -17,7 +17,12 @@ import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si
+from pbench_eval.utils import (
+    scorer_categorical,
+    scorer_pymatgen,
+    scorer_si,
+    scorer_space_group,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -106,6 +111,11 @@ def score_row(
         # Get specific mapping for this property if available
         mapping = CLUSTERS.get(property_name, None) if property_name else None
         return scorer_categorical(str(pred_value), str(answer_value), mapping=mapping)
+
+    elif rubric == "space_group":
+        if pd.isna(pred_value) or pd.isna(answer_value):
+            return None
+        return scorer_space_group(str(pred_value), str(answer_value))
 
     else:
         # Unknown rubric
