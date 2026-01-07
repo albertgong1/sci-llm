@@ -1,4 +1,7 @@
-"""Script to generate embeddings from ground truth property names."""
+"""Script to generate embeddings from ground truth property names.
+
+Reference: https://ai.google.dev/gemini-api/docs/embeddings#task-types
+"""
 
 # standard imports
 import logging
@@ -8,6 +11,7 @@ from datasets import load_dataset
 
 # llm imports
 from google import genai
+from google.genai import types
 
 # pbench imports
 import pbench
@@ -43,7 +47,9 @@ for i, row in gt_df.iterrows():
     for i in range(0, len(unique_property_names), BATCH_SIZE):
         batch = unique_property_names[i : i + BATCH_SIZE]
         result = client.models.embed_content(
-            model="gemini-embedding-001", contents=batch
+            model="gemini-embedding-001",
+            contents=batch,
+            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
         )
         embeddings.extend([emb.values for emb in result.embeddings])
 
