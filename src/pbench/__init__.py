@@ -29,6 +29,12 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Material science domain",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="kilian-group/supercon-mini-v2",
+        help="Path to Ground Truth CSV or Hugging Face dataset name",
+    )
+    parser.add_argument(
         "--task",
         type=str,
         default=None,
