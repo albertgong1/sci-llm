@@ -74,8 +74,14 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--model_name",
         type=str,
-        default=None,
-        help="Model name (e.g., 'gemini-2.5-flash').",
+        default="gemini-3-flash-preview",
+        help="Model name (e.g., 'gemini-3-flash-preview').",
+    )
+    parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Overwrite existing output files",
     )
 
     # Logging args
