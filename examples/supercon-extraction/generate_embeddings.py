@@ -3,13 +3,14 @@
 import pandas as pd
 from google import genai
 from argparse import ArgumentParser
-from pathlib import Path
+import pbench
 
 BATCH_SIZE = 100
 
 parser = ArgumentParser(description="Generate embeddings from property names.")
-parser.add_argument("--output_dir", "-od", type=Path, default=Path("out"))
+parser = pbench.add_base_args(parser)
 args = parser.parse_args()
+pbench.setup_logging(args.log_level)
 
 preds_dir = args.output_dir / "unsupervised_llm_extraction"
 preds_files = list(preds_dir.glob("*.csv"))
