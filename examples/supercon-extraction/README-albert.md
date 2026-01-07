@@ -4,6 +4,10 @@
 > We only need to construct the dataset following [Construct the Dataset from Scratch](#constructing-the-dataset-from-scratch) once.
 > For now, we will use the orignal SuperCon dataset as the ground-truth.
 
+TODO:
+- [ ] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
+- [ ] Push GT property name embeddings to HF.
+
 ## Experiments
 
 1. Run the tasks using Harbor/Modal:
@@ -68,19 +72,20 @@ There are more instructions in `docs/VALIDATOR_GUIDE.md`.
 1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
-uv run python generate_embeddings.py -od OUTPUT_DIR
+uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+uv run python generate_gt_embeddings.py -od OUTPUT_DIR
 ```
 
 2. Query LLM to determine best match between generated and ground-truth property name:
 
 ```bash
-uv run python verify_aliases.py
+uv run python verify_aliases.py -od OUTPUT_DIR -m gemini-3-pro-preview
 ```
 
 3. Apply property-specific scoring rules and compute overall recall:
 
 ```bash
-uv run python score_pr.py -od OUTPUT_DIR
+uv run python score_pr.py -od OUTPUT_DIR --dataset kilian-group/supercon-mini-v2
 ```
 
 **Computing precision:**
