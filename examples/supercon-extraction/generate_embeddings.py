@@ -1,0 +1,43 @@
+"""Script to generate embeddings from property names."""
+
+import pandas as pd
+from google import genai
+from argparse import ArgumentParser
+from pathlib import Path
+
+BATCH_SIZE = 100
+
+parser = ArgumentParser(description="Generate embeddings from property names.")
+parser.add_argument("--output_dir", "-od", type=Path, default=Path("out"))
+args = parser.parse_args()
+
+preds_dir = args.output_dir / "unsupervised_llm_extraction"
+preds_files = list(preds_dir.glob("*.csv"))
+if not preds_files:
+    raise FileNotFoundError(f"No CSV files found in {preds_dir}")
+
+embeddings_dir = args.output_dir / "embeddings"
+embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+client = genai.Client()
+
+for file in preds_files:
+    print(f"Generating embeddings for {file.stem}...")
+    preds_df = pd.read_csv(file)
+    property_names = preds_df["property_name"].tolist()
+    # get unique property names
+    unique_property_names = list(set(property_names))
+    # generate embeddings in batches
+    embeddings = []
+    for i in range(0, len(unique_property_names), BATCH_SIZE):
+        batch = unique_property_names[i : i + BATCH_SIZE]
+        result = client.models.embed_content(
+            model="gemini-embedding-001", contents=batch
+        )
+        embeddings.extend([emb.values for emb in result.embeddings])
+
+    # save embeddings to parquet
+    df = pd.DataFrame({"property_name": unique_property_names, "embedding": embeddings})
+    save_path = embeddings_dir / f"{file.stem}.parquet"
+    df.to_parquet(save_path)
+    print(f"Saved embeddings to {save_path} with {len(df)} rows")
