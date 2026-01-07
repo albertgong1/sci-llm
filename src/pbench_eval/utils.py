@@ -5,19 +5,15 @@ from pathlib import Path
 from pymatgen.core import Composition
 
 # Load normalized space groups
-try:
-    import json
+import json
 
-    # Assuming this file is in the same directory as this script (examples/extraction)
-    # and assets is a subdirectory (examples/extraction/assets)
-    ASSETS_DIR = Path(__file__).parent / "assets"
-    SPACE_GROUPS_PATH = ASSETS_DIR / "space_groups_normalized.json"
+# Assuming this file is in the same directory as this script (examples/extraction)
+# and assets is a subdirectory (examples/extraction/assets)
+ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
+SPACE_GROUPS_PATH = ASSETS_DIR / "hard" / "space_groups_normalized.json"
 
-    with open(SPACE_GROUPS_PATH, "r") as f:
-        SPACE_GROUPS = json.load(f)
-except Exception:
-    # It is okay if this fails in the containerized environment if we don't need space groups
-    SPACE_GROUPS = {}
+with open(SPACE_GROUPS_PATH, "r") as f:
+    SPACE_GROUPS = json.load(f)
 
 
 _SUPERSCRIPT_MAP = str.maketrans(
