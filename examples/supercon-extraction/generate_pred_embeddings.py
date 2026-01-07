@@ -1,8 +1,13 @@
 """Script to generate embeddings from property names."""
 
+# standard imports
 import pandas as pd
-from google import genai
 from argparse import ArgumentParser
+
+# llm imports
+from google import genai
+
+# pbench imports
 import pbench
 
 BATCH_SIZE = 100
@@ -17,7 +22,7 @@ preds_files = list(preds_dir.glob("*.csv"))
 if not preds_files:
     raise FileNotFoundError(f"No CSV files found in {preds_dir}")
 
-embeddings_dir = args.output_dir / "embeddings"
+embeddings_dir = args.output_dir / "pred_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
 
 client = genai.Client()
@@ -38,7 +43,15 @@ for file in preds_files:
         embeddings.extend([emb.values for emb in result.embeddings])
 
     # save embeddings to parquet
-    df = pd.DataFrame({"property_name": unique_property_names, "embedding": embeddings})
+    assert len(preds_df["refno"].unique()) == 1, "Expected only one refno per file"
+    refno = preds_df["refno"].unique()[0]
+    df = pd.DataFrame(
+        {
+            "refno": [refno] * len(unique_property_names),
+            "property_name": unique_property_names,
+            "embedding": embeddings,
+        }
+    )
     save_path = embeddings_dir / f"{file.stem}.parquet"
     df.to_parquet(save_path)
     print(f"Saved embeddings to {save_path} with {len(df)} rows")
