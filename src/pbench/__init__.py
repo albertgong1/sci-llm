@@ -8,10 +8,10 @@ import llm_utils
 
 # NOTE: Assets are in the root directory of the project, change the path
 # if the project structure changes.
-ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
+# ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
+# DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
-SUPPORTED_DOMAINS: list[str] = ["supercon"]
+SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
 
 DOMAIN2HF_DATASET_NAME: dict[str, str] = {
     "supercon": "kilian-group/supercon-mini",
@@ -24,9 +24,15 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--domain",
         type=str,
-        required=True,
+        # required=True,
         choices=SUPPORTED_DOMAINS,
         help="Material science domain",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="kilian-group/supercon-mini-v2",
+        help="Path to Ground Truth CSV or Hugging Face dataset name",
     )
     parser.add_argument(
         "--task",
@@ -46,7 +52,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--data_dir",
         "-dd",
         type=Path,
-        default=DATA_DIR,
+        default="data",
         help="Directory containing the papers and properties",
     )
     parser.add_argument(
@@ -68,8 +74,14 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "--model_name",
         type=str,
-        default=None,
-        help="Model name (e.g., 'gemini-2.5-flash').",
+        default="gemini-3-flash-preview",
+        help="Model name (e.g., 'gemini-3-flash-preview').",
+    )
+    parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Overwrite existing output files",
     )
 
     # Logging args

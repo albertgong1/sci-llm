@@ -23,16 +23,8 @@ GOOGLE_API_KEY=your_api_key_here
 Run the app using Streamlit:
 
 ```bash
-uv run streamlit run examples/extraction/validator_app.py
+./src/pbench_validator_app/app.py
 ```
-
-You can optionally specify a CSV file to load directly:
-
-```bash
-uv run streamlit run examples/extraction/validator_app.py --csv_path "path/to/my_data.csv"
-```
-
-### Data Loading & File Selection
 
 By default, the app looks for files in:
 *   **CSVs**: `examples/extraction/assets/validate_csv/`
@@ -41,7 +33,7 @@ By default, the app looks for files in:
 You can customize these folders using CLI flags:
 
 ```bash
-uv run streamlit run examples/extraction/validator_app.py --csv_folder "my_csvs/" --paper_folder "my_pdfs/"
+./src/pbench_validator_app/app.py --csv_folder /path/to/unsupervised_llm_extraction/ --paper_folder /path/to/Paper_DB/
 ```
 
 **Workflow**:

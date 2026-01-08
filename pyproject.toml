@@ -28,6 +28,7 @@ dependencies = [
     "google-genai",
     "openai",
     "pymupdf",
+    "scikit-learn>=1.8.0",
 ]
 
 [dependency-groups]

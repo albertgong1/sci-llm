@@ -48,43 +48,6 @@ def load_prompt(prompt_path: Path) -> str:
         return f.read()
 
 
-def split_pdf_into_pages(pdf_path: Path, output_dir: Path) -> list[Path]:
-    """Split a PDF into individual page PDFs.
-
-    Args:
-        pdf_path: Path to the source PDF
-        output_dir: Directory to save split PDFs (e.g., <data_dir>/<domain>/Paper_DB_split/<refno>/*)
-
-    Returns:
-        List of paths to individual page PDFs
-
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    page_paths = []
-
-    try:
-        doc = fitz.open(pdf_path)
-        for page_num in range(len(doc)):
-            # Create a new PDF with just this page
-            page_doc = fitz.open()
-            page_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
-
-            # Save to file
-            page_path = output_dir / f"page{page_num + 1}.pdf"
-            page_doc.save(page_path)
-            page_doc.close()
-
-            page_paths.append(page_path)
-
-        doc.close()
-        logger.info(f"Split {pdf_path.name} into {len(page_paths)} pages")
-        return page_paths
-
-    except Exception as e:
-        logger.error(f"Failed to split PDF {pdf_path}: {e}")
-        return []
-
-
 def parse_json_response(response_text: str) -> dict | None:
     """Parse JSON from LLM response, handling markdown code blocks.
 
@@ -193,8 +156,8 @@ def json_property_to_csv_row(prop: dict) -> pd.Series:
             "property_name": prop.get("property_name", ""),
             "category": prop.get("category", ""),
             "value_string": prop.get("value_string", ""),
-            "value_number": "",  # TODO: how to extract value number from value_string?
-            "units": "",  # TODO: how to extract units from value_string?
+            "value_number": "",
+            "units": "",
             "method": prop.get("method", ""),
             "notes": prop.get("notes", ""),
             "location.page": location.get("page", ""),
@@ -223,48 +186,53 @@ def process_paper(
     prompt: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
-    paper_split_dir: Path,
 ) -> list[pd.Series]:
-    """Process a single paper by splitting into pages and extracting properties.
+    """Process a single paper by prompting the LLM one page at a time to extract properties.
 
     Args:
         paper_path: Path to the PDF file
         prompt: Extraction prompt text
         llm: LLMChat instance
         inf_gen_config: InferenceGenerationConfig instance
-        paper_split_dir: Directory to save split PDFs (e.g., <data_dir>/<domain>/Paper_DB_split/<refno>/*)
 
     Returns:
         List of pandas Series (one per extracted property)
 
     """
-    # Extract refno from filename
+    # Extract refno from filename and create file object for the paper
     refno = paper_path.stem
+    file = File(path=paper_path)
 
-    # Split PDF into individual pages
-    page_paths = split_pdf_into_pages(paper_path, paper_split_dir)
+    # Get number of pages in the paper, we will upload the entire paper to the LLM
+    # server at once, but prompt one page at a time.
+    try:
+        doc = fitz.open(paper_path)
+        num_pages = len(doc)
+        doc.close()
+    except Exception as e:
+        logger.error(f"Failed to get number of pages from {paper_path}: {e}")
 
-    if not page_paths:
-        logger.error(f"No pages extracted from {refno}")
-        return []
-
-    # Process each page
     all_rows: list[pd.Series] = []
     property_counter = 0
 
     pbar = tqdm(
-        enumerate(page_paths, start=1),
-        total=len(page_paths),
+        range(1, num_pages + 1),
+        total=num_pages,
         desc=f"Processing {refno} pages",
     )
-    for page_num, page_path in pbar:
-        # Create file object for this page
-        file = File(path=page_path)
-
+    for page_num in pbar:
         # Build conversation
+        page_prompt = f"""
+\n\n
+------FINAL INSTRUCTIONS------
+Now extract all properties in the research article that are on page number {page_num}.
+It is important to ONLY extract properties that are on page number {page_num}.
+DO NOT extract properties that are on other pages.
+--------------------------------
+        """
         conv = Conversation(
             messages=[
-                Message(role="user", content=[file, prompt]),
+                Message(role="user", content=[file, prompt, page_prompt]),
             ]
         )
 
@@ -310,7 +278,6 @@ def process_paper(
                     row_series["id"] = f"prop_{property_counter:03d}"
                     row_series["refno"] = refno
                     row_series["paper_pdf_path"] = str(paper_path)
-                    row_series["location.page"] = page_num
                     row_series["validated"] = False
                     row_series["validator_name"] = ""
                     row_series["validation_date"] = ""
@@ -328,11 +295,9 @@ def process_paper(
         except Exception as e:
             logger.error(f"Error processing {refno} page {page_num}: {e}")
             continue
-        finally:
-            # Delete file from LLM server
-            llm.delete_file(file)
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
+    llm.delete_file(file)
     return all_rows
 
 
@@ -393,9 +358,8 @@ def main(args: argparse.Namespace) -> None:
             )
             continue
 
-        # Process the paper (splits into pages internally)
-        paper_split_dir = args.data_dir / args.domain / "Paper_DB_split" / refno
-        rows = process_paper(pdf_path, prompt, llm, inf_gen_config, paper_split_dir)
+        # Process the paper
+        rows = process_paper(pdf_path, prompt, llm, inf_gen_config)
 
         # Save to CSV
         if len(rows) > 0:

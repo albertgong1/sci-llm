@@ -89,11 +89,12 @@ def main() -> int:
     for key, value in dotenv.items():
         os.environ.setdefault(key, value)
 
-    if "GEMINI_API_KEY" not in os.environ and "GOOGLE_API_KEY" in os.environ:
-        os.environ["GEMINI_API_KEY"] = os.environ["GOOGLE_API_KEY"]
-
-    if "GOOGLE_API_KEY" not in os.environ and "GEMINI_API_KEY" in os.environ:
-        os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
+    # common issue: having both might confuse some clients
+    # enforce GOOGLE_API_KEY as primary
+    if "GOOGLE_API_KEY" in os.environ:
+       os.environ.pop("GEMINI_API_KEY", None)
+    elif "GEMINI_API_KEY" in os.environ:
+       os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 
     # Claude Code authentication: Harbor's `claude-code` agent looks for these vars.
     if "ANTHROPIC_API_KEY" not in os.environ and "CLAUDE_API_KEY" in os.environ:
