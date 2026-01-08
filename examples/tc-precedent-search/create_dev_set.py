@@ -6,8 +6,8 @@ import numpy as np
 np.random.seed(42)
 
 repo_root = Path(__file__).resolve().parents[2]
-input_path = repo_root / "examples/tc-precedence-search/SuperCon_Tc_Tcn - no NA.csv"
-output_path = repo_root / "examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv"
+input_path = repo_root / "examples/tc-precedent-search/SuperCon_Tc_Tcn - no NA.csv"
+output_path = repo_root / "examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv"
 
 print(f"Loading {input_path}...")
 df = pd.read_csv(input_path)

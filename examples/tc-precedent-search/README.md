@@ -1,11 +1,11 @@
-# Tc Precedence Search Evaluation
+# Tc precedent Search Evaluation
 
 This directory contains the workflow for evaluating the "Precedent Search" task, where an agent must determine if a material has been reported as superconducting, and if so, what the highest Tc and lowest Tcn (non-superconducting temperature) are.
 
 ## Workflow
 
 ### 1. Generate Development Set
-Download [SuperCon_Tc_Tcn - no NA.csv](https://drive.google.com/file/d/11mqYhvSbl_cCNIDiQOgnS5N1P-26BREC/view?usp=sharing) and save to `examples/tc-precedence-search/` directory.
+Download [SuperCon_Tc_Tcn - no NA.csv](https://drive.google.com/file/d/11mqYhvSbl_cCNIDiQOgnS5N1P-26BREC/view?usp=sharing) and save to `examples/tc-precedent-search/` directory.
 
 > \[!NOTE\]
 > 1. Total SuperCon rows: 21,153
@@ -16,7 +16,7 @@ Download [SuperCon_Tc_Tcn - no NA.csv](https://drive.google.com/file/d/11mqYhvSb
 
 **Command:**
 ```bash
-cd examples/tc-precedence-search/
+cd examples/tc-precedent-search/
 python create_dev_set.py
 ```
 
@@ -24,7 +24,7 @@ python create_dev_set.py
 - `assets/SuperCon_Tc_Tcn - no NA.csv`: Source SuperCon dataset.
 
 **Outputs:**
-- `examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv`: The generated development set.
+- `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`: The generated development set.
 - You can verify the dev set is correct by comparing with the dev set [here](https://drive.google.com/file/d/13nb4HTU2p28b8oiEbQ87Y1CF4Jrcwlsa/view?usp=sharing).
 
 ### 2. Generate Harbor Tasks
@@ -32,23 +32,23 @@ Generate the task directories for Harbor evaluation. This script reads the dev s
 
 **Command:**
 ```bash
-cd examples/tc-precedence-search/
+cd examples/tc-precedent-search/
 python prepare_precedent_tasks.py --force --write-job-config
 ```
 
 **Options:**
-- `--csv`: Path to the input CSV (default: `examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv`).
+- `--csv`: Path to the input CSV (default: `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`).
 - `--limit N`: Generate only N tasks (useful for testing).
 - `--force`: Overwrite existing output directory.
 - `--write-job-config`: Write the `job.yaml` file for Harbor.
 
 **Inputs:**
-- `examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv`: The dev set.
-- `examples/tc-precedence-search/search-template/`: Template files for the tasks.
+- `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`: The dev set.
+- `examples/tc-precedent-search/search-template/`: Template files for the tasks.
 
 **Outputs:**
-- `out/harbor/precedent-search/tc-precedence-search/tasks/`: Directory containing one task folder per material.
-- `out/harbor/precedent-search/tc-precedence-search/job.yaml`: Job configuration file.
+- `out/harbor/precedent-search/tc-precedent-search/tasks/`: Directory containing one task folder per material.
+- `out/harbor/precedent-search/tc-precedent-search/job.yaml`: Job configuration file.
 
 > **Note on Docker Image Rebuilding:**
 > Running this step creates fresh `Dockerfile`s in each task's `environment/` directory. When you run Step 3 (trials), Harbor will detect these new Dockerfiles and rebuild the Docker images. However, once built, these images are cached and reused for subsequent trial runs unless you re-run this step or modify the Dockerfile template.
@@ -60,21 +60,21 @@ Execute the agents on the generated tasks using Harbor.
 ```bash
 # From the root
 python src/pbench_containerized_eval/run_harbor.py trials start \
-  -p out/harbor/precedent-search/tc-precedence-search/tasks/<task_name> \
+  -p out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
   -a gemini-cli -m gemini/gemini-3-pro-preview
 ```
-- `<task_name>` is just the name of the task directories in `out/harbor/precedent-search/tc-precedence-search/tasks/`.
+- `<task_name>` is just the name of the task directories in `out/harbor/precedent-search/tc-precedent-search/tasks/`.
 
 **Command (Run all tasks):**
 ```bash
 # From the root
 python src/pbench_containerized_eval/run_harbor.py trials start \
-  -j out/harbor/precedent-search/tc-precedence-search/job.yaml \
+  -j out/harbor/precedent-search/tc-precedent-search/job.yaml \
   -a gemini-cli -m gemini/gemini-3-pro-preview
 ```
 
 **Inputs:**
-- Task directories in `out/harbor/precedent-search/tc-precedence-search/tasks/`.
+- Task directories in `out/harbor/precedent-search/tc-precedent-search/tasks/`.
 - `job.yaml` (for batch execution).
 
 **Outputs:**
