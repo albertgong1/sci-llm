@@ -37,14 +37,14 @@ python prepare_precedent_tasks.py --force --write-job-config
 ```
 
 **Options:**
-- `--csv`: Path to the input CSV (default: `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`).
+- `--csv`: Path to the input CSV (default: `SuperCon_Tc_Tcn_dev-set.csv`).
 - `--limit N`: Generate only N tasks (useful for testing).
 - `--force`: Overwrite existing output directory.
 - `--write-job-config`: Write the `job.yaml` file for Harbor.
 
 **Inputs:**
-- `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`: The dev set.
-- `examples/tc-precedent-search/search-template/`: Template files for the tasks.
+- `SuperCon_Tc_Tcn_dev-set.csv`: The dev set.
+- `search-template/`: Template files for the tasks.
 
 **Outputs:**
 - `out/harbor/precedent-search/tc-precedent-search/tasks/`: Directory containing one task folder per material.
