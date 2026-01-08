@@ -1,3 +1,24 @@
+#!/usr/bin/env -S uv run --env-file=.env -- streamlit run --
+"""
+Property Validator App
+
+A Streamlit application for validating extracted property data from scientific papers against their source PDFs.
+
+Usage (note the -- after the script name is necessary)
+```bash
+./src/pbench_validator_app/app.py \
+    --csv_folder /path/to/unsupervised_llm_extraction/ \
+    --paper_folder /path/to/Paper_DB/
+```
+
+CLI Arguments:
+    --csv_path (str): Path to the initial CSV file to validate.
+    --pdf_path (str): Default PDF path to use if not specified in CSV.
+    --csv_folder (str): Folder containing validation CSVs (for the dropdown).
+    --paper_folder (str): Folder containing PDFs (for the dropdown).
+"""
+
+from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -12,25 +33,9 @@ from google.genai import types
 import json
 import numpy as np
 
-# Property Validator App
-#
-# A Streamlit application for validating extracted property data from scientific papers against their source PDFs.
-#
-# Usage:
-#     streamlit run app.py
-#
-# CLI Arguments:
-#     --csv_path (str): Path to the initial CSV file to validate.
-#     --pdf_path (str): Default PDF path to use if not specified in CSV.
-#     --csv_folder (str): Folder containing validation CSVs (for the dropdown).
-#
-# Example:
-#     streamlit run app.py --csv_path "mycsv.csv" --pdf_path "mypdf.pdf" --csv_folder "mycsvs"
-
 # Page configuration
 st.set_page_config(layout="wide", page_title="Property Validator")
 
-from pathlib import Path
 
 # Robustly determine the paths to assets, handling script relocation
 def find_repo_root(start_path: Path) -> Path:

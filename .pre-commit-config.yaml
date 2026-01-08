@@ -19,6 +19,6 @@ repos:
       # Run the linter.
       - id: ruff
         args: [ --fix ]
-        exclude: ^examples/harbor/hello-world/
+        exclude: ^(examples/harbor/hello-world/|examples/supercon-extraction/score_pr.py|examples/supercon-extraction/analyze_mismatches.py|examples/supercon-extraction/verify_aliases.py)
       # Run the formatter.
       - id: ruff-format
