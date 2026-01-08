@@ -207,59 +207,40 @@ def _as_prediction(raw: dict[str, Any]) -> Prediction:
     )
 
 
-def _flatten_and_convert(payload: Any) -> list[Prediction]:
-    """Convert payload to Predictions, flattening 'values' lists if present."""
-    raw_list = _coerce_predictions_payload(payload)
-    predictions: list[Prediction] = []
-    for raw in raw_list:
-        values = raw.get("values")
-        if isinstance(values, list):
-            if not values:
-                # Explicit empty list implies "N/A" (matches negative ground truth)
-                new_raw = raw.copy()
-                new_raw["pred_value"] = "N/A"
-                new_raw.pop("values", None)
-                predictions.append(_as_prediction(new_raw))
-            else:
-                # Expand list prediction into multiple candidates
-                for v in values:
-                    new_raw = raw.copy()
-                    new_raw["pred_value"] = str(v)
-                    # Remove collection key to safely map as single value
-                    new_raw.pop("values", None)
-                    predictions.append(_as_prediction(new_raw))
-        else:
-            predictions.append(_as_prediction(raw))
-    return predictions
-
-
 def load_predictions(predictions_path: Path) -> list[Prediction]:
     """Load predictions from disk or fall back to parsing agent logs."""
+    payload = None
     if predictions_path.exists():
         payload = _load_json(predictions_path)
-        return _flatten_and_convert(payload)
+    else:
+        agent_logs_dir = Path("/logs/agent")
+        if agent_logs_dir.exists():
+            for log_path in sorted(agent_logs_dir.glob("*.txt")):
+                try:
+                    content = log_path.read_text()
+                except Exception:
+                    continue
+                decoded = _extract_text_from_jsonlines_log(content)
+                text = decoded or content
 
-    agent_logs_dir = Path("/logs/agent")
-    if agent_logs_dir.exists():
-        for log_path in sorted(agent_logs_dir.glob("*.txt")):
-            try:
-                content = log_path.read_text()
-            except Exception:
-                continue
-            decoded = _extract_text_from_jsonlines_log(content)
-            text = decoded or content
+                extracted_obj = _extract_first_json_object(text)
+                if extracted_obj is not None:
+                    payload = extracted_obj
+                    break
 
-            extracted_obj = _extract_first_json_object(text)
-            if extracted_obj is not None:
-                return _flatten_and_convert(extracted_obj)
+                extracted_arr = _extract_first_json_array(text)
+                if extracted_arr is not None:
+                    payload = extracted_arr
+                    break
 
-            extracted_arr = _extract_first_json_array(text)
-            if extracted_arr is not None:
-                return _flatten_and_convert(extracted_arr)
+    if payload is None:
+        raise FileNotFoundError(
+            f"Missing predictions file at {predictions_path} and could not parse JSON from /logs/agent/*.txt"
+        )
 
-    raise FileNotFoundError(
-        f"Missing predictions file at {predictions_path} and could not parse JSON from /logs/agent/*.txt"
-    )
+    # Convert to standard list of Predictions (new schema has no 'values' list)
+    raw_list = _coerce_predictions_payload(payload)
+    return [_as_prediction(r) for r in raw_list]
 
 
 _STOPWORDS = {
@@ -307,7 +288,6 @@ def _property_name_match(
     *, truth_property_name: str, pred_property_name: str, task_name: str | None
 ) -> bool:
     """Return True if a prediction's property_name matches the ground-truth name."""
-    """Return True if a prediction's property_name matches the ground-truth name."""
     truth_norm = normalize_unicode(normalize_ws(truth_property_name)).lower()
     pred_norm = normalize_unicode(normalize_ws(pred_property_name)).lower()
     if not pred_norm:
@@ -315,6 +295,9 @@ def _property_name_match(
 
     if truth_norm == pred_norm:
         return True
+    
+    # Removed loose substring match (truth in pred or pred in truth) 
+    # because short keys like "tc" match "tcn" and break scoring.
 
     if _is_tc_like_truth(truth_property_name, task_name):
         if re.search(r"\btc\b", pred_norm) or re.search(
@@ -331,9 +314,8 @@ def _property_name_match(
 
     if truth_norm == pred_norm:
         return True
-    if truth_norm and (truth_norm in pred_norm or pred_norm in truth_norm):
-        return True
 
+    # Strict token overlap for other properties
     truth_toks = _tokens(truth_property_name)
     pred_toks = _tokens(pred_property_name)
     if not truth_toks or not pred_toks:
@@ -460,19 +442,25 @@ def main() -> None:
                 best_score = -1.0
 
                 # Simple greedy match logic reusing the robust score_value
-                for idx, item in enumerate(pool):
-                    pred = item["pred"]
-                    score = score_value(pred.pred_value, answer_value, rubric_row)
-                    
-                    # If perfect score, take it immediately (break early optimization)
-                    if score > best_score:
-                        best_score = score
-                        best_idx = idx
-                        chosen_pred = pred
-                        chosen_value = pred.pred_value
-                        chosen_score = float(score)
-                        if best_score == 1.0:
-                            break
+                if not pool:
+                    # If no predictions were found for this property, check if the answer is N/A
+                    if answer_value in {"N/A", "nan", ""}:
+                         chosen_score = 1.0
+                         chosen_value = "N/A (Implicit)"
+                else:
+                    for idx, item in enumerate(pool):
+                        pred = item["pred"]
+                        score = score_value(pred.pred_value, answer_value, rubric_row)
+                        
+                        # If perfect score, take it immediately (break early optimization)
+                        if score > best_score:
+                            best_score = score
+                            best_idx = idx
+                            chosen_pred = pred
+                            chosen_value = pred.pred_value
+                            chosen_score = float(score)
+                            if best_score == 1.0:
+                                break
                         
                 if best_idx is not None and chosen_score == 1.0:
                     pool.pop(best_idx)

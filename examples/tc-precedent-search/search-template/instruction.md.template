@@ -1,15 +1,13 @@
+You are a careful condensed-matter physicist and materials scientist.
 
-You are a materials science research assistant.
-
-Your task is to determine whether the material **{material}** has been reported to be superconducting.
+Your task is to determine whether the material **{material}** has been reported to be superconducting, and to extract detailed properties about its phase behavior and related materials.
 
 You must search for experimental evidence in scientific literature.
 
-Please answer the following three questions:
+Please answer the following questions:
 Q1. Has **{material}** been reported to be superconducting? (Answer "Yes" or "No")
 Q2. If Yes, what are ALL the measured superconducting transition temperatures (Tc) reported? (Provide values designated in Kelvin as a list, e.g., ["12", "11.5"]. Do NOT include unit.)
 Q3. If No, what are ALL the lowest temperatures at which it was measured and found NOT to be superconducting (Tcn)? (Provide values designated in Kelvin as a list, e.g., ["0.05", "4.2"].)
-Q4. If No, is it a known magnetic material or insulator? Specify the state (e.g., "Antiferromagnetic Insulator", "Paramagnetic Metal") and any relevant transition temperatures (e.g. Curie temperature, Neel temperature).
 
 **Output Format:**
 
@@ -22,44 +20,71 @@ You must output a SINGLE JSON object exactly matching this structure:
       "material": "{material}",
       "property_name": "is_superconducting",
       "value_string": "Yes" or "No",
-      "related_materials": "...",
       "source_dois": ["...", "..."]
     }},
     {{
       "material": "{material}",
-      "property_name": "highest_tc",
-      "values": ["...", "..."],
-      "conditions": {{
-          "pressure": "...",
-          "magnetic_field": "..."
-      }},
-      "source_dois": ["...", "..."]
-    }},
-    {{
-      "material": "{material}",
-      "property_name": "lowest_tcn",
-      "values": ["...", "..."],
-      "conditions": {{
-          "pressure": "...",
-          "magnetic_field": "..."
-      }},
-      "source_dois": ["...", "..."]
-    }},
-    {{
-      "material": "{material}",
-      "property_name": "magnetic_or_insulating_state",
+      "property_name": "tc",
       "value_string": "...",
+      "conditions": {{
+          "pressure": "...",
+          "magnetic_field": "..."
+      }},
+      "source_dois": ["...", "..."]
+    }},
+    {{
+      "material": "{material}",
+      "property_name": "tcn",
+      "value_string": "...",
+      "conditions": {{
+          "pressure": "...",
+          "magnetic_field": "..."
+      }},
       "source_dois": ["...", "..."]
     }}
-  ]
+  ],
+  "superconductors_mentioned": [
+    {{
+      "material": "...",
+      "Tc": "..."
+    }}
+  ],
+  "electronic_or_magnetic_phases": [
+    {{
+      "material": "...",
+      "phase": "...",
+      "temperature": "...",
+      "temperature_type": "transition | measurement | null"
+    }}
+  ],
+  "missing_or_notable_information": "..."
 }}
 ```
 
-**Rules:**
-- **If Q1="No"**: set `highest_tc` values to empty list `[]`, and provide all `lowest_tcn` values found.
-    - **Tcn Inference**: If the material is reported as not superconducting (e.g., insulating, paramagnetic), provide the lowest temperature measured in the experiment. Do NOT output empty list just because the text doesn't explicitly say "not superconducting down to X". Infer X from the measurement range.
-- **If Q1="Yes"**: set `lowest_tcn` values to empty list `[]`, and provide all `highest_tc` values found.
-- **Conditions**: Explicitly state the pressure and magnetic field conditions for the measurement if available (e.g., "Ambient pressure", "0 T").
-- **Related Materials**: Mention any closely related materials or variants found during the search (e.g., "Found doped variant...").
-- **Source DOIs**: Provide a list of digital object identifiers (DOIs) for the papers where you found the information.
-- Provide ONLY the JSON. No Markdown fencing or explanation.
+**Rules & Constraints:**
+
+1. **Core Superconductivity Check (Q1-Q3):**
+    - **One Object Per Measurement**: For `tc` and `tcn`, create a **separate** JSON object in the `properties` list for EACH distinct measurement found (with its specific conditions and DOIs). Do not list them.
+    - **If Q1="No"**: Do not output any `tc` properties. Provide `tcn` properties for all non-superconducting measurements found.
+        - **Tcn Inference**: If the material is reported as not superconducting (e.g., insulating, paramagnetic), provide the lowest temperature measured in the experiment. Do NOT skip just because the text doesn't explicitly say "not superconducting down to X". Infer X from the measurement range.
+    - **If Q1="Yes"**: Do not output any `tcn` properties. Provide `tc` properties for all superconducting measurements found.
+
+2. **Superconductor Mention Check (`superconductors_mentioned`):**
+    - Identify all materials mentioned that are closely related to **{material}** AND explicitly stated to be superconductors.
+    - Extract material name and Tc (exactly as stated, with units).
+
+3. **Electronic / Magnetic Ground State Extraction (`electronic_or_magnetic_phases`):**
+    - Identify all explicit statements about electronic or magnetic phases for the main material AND related materials.
+    - Recognized phases: band gap/semiconductor, Mott insulator, antiferromagnet, ferromagnet, charge density wave, spin glass, metallic state, paramagnetic/diamagnetic, etc.
+    - Extract: material, phase name, temperature (if stated), and type (transition vs measurement).
+
+4. **Descriptive Note (`missing_or_notable_information`):**
+    - Provide a short (1–3 sentence) note summarizing important info that doesn't fit the fields, ambiguities, or extra details.
+    - Must be grounded in search results.
+
+5. **General Constraints:**
+    - Use ONLY information explicitly present in the search results.
+    - If a Tc, phase, or temperature is not stated, return null (or empty list/string as appropriate).
+    - Do NOT infer superconductivity or phases even if they are typical for the material class.
+    - **Source DOIs**: Provide a list of digital object identifiers (DOIs) for all papers used.
+    - Provide ONLY the JSON. No Markdown fencing or explanation.
