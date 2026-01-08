@@ -8,12 +8,12 @@ contracts, debugging playbook).
 
 ## Setup (uv + Harbor)
 
-1) Install deps (Harbor is in the `dev` extra):
+1) Install deps
 ```bash
-uv sync --extra dev
+uv sync
 ```
 
-2) Add keys (export or put in `.env` at repo root):
+1) Add keys (export or put in `.env` at repo root):
 ```bash
 export GOOGLE_API_KEY="..."
 export ANTHROPIC_API_KEY="..."
@@ -28,7 +28,7 @@ PDF corpus lives at `src/pbench_containerized_eval/data/Paper_DB/<refno>.pdf` (1
 
 Templates live in `src/pbench_containerized_eval/`:
 - `ground-template` (default free-form)
-- `prompted-template` (question-style)
+- `ground-template-easy` (the base template, but prompted with each property it needs to look for, better for testing if the LLM is following instructions)
 
 Build tasks for all properties with the default template (no task alias needed):
 ```bash
@@ -40,10 +40,10 @@ Outputs go to `out/harbor/supercon-mini-v2/ground-template/` with a `job.yaml`.
 If you want to filter to a task alias (e.g., only Tc rows), pass `--task tc`. This
 changes the output path to `out/harbor/supercon-mini-v2/tc/<template>/`.
 
-Prompted template:
+Easier template:
 ```bash
 uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
-  --template prompted-template --write-job-config --force
+  --template ground-template-easy --write-job-config --force
 ```
 
 Build a single paper while iterating:
@@ -51,6 +51,18 @@ Build a single paper while iterating:
 uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
   --refno PR05001178 --write-job-config --force
 ```
+
+## Publish Tasks to HF (optional)
+
+Upload a tasks directory to HF and write a Harbor `registry.json`:
+```bash
+uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py \
+  --template ground-template --write-job-config --force \
+  --upload-hf --hf-repo-id YOUR_ORG/supercon-harbor-tasks
+```
+The script prints the dataset name and registry URL you will use to run from HF.
+For public repos, HF auth is not required. For private repos, set `HF_TOKEN`
+in `.env` (or `HUGGINGFACE_HUB_TOKEN` / `HF_API_TOKEN`).
 
 ### Template placeholders
 `prepare_harbor_tasks.py` does safe substitution; you can use:
@@ -68,7 +80,7 @@ Results are written locally under `jobs/` or `trials/`, even when using Modal.
 If you pass `-m gemini-2.5-flash`, the wrapper normalizes it to
 `gemini/gemini-2.5-flash` automatically.
 
-When you use Modal (`--env modal` or `run_harbor_modal.py`), the agent runs inside a
+When you use Modal (`--env modal` or `--modal`), the agent runs inside a
 remote Modal sandbox. Your machine just builds the task bundle, uploads it, and
 streams logs/results back. Scaling is limited by Modal quotas and budget, plus network
 latency.
@@ -77,21 +89,14 @@ latency.
 Harbor supports Modal as an environment backend. Ensure `MODAL_TOKEN_ID` and
 `MODAL_TOKEN_SECRET` are in `.env` (or run `modal token set`).
 Example: `modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET"`.
-Use `--env modal` (or the convenience wrapper `run_harbor_modal.py`, which appends it).
+Use `--env modal` or the wrapper flag `--modal` (which also enables cleanup defaults).
 Modal environments are deleted after each run by default (`--delete`); pass
 `--no-delete` only when you want to keep a sandbox for debugging.
 ```bash
 uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env modal --n-concurrent 4
-```
-or
-```bash
-uv run python src/pbench_containerized_eval/run_harbor_modal.py \
-  jobs start -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-2.5-flash \
-  --n-concurrent 4
+  --modal --n-concurrent 4
 ```
 
 Single-task trial on Modal:
@@ -99,7 +104,7 @@ Single-task trial on Modal:
 uv run python src/pbench_containerized_eval/run_harbor.py trials start \
   -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env modal
+  --modal
 ```
 If Modal hits resource limits, lower resources with:
 `--override-storage-mb 1024` and/or `--override-memory-mb 1024`, or rebuild tasks after
@@ -107,19 +112,42 @@ adjusting `[environment]` in `task.toml.template`.
 
 Quick single-task test (Modal + overrides):
 ```bash
-uv run python src/pbench_containerized_eval/run_harbor_modal.py trials start \
+uv run python src/pbench_containerized_eval/run_harbor.py trials start \
   -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --override-storage-mb 1024 --override-memory-mb 1024
+  --modal --override-storage-mb 1024 --override-memory-mb 1024
 ```
 Concurrency for jobs is controlled with `--n-concurrent` (example above).
+
+### Run Harbor from HF tasks
+Jobs from an HF task registry:
+```bash
+uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
+  --hf-tasks-repo YOUR_ORG/supercon-harbor-tasks \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --modal --n-concurrent 4
+```
+Single-task trial from HF:
+```bash
+uv run python src/pbench_containerized_eval/run_harbor.py trials start \
+  --hf-tasks-repo YOUR_ORG/supercon-harbor-tasks \
+  --hf-task pr05001178 \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --modal
+```
+If your registry file or tasks live under a different path, add
+`--hf-registry-path path/to/registry.json` or `--hf-tasks-path path/to/tasks`.
+If you used a custom dataset name/version in the registry, pass
+`--hf-tasks-dataset NAME` and `--hf-tasks-version VERSION`.
+If needed, you can also set `--hf-registry-url` explicitly (e.g.,
+`https://huggingface.co/datasets/<repo>/raw/main/registry.json`).
 
 ### Export traces to HF (built-in Harbor)
 ```bash
 uv run python src/pbench_containerized_eval/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
-  --env modal --n-concurrent 4 \
+  --modal --n-concurrent 4 \
   --export-traces --export-push --export-repo your-org/your-traces-dataset
 ```
 
@@ -186,13 +214,14 @@ uv run python -m harbor.cli.main traces export \
 ### 1) Compile a run bundle (lossless)
 Latest run under `jobs/` or `trials/` → `out/harbor-runs/<run-name>/`:
 ```bash
-uv run python src/pbench_containerized_eval/compile_harbor_run.py
+uv run python src/pbench_containerized_eval/run_harbor.py compile-run
 ```
 Or specify a run:
 ```bash
-uv run python src/pbench_containerized_eval/compile_harbor_run.py \
+uv run python src/pbench_containerized_eval/run_harbor.py compile-run \
   --run-dir jobs/<job-name>
 ```
+You can also append `--compile-run` to a Harbor invocation to bundle the latest run.
 
 ### 2) Push to HF
 ```bash
@@ -210,14 +239,16 @@ uv run python src/pbench_containerized_eval/run_harbor.py trials start \
   -a gemini-cli -m gemini/gemini-2.5-flash
 
 TRIAL_DIR=$(ls -td trials/* | head -1)
-BUNDLE=$(uv run python src/pbench_containerized_eval/compile_harbor_run.py --run-dir "$TRIAL_DIR")
+BUNDLE=$(uv run python src/pbench_containerized_eval/run_harbor.py compile-run --run-dir "$TRIAL_DIR")
 
-uv run python src/pbench_containerized_eval/push_harbor_run_to_hf.py \
+uv run python src/pbench_containerized_eval/run_harbor.py push-run-to-hf \
   --repo-id kilian-group/foolmetwice-testing \
   --bundle-dir "$BUNDLE" \
   --write-root-readme
 ```
 By default each run uploads to `runs/<run-name>/` in the HF dataset repo.
+To push immediately after a Harbor run, add:
+`--push-run-to-hf --hf-runs-repo <org/repo> --hf-runs-write-root-readme`.
 
 ### 3) Query on the other end (example)
 ```python
