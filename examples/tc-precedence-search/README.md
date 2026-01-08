@@ -63,6 +63,7 @@ python src/pbench_containerized_eval/run_harbor.py trials start \
   -p out/harbor/precedent-search/tc-precedence-search/tasks/<task_name> \
   -a gemini-cli -m gemini/gemini-3-pro-preview
 ```
+- `<task_name>` is just the name of the task directories in `out/harbor/precedent-search/tc-precedence-search/tasks/`.
 
 **Command (Run all tasks):**
 ```bash
@@ -105,10 +106,20 @@ python src/pbench_eval/score_task.py \
 ```
 
 **Inputs:**
-- `out/harbor/precedent-search/preds/*.json`: Predictions.
-- `assets/hard/rubric.csv`: Scoring rubric.
+- `out/harbor/precedent-search/preds/*.json`: The collected JSON results.
+- `assets/hard/rubric.csv`: The scoring rubric.
+- `src/pbench_eval/utils.py`: The scoring logic.
 
 **Outputs:**
-- `out/harbor/precedent-search/scores/`: CSVs with per-instance scores.
-- `out/harbor/precedent-search/analysis/`: Aggregate metrics.
-- `out/harbor/precedent-search/figures/`: Visualization plots.
+- `out/harbor/precedent-search/scores/*.csv`: CSVs containing exact scores for every prediction.
+- `out/harbor/precedent-search/analysis/*.csv`: CSVs with aggregate statistics (Mean/Error by property).
+- `out/harbor/precedent-search/figures/*.pdf`: PDF plots of the analysis.
+
+```bash
+# Ensure you are running in an environment with 'pymatgen' and 'pandas' installed
+PYTHONPATH=src python src/pbench_eval/score_task.py \
+  --domain precedent-search \
+  --output_dir out/harbor \
+  --analyze \
+  --split ""
+```
