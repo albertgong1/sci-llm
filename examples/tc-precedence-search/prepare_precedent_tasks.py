@@ -160,7 +160,7 @@ datasets:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", type=Path, default=repo_root() / "assets/SuperCon_Tc_Tcn_dev-set.csv")
+    parser.add_argument("--csv", type=Path, default=repo_root() / "examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv")
     parser.add_argument("--output-dir", type=Path, default=repo_root() / "out/harbor/precedent-search")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--write-job-config", action="store_true")
@@ -168,7 +168,7 @@ def main():
     
     args = parser.parse_args()
     
-    task_root = args.output_dir / "search-template"
+    task_root = args.output_dir / "tc-precedence-search"
     tasks_dir = task_root / "tasks"
     
     if task_root.exists():

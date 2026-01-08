@@ -16,7 +16,7 @@ try:
 except ImportError:
     # During dev/testing, if simple python execution is tried without the copies
     import sys
-    sys.path.append(str(Path(__file__).parents[3] / "pbench_eval"))
+    sys.path.append(str(Path(__file__).parents[4] / "src" / "pbench_eval"))
     from utils import score_value, normalize_unicode, normalize_ws
 
 

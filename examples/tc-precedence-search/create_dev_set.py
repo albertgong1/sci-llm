@@ -1,11 +1,13 @@
+from pathlib import Path
 import pandas as pd
 import numpy as np
 
 # Set random seed for reproducibility
 np.random.seed(42)
 
-input_path = "/Users/jjk297/repos/sci-llm/assets/SuperCon_Tc_Tcn - no NA.csv"
-output_path = "/Users/jjk297/repos/sci-llm/assets/SuperCon_Tc_Tcn_dev-set.csv"
+repo_root = Path(__file__).resolve().parents[2]
+input_path = repo_root / "examples/tc-precedence-search/SuperCon_Tc_Tcn - no NA.csv"
+output_path = repo_root / "examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv"
 
 print(f"Loading {input_path}...")
 df = pd.read_csv(input_path)

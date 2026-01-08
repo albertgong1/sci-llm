@@ -9,17 +9,17 @@ This step creates the task directories, putting the necessary scoring logic and 
 It copies `check_prediction.py` and the shared `utils.py` (renamed to `pbench_eval_utils.py`) into each task folder.
 
 **Inputs:**
-- `assets/SuperCon_Tc_Tcn_dev-set.csv`: The source data.
+- `examples/tc-precedence-search/SuperCon_Tc_Tcn_dev-set.csv`: The source data.
 - `src/pbench_eval/utils.py`: Shared scoring logic.
-- `src/pbench_containerized_eval/search-template/`: Template files.
+- `examples/tc-precedence-search/search-template/`: Template files.
 
 **Outputs:**
-- `out/harbor/precedent-search/search-template/tasks/`: Directory containing one folder per task.
-- `out/harbor/precedent-search/search-template/job.yaml`: Configuration for Harbor/Modal.
+- `out/harbor/precedent-search/tc-precedence-search/tasks/`: Directory containing one folder per task.
+- `out/harbor/precedent-search/tc-precedence-search/job.yaml`: Configuration for Harbor/Modal.
 
 ```bash
 # From repo root
-python src/pbench_containerized_eval/prepare_precedent_tasks.py --force --write-job-config
+python examples/tc-precedence-search/prepare_precedent_tasks.py --force --write-job-config
 ```
 
 ### 2. Execute Trials (Harbor)
@@ -27,8 +27,8 @@ This runs the agents against the tasks in Docker (or Modal).
 Results are saved to `trials/`.
 
 **Inputs:**
-- `out/harbor/precedent-search/search-template/tasks/`: The generated task directories.
-- `out/harbor/precedent-search/search-template/job.yaml`: The job config.
+- `out/harbor/precedent-search/tc-precedence-search/tasks/`: The generated task directories.
+- `out/harbor/precedent-search/tc-precedence-search/job.yaml`: The job config.
 
 **Outputs:**
 - `trials/`: A directory for each trial run, containing logs and the agent's raw output (`predictions.json`).
@@ -36,7 +36,7 @@ Results are saved to `trials/`.
 ```bash
 # Run one trial manually (example)
 python src/pbench_containerized_eval/run_harbor.py trials start \
-  -p out/harbor/precedent-search/search-template/tasks/<task_name> \
+  -p out/harbor/precedent-search/tc-precedence-search/tasks/<task_name> \
   -a gemini-cli -m gemini/gemini-pro
 ```
 
@@ -59,7 +59,7 @@ It uses the same underlying scoring logic (`utils.py`) as the online verifier.
 
 **Inputs:**
 - `out/harbor/precedent-search/preds/*.json`: The collected JSON results.
-- `assets/precedent-search/rubric.csv`: The scoring rules.
+- `assets/hard/rubric.csv`: The scoring rules.
 - `src/pbench_eval/utils.py`: The scoring logic.
 
 **Outputs:**
