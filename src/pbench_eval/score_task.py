@@ -29,8 +29,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tabulate import tabulate
+import sys
 
-import pbench
+# Hack: Ensure project root is in sys.path if pbench is not installed
+try:
+    import pbench
+except ImportError:
+    repo_root = Path(__file__).resolve().parents[2]
+    sys.path.append(str(repo_root / "src"))
+    import pbench
 from pbench_eval.utils import scorer_categorical, scorer_pymatgen, scorer_si, score_value
 
 logger = logging.getLogger(__name__)
@@ -389,8 +396,8 @@ def main() -> None:
     parser.add_argument(
         "--rubric_csv_filename",
         type=str,
-        default="rubric.csv",
-        help="Filename of the rubric CSV file (default: rubric.csv)",
+        default=None,
+        help="Filename of the rubric CSV file (default: rubric.csv or 'assets/hard/rubric.csv' for precedent-search)",
     )
     parser.add_argument(
         "--analyze",
@@ -443,7 +450,17 @@ def main() -> None:
     scores_dir.mkdir(parents=True, exist_ok=True)
 
     # Score predictions
-    rubric_path = pbench.ASSETS_DIR / args.domain / args.rubric_csv_filename
+    rubric_arg = Path(args.rubric_csv_filename) if args.rubric_csv_filename else None
+    
+    if rubric_arg and rubric_arg.exists():
+        rubric_path = rubric_arg
+    elif args.domain == "precedent-search":
+        # Special case for precedent search
+        rubric_path = pbench.ASSETS_DIR / "hard" / "rubric.csv" 
+    else:
+        # Default behavior
+        filename = args.rubric_csv_filename or "rubric.csv"
+        rubric_path = pbench.ASSETS_DIR / args.domain / filename
     scored_df = score_predictions(preds_df, rubric_path, output_path)
 
     # Analyze scores by material and property
