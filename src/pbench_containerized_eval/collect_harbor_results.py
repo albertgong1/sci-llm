@@ -5,7 +5,7 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description="Collect Harbor results into pbench format.")
     parser.add_argument("--trials-dir", type=Path, default="trials")
-    parser.add_argument("--output-dir", type=Path, default="out/harbor/precedent-search/preds")
+    parser.add_argument("--output-dir", type=Path, required=True, help="Directory to save collected JSONs")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -37,6 +37,12 @@ def main():
         
         pbench_records = []
         for row in rows:
+            # pred_raw can be None if no prediction was matched
+            pred_raw = row.get("pred_raw") or {}
+
+            # Fallback to 'value' if 'value_string' is missing (compatibility with extraction task)
+            pred_val_str = pred_raw.get("value_string") or pred_raw.get("value") or ""
+
             record = {
                 "refno": details.get("refno", "unknown"),
                 "material": row["material"],
@@ -51,10 +57,10 @@ def main():
                 },
                 "rubric": row.get("rubric"),
                 "response": {
-                    "pred": row.get("pred_raw", {}).get("value_string", ""),
-                    "source_doi": row.get("pred_raw", {}).get("source_doi"),
-                    "conditions": row.get("pred_raw", {}).get("conditions"),
-                    "related_materials": row.get("pred_raw", {}).get("related_materials"),
+                    "pred": pred_val_str,
+                    "source_doi": pred_raw.get("source_doi"),
+                    "conditions": pred_raw.get("conditions"),
+                    "related_materials": pred_raw.get("related_materials"),
                 },
                 # Add metadata to enable filtering in score_task.py
                 "metadata": {

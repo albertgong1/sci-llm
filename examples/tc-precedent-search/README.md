@@ -86,9 +86,12 @@ Consolidate the results from the `trials/` directory into a clean format for ana
 **Command:**
 ```bash
 # From the root
-python src/pbench_containerized_eval/collect_harbor_results.py
+python src/pbench_containerized_eval/collect_harbor_results.py \
+  --output-dir out/harbor/precedent-search/preds
 ```
 *(Note: This script typically looks in `trials/` and aggregates results based on the task metadata.)*
+
+- `--output-dir` is required. This is where the collected results will be saved.
 
 **Outputs:**
 - `out/harbor/precedent-search/preds/*.json`: Consolidated prediction files.
@@ -106,7 +109,7 @@ python src/pbench_eval/score_task.py \
 ```
 
 **Inputs:**
-- `out/harbor/precedent-search/preds/*.json`: The collected JSON results.
+- `out/harbor/precedent-search/preds/*.json`: The collected JSON results will be used by default if no `--input_csv` is specified.
 - `assets/hard/rubric.csv`: The scoring rubric.
 - `src/pbench_eval/utils.py`: The scoring logic.
 
