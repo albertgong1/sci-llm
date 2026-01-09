@@ -68,13 +68,13 @@ def build_task(task_dir: Path, row: dict[str, str], task_name: str) -> None:
         },
         {
             "material": material,
-            "property_name": "highest_tc",
+            "property_name": "tc",
             "property_value": highest_tc,
             "rubric": "categorical" if highest_tc == "N/A" else "0.1% SI"
         },
         {
             "material": material,
-            "property_name": "lowest_tcn",
+            "property_name": "tcn",
             "property_value": lowest_tcn,
             "rubric": "categorical" if lowest_tcn == "N/A" else "0.1% SI"
         }

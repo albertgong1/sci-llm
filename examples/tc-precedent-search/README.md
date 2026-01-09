@@ -47,8 +47,8 @@ python prepare_precedent_tasks.py --force --write-job-config
 - `search-template/`: Template files for the tasks.
 
 **Outputs:**
-- `out/harbor/precedent-search/tc-precedent-search/tasks/`: Directory containing one task folder per material.
-- `out/harbor/precedent-search/tc-precedent-search/job.yaml`: Job configuration file.
+- `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`: Directory containing one task folder per material.
+- `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/job.yaml`: Job configuration file.
 
 > **Note on Docker Image Rebuilding:**
 > Running this step creates fresh `Dockerfile`s in each task's `environment/` directory. When you run Step 3 (trials), Harbor will detect these new Dockerfiles and rebuild the Docker images. However, once built, these images are cached and reused for subsequent trial runs unless you re-run this step or modify the Dockerfile template.
@@ -90,6 +90,8 @@ python examples/harbor-workspace/collect_harbor_results.py
 ```
 *(Note: This script typically looks in `trials/` and aggregates results based on the task metadata.)*
 
+Optional: pass `--output-dir` to override the default output location.
+
 **Outputs:**
 - `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: Consolidated prediction files.
 
@@ -119,7 +121,7 @@ python src/pbench_eval/score_task.py \
 # Ensure you are running in an environment with 'pymatgen' and 'pandas' installed
 PYTHONPATH=src python src/pbench_eval/score_task.py \
   --domain precedent-search \
-  --output_dir out/harbor \
+  --output_dir examples/harbor-workspace/out/harbor \
   --analyze \
   --split ""
 ```

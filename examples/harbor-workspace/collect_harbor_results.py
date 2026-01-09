@@ -1,9 +1,12 @@
 """Collect Harbor verifier outputs into PBench-style prediction JSON files.
 
 Usage:
+  uv run python examples/harbor-workspace/collect_harbor_results.py
   uv run python examples/harbor-workspace/collect_harbor_results.py \
-    --trials-dir trials \
-    --output-dir out/harbor/precedent-search/preds
+    --workspace /path/to/workspace
+  uv run python examples/harbor-workspace/collect_harbor_results.py \
+    --trials-dir /path/to/trials \
+    --output-dir /path/to/out/harbor/precedent-search/preds
 
 This script reads `verifier/details.json` from each trial and writes one JSON file
 per trial with PBench-style records (refno/material/property_name/true/pred/response).
@@ -82,6 +85,12 @@ def main() -> int:
 
         pbench_records = []
         for row in rows:
+            # pred_raw can be None if no prediction was matched
+            pred_raw = row.get("pred_raw") or {}
+
+            # Fallback to 'value' if 'value_string' is missing (compatibility with extraction task)
+            pred_val_str = pred_raw.get("value_string") or pred_raw.get("value") or ""
+
             record = {
                 "refno": details.get("refno", "unknown"),
                 "material": row["material"],
@@ -90,12 +99,10 @@ def main() -> int:
                 "pred": {"value": row["pred_value"], "unit": row["pred_unit"]},
                 "rubric": row.get("rubric"),
                 "response": {
-                    "pred": row.get("pred_raw", {}).get("value_string", ""),
-                    "source_doi": row.get("pred_raw", {}).get("source_doi"),
-                    "conditions": row.get("pred_raw", {}).get("conditions"),
-                    "related_materials": row.get("pred_raw", {}).get(
-                        "related_materials"
-                    ),
+                    "pred": pred_val_str,
+                    "source_doi": pred_raw.get("source_doi"),
+                    "conditions": pred_raw.get("conditions"),
+                    "related_materials": pred_raw.get("related_materials"),
                 },
                 # Add metadata to enable filtering in score_task.py
                 "metadata": {
