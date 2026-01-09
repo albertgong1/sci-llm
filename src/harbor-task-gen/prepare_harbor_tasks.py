@@ -10,26 +10,33 @@ each with:
 The source of truth for the benchmark is the Hugging Face dataset
 `kilian-group/supercon-mini-v2`, grouped by `refno` (one Harbor task per paper).
 
-By default this script writes tasks under `out/harbor/supercon-mini-v2/<task>/<template>/` so the
-repository doesn't contain a persistent `harbor/` directory until you build.
+Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
+and write a `registry.json` so Harbor can pull tasks directly from the Hub.
+
+By default this script writes tasks under
+`examples/harbor-workspace/out/harbor/supercon-mini-v2/<task>/<template>/` so the
+repository stays clean until you build.
 
 Example (from repo root):
     # Default template is `ground-template`.
-    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --force
-    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
       -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
 
-    # To use the question-based template:
-    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --template prompted-template --force
-    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/prompted-template/job.yaml -a oracle
+    # To use the guided template:
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
+      --task tc --template ground-template-easy --force
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini-v2/ground-template-easy/job.yaml -a oracle
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
+import os
 import re
 import shutil
 import textwrap
@@ -38,6 +45,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, cast
 
 from datasets import load_dataset
+from harbor.models.task.paths import TaskPaths
+from huggingface_hub import HfApi
 
 
 def repo_root() -> Path:
@@ -45,12 +54,23 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def default_workspace_root() -> Path:
+    """Return the default Harbor workspace location."""
+    return repo_root() / "examples" / "harbor-workspace"
+
+
+def workspace_root() -> Path:
+    """Return the configured Harbor workspace root."""
+    return _WORKSPACE_ROOT or default_workspace_root()
+
+
 def templates_dir() -> Path:
     """Return the directory containing files copied into generated Harbor tasks."""
-    return Path(__file__).parent / _TEMPLATES_SUBDIR
+    return workspace_root() / _TEMPLATES_SUBDIR
 
 
 _TEMPLATES_SUBDIR = "ground-template"
+_WORKSPACE_ROOT: Path | None = None
 
 _TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
     # Default task: superconducting critical temperature recommended for the sample.
@@ -59,12 +79,12 @@ _TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
 
 
 def read_template(relative_path: str) -> str:
-    """Read a template file relative to `task_templates/`."""
+    """Read a template file relative to the workspace template folder."""
     return (templates_dir() / relative_path).read_text()
 
 
 def copy_template(relative_path: str, dest_path: Path) -> None:
-    """Copy a template file relative to `task_templates/` to the destination path."""
+    """Copy a template file relative to the workspace template folder."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(templates_dir() / relative_path, dest_path)
 
@@ -215,11 +235,15 @@ def flatten_dataset(
     return grouped
 
 
-def write_job_config(tasks_dir: Path, job_path: Path) -> None:
+def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> None:
     """Write a Harbor job YAML pointing at the generated tasks."""
-    tasks_rel = (
-        tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
-    )
+    if tasks_dir.is_absolute():
+        try:
+            tasks_rel = tasks_dir.relative_to(workspace)
+        except ValueError:
+            tasks_rel = tasks_dir
+    else:
+        tasks_rel = tasks_dir
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
@@ -369,18 +393,30 @@ EOF
 
 
 def main() -> None:
-    """Generate Harbor tasks for the benchmark."""
+    """Generate Harbor tasks for the benchmark.
+
+    This is a multi-step pipeline:
+      1) Load the HF dataset (refno -> properties).
+      2) Flatten rows into per-paper questions.
+      3) Materialize Harbor tasks on disk (env/tests/solution + prompt).
+      4) Optionally upload tasks to HF and write a registry.json.
+    """
     global _TEMPLATES_SUBDIR
 
     parser = argparse.ArgumentParser(
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
     parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="Workspace root for templates/data/output (default: examples/harbor-workspace).",
+    )
+    parser.add_argument(
         "--template",
         type=str,
         default="ground-template",
-        choices=["ground-template", "prompted-template"],
-        help="Which template bundle to use under src/pbench_containerized_eval/.",
+        help="Template folder under the workspace (default: ground-template).",
     )
     parser.add_argument(
         "--task",
@@ -391,14 +427,17 @@ def main() -> None:
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path(__file__).parent / "data" / "Paper_DB",
-        help="Directory containing PDFs named <refno>.pdf.",
+        default=None,
+        help="Directory containing PDFs named <refno>.pdf (default: <workspace>/data/Paper_DB).",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=repo_root() / "out" / "harbor" / "supercon-mini-v2",
-        help="Where to write generated Harbor tasks (default: out/harbor/supercon-mini-v2).",
+        default=None,
+        help=(
+            "Where to write generated Harbor tasks "
+            "(default: <workspace>/out/harbor/supercon-mini-v2)."
+        ),
     )
     parser.add_argument(
         "--limit",
@@ -422,9 +461,99 @@ def main() -> None:
         action="store_true",
         help="Also emit a Harbor job config pointing at the generated tasks.",
     )
+    parser.add_argument(
+        "--upload-hf",
+        action="store_true",
+        help="Upload the generated tasks to a Hugging Face repo (writes registry.json).",
+    )
+    parser.add_argument(
+        "--hf-repo-id",
+        default=None,
+        help="Hugging Face repo id, e.g. ORG/supercon-harbor-tasks.",
+    )
+    parser.add_argument(
+        "--hf-repo-type",
+        default="dataset",
+        choices=["dataset", "model", "space"],
+        help="Hugging Face repo type (default: dataset).",
+    )
+    parser.add_argument(
+        "--hf-path-in-repo",
+        default="tasks",
+        help="Where to place task folders inside the repo (default: tasks).",
+    )
+    parser.add_argument(
+        "--hf-registry-path",
+        default="registry.json",
+        help="Registry JSON path inside the repo (default: registry.json).",
+    )
+    parser.add_argument(
+        "--hf-dataset-name",
+        default=None,
+        help="Dataset name in registry.json (default: repo id).",
+    )
+    parser.add_argument(
+        "--hf-dataset-version",
+        default="head",
+        help="Dataset version in registry.json (default: head).",
+    )
+    parser.add_argument(
+        "--hf-description",
+        default="Harbor tasks uploaded from a local tasks directory.",
+        help="Dataset description for registry.json.",
+    )
+    parser.add_argument(
+        "--hf-private",
+        action="store_true",
+        help="Create the repo as private if it does not exist.",
+    )
+    parser.add_argument(
+        "--hf-public",
+        action="store_true",
+        help="Create the repo as public if it does not exist.",
+    )
+    parser.add_argument(
+        "--hf-create",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Create the repo if it does not exist (default: create).",
+    )
+    parser.add_argument(
+        "--hf-no-input",
+        action="store_true",
+        help="Disable interactive prompts for HF upload settings.",
+    )
+    parser.add_argument(
+        "--hf-tasks-root",
+        default=None,
+        help="Override the tasks root to upload (default: generated tasks dir).",
+    )
     args = parser.parse_args()
 
+    resolved_workspace = (args.workspace or default_workspace_root()).resolve()
+    global _WORKSPACE_ROOT
+    _WORKSPACE_ROOT = resolved_workspace
     _TEMPLATES_SUBDIR = str(args.template)
+
+    if resolved_workspace.exists() and not resolved_workspace.is_dir():
+        raise SystemExit(f"--workspace must be a directory: {resolved_workspace}")
+    resolved_workspace.mkdir(parents=True, exist_ok=True)
+
+    if args.pdf_dir is None:
+        args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
+    if args.output_dir is None:
+        args.output_dir = resolved_workspace / "out" / "harbor" / "supercon-mini-v2"
+    if not args.pdf_dir.is_absolute():
+        args.pdf_dir = resolved_workspace / args.pdf_dir
+    if not args.output_dir.is_absolute():
+        args.output_dir = resolved_workspace / args.output_dir
+
+    template_root = templates_dir()
+    if not template_root.exists():
+        raise FileNotFoundError(
+            f"Template not found: {template_root}. "
+            "Create it under the workspace or pass --template."
+        )
 
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
@@ -446,7 +575,7 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = Path(__file__).parent / "rubric.csv"
+    rubric_path = resolved_workspace / "rubric.csv"
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
@@ -496,12 +625,238 @@ def main() -> None:
             rows=rows,
             rubric_mapping=rubric_mapping,
         )
-        print(f"Wrote task {task_id} -> {task_dir.relative_to(repo_root())}")
+        try:
+            task_rel = task_dir.relative_to(resolved_workspace)
+        except ValueError:
+            task_rel = task_dir
+        print(f"Wrote task {task_id} -> {task_rel}")
 
     if args.write_job_config:
         job_path = task_root / "job.yaml"
-        write_job_config(tasks_dir, job_path)
-        print(f"Wrote job config -> {job_path.relative_to(repo_root())}")
+        write_job_config(tasks_dir, job_path, workspace=resolved_workspace)
+        try:
+            job_rel = job_path.relative_to(resolved_workspace)
+        except ValueError:
+            job_rel = job_path
+        print(f"Wrote job config -> {job_rel}")
+
+    if args.upload_hf:
+        _upload_tasks_after_build(
+            args=args,
+            tasks_root=tasks_dir,
+        )
+
+
+def _infer_hf_token() -> str | None:
+    """Return an HF auth token from common environment variables."""
+    return (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+        or os.environ.get("HF_API_TOKEN")
+    )
+
+
+def _prompt_value(label: str, default: str | None = None) -> str:
+    """Prompt for a string value with an optional default."""
+    prompt = f"{label} [{default}]: " if default else f"{label}: "
+    value = input(prompt).strip()
+    return value or (default or "")
+
+
+def _resolve_tasks_root(path: Path) -> Path:
+    """Allow passing either the tasks root or its parent directory."""
+    if (path / "tasks").is_dir():
+        return path / "tasks"
+    return path
+
+
+def _collect_task_dirs(tasks_root: Path) -> list[Path]:
+    """Return Harbor-valid task directories under the tasks root."""
+    return [
+        child
+        for child in sorted(tasks_root.iterdir())
+        if child.is_dir() and TaskPaths(child).is_valid()
+    ]
+
+
+def _hf_repo_url(repo_id: str, repo_type: str) -> str:
+    """Return the https URL for a HF repo."""
+    base = "https://huggingface.co"
+    if repo_type == "dataset":
+        return f"{base}/datasets/{repo_id}"
+    if repo_type == "space":
+        return f"{base}/spaces/{repo_id}"
+    return f"{base}/{repo_id}"
+
+
+def _hf_git_url(repo_id: str, repo_type: str) -> str:
+    """Return the git URL for a HF repo."""
+    return f"{_hf_repo_url(repo_id, repo_type)}.git"
+
+
+def _hf_resolve_url(repo_id: str, repo_type: str, path_in_repo: str) -> str:
+    """Return a resolve URL for a file in a HF repo."""
+    return f"{_hf_repo_url(repo_id, repo_type)}/resolve/main/{path_in_repo}"
+
+
+def _build_registry(
+    *,
+    task_dirs: list[Path],
+    repo_id: str,
+    repo_type: str,
+    path_in_repo: str,
+    dataset_name: str,
+    dataset_version: str,
+    description: str,
+) -> list[dict[str, object]]:
+    """Build a Harbor registry.json payload for a list of tasks."""
+    git_url = _hf_git_url(repo_id, repo_type)
+    tasks = []
+    for task_dir in task_dirs:
+        task_path = (Path(path_in_repo) / task_dir.name).as_posix()
+        tasks.append(
+            {
+                "name": task_dir.name,
+                "git_url": git_url,
+                "git_commit_id": None,
+                "path": task_path,
+            }
+        )
+    return [
+        {
+            "name": dataset_name,
+            "version": dataset_version,
+            "description": description,
+            "tasks": tasks,
+        }
+    ]
+
+
+def upload_tasks_to_hf(
+    *,
+    tasks_root: Path,
+    repo_id: str,
+    repo_type: str = "dataset",
+    path_in_repo: str = "tasks",
+    registry_path: str = "registry.json",
+    dataset_name: str | None = None,
+    dataset_version: str = "head",
+    description: str = "Harbor tasks uploaded from a local tasks directory.",
+    create: bool = True,
+    private: bool | None = None,
+    token: str | None = None,
+) -> dict[str, str]:
+    """Upload Harbor tasks and registry.json to a Hugging Face repo.
+
+    Returns a small summary dict for logging.
+    """
+    resolved_root = _resolve_tasks_root(tasks_root).resolve()
+    if not resolved_root.exists():
+        raise FileNotFoundError(f"Tasks root not found: {resolved_root}")
+
+    task_dirs = _collect_task_dirs(resolved_root)
+    if not task_dirs:
+        raise SystemExit(f"No valid Harbor task folders found under {resolved_root}.")
+
+    dataset_name = dataset_name or repo_id
+    path_in_repo = str(path_in_repo).strip("/")
+    registry_path = str(registry_path).strip("/")
+
+    hf_token = token or _infer_hf_token()
+    api = HfApi(token=hf_token)
+
+    if create:
+        api.create_repo(
+            repo_id=str(repo_id),
+            repo_type=str(repo_type),
+            private=True if private is None else private,
+            exist_ok=True,
+        )
+    else:
+        try:
+            api.list_repo_files(repo_id=str(repo_id), repo_type=str(repo_type))
+        except Exception as exc:
+            raise SystemExit(f"Repo not found or not accessible: {repo_id}") from exc
+
+    api.upload_folder(
+        repo_id=str(repo_id),
+        repo_type=str(repo_type),
+        folder_path=str(resolved_root),
+        path_in_repo=path_in_repo or None,
+        commit_message=f"Upload Harbor tasks from {resolved_root.name}",
+        token=hf_token,
+    )
+
+    registry = _build_registry(
+        task_dirs=task_dirs,
+        repo_id=str(repo_id),
+        repo_type=str(repo_type),
+        path_in_repo=path_in_repo or ".",
+        dataset_name=dataset_name,
+        dataset_version=str(dataset_version),
+        description=str(description),
+    )
+
+    api.upload_file(
+        repo_id=str(repo_id),
+        repo_type=str(repo_type),
+        path_or_fileobj=io.BytesIO(json.dumps(registry, indent=2).encode("utf-8")),
+        path_in_repo=registry_path,
+        commit_message="Add/update Harbor registry.json",
+        token=hf_token,
+    )
+
+    return {
+        "task_count": str(len(task_dirs)),
+        "registry_url": _hf_resolve_url(str(repo_id), str(repo_type), registry_path),
+        "dataset_name": f"{dataset_name}@{dataset_version}",
+        "path_in_repo": path_in_repo or "/",
+    }
+
+
+def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> None:
+    """Handle HF upload configuration + calls after tasks are generated."""
+    if args.hf_private and args.hf_public:
+        raise SystemExit("Pass at most one of --hf-private/--hf-public.")
+
+    repo_id = args.hf_repo_id
+    if repo_id is None and not args.hf_no_input:
+        repo_id = _prompt_value("HF repo id (org/name)")
+
+    if repo_id is None:
+        raise SystemExit("--hf-repo-id is required when --upload-hf is set.")
+
+    if args.hf_tasks_root is not None:
+        tasks_root = Path(args.hf_tasks_root)
+        if not tasks_root.is_absolute():
+            tasks_root = workspace_root() / tasks_root
+
+    private: bool | None
+    if args.hf_private:
+        private = True
+    elif args.hf_public:
+        private = False
+    else:
+        private = None
+
+    summary = upload_tasks_to_hf(
+        tasks_root=tasks_root,
+        repo_id=str(repo_id),
+        repo_type=str(args.hf_repo_type),
+        path_in_repo=str(args.hf_path_in_repo),
+        registry_path=str(args.hf_registry_path),
+        dataset_name=args.hf_dataset_name or str(repo_id),
+        dataset_version=str(args.hf_dataset_version),
+        description=str(args.hf_description),
+        create=bool(args.hf_create),
+        private=private,
+    )
+
+    print(
+        f"Uploaded {summary['task_count']} tasks to {repo_id}:{summary['path_in_repo']}"
+    )
+    print(f"Registry URL: {summary['registry_url']}")
+    print(f"Dataset name: {summary['dataset_name']}")
 
 
 if __name__ == "__main__":
