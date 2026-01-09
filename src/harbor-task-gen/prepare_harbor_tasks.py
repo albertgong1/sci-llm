@@ -13,19 +13,21 @@ The source of truth for the benchmark is the Hugging Face dataset
 Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
 and write a `registry.json` so Harbor can pull tasks directly from the Hub.
 
-By default this script writes tasks under `out/harbor/supercon-mini-v2/<task>/<template>/` so the
-repository doesn't contain a persistent `harbor/` directory until you build.
+By default this script writes tasks under
+`examples/harbor-workspace/out/harbor/supercon-mini-v2/<task>/<template>/` so the
+repository stays clean until you build.
 
 Example (from repo root):
     # Default template is `ground-template`.
-    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --force
-    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
       -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
 
-    # To use the question-based template:
-    uv run python src/pbench_containerized_eval/prepare_harbor_tasks.py --task tc --template prompted-template --force
-    uv run python src/pbench_containerized_eval/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/prompted-template/job.yaml -a oracle
+    # To use the guided template:
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
+      --task tc --template ground-template-easy --force
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
+      -c out/harbor/supercon-mini-v2/ground-template-easy/job.yaml -a oracle
 """
 
 from __future__ import annotations
@@ -52,12 +54,23 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def default_workspace_root() -> Path:
+    """Return the default Harbor workspace location."""
+    return repo_root() / "examples" / "harbor-workspace"
+
+
+def workspace_root() -> Path:
+    """Return the configured Harbor workspace root."""
+    return _WORKSPACE_ROOT or default_workspace_root()
+
+
 def templates_dir() -> Path:
     """Return the directory containing files copied into generated Harbor tasks."""
-    return Path(__file__).parent / _TEMPLATES_SUBDIR
+    return workspace_root() / _TEMPLATES_SUBDIR
 
 
 _TEMPLATES_SUBDIR = "ground-template"
+_WORKSPACE_ROOT: Path | None = None
 
 _TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
     # Default task: superconducting critical temperature recommended for the sample.
@@ -66,12 +79,12 @@ _TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
 
 
 def read_template(relative_path: str) -> str:
-    """Read a template file relative to `task_templates/`."""
+    """Read a template file relative to the workspace template folder."""
     return (templates_dir() / relative_path).read_text()
 
 
 def copy_template(relative_path: str, dest_path: Path) -> None:
-    """Copy a template file relative to `task_templates/` to the destination path."""
+    """Copy a template file relative to the workspace template folder."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(templates_dir() / relative_path, dest_path)
 
@@ -222,11 +235,15 @@ def flatten_dataset(
     return grouped
 
 
-def write_job_config(tasks_dir: Path, job_path: Path) -> None:
+def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> None:
     """Write a Harbor job YAML pointing at the generated tasks."""
-    tasks_rel = (
-        tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
-    )
+    if tasks_dir.is_absolute():
+        try:
+            tasks_rel = tasks_dir.relative_to(workspace)
+        except ValueError:
+            tasks_rel = tasks_dir
+    else:
+        tasks_rel = tasks_dir
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
@@ -390,11 +407,16 @@ def main() -> None:
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
     parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="Workspace root for templates/data/output (default: examples/harbor-workspace).",
+    )
+    parser.add_argument(
         "--template",
         type=str,
         default="ground-template",
-        choices=["ground-template", "prompted-template"],
-        help="Which template bundle to use under src/pbench_containerized_eval/.",
+        help="Template folder under the workspace (default: ground-template).",
     )
     parser.add_argument(
         "--task",
@@ -405,14 +427,17 @@ def main() -> None:
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path(__file__).parent / "data" / "Paper_DB",
-        help="Directory containing PDFs named <refno>.pdf.",
+        default=None,
+        help="Directory containing PDFs named <refno>.pdf (default: <workspace>/data/Paper_DB).",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=repo_root() / "out" / "harbor" / "supercon-mini-v2",
-        help="Where to write generated Harbor tasks (default: out/harbor/supercon-mini-v2).",
+        default=None,
+        help=(
+            "Where to write generated Harbor tasks "
+            "(default: <workspace>/out/harbor/supercon-mini-v2)."
+        ),
     )
     parser.add_argument(
         "--limit",
@@ -505,7 +530,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    resolved_workspace = (args.workspace or default_workspace_root()).resolve()
+    global _WORKSPACE_ROOT
+    _WORKSPACE_ROOT = resolved_workspace
     _TEMPLATES_SUBDIR = str(args.template)
+
+    if resolved_workspace.exists() and not resolved_workspace.is_dir():
+        raise SystemExit(f"--workspace must be a directory: {resolved_workspace}")
+    resolved_workspace.mkdir(parents=True, exist_ok=True)
+
+    if args.pdf_dir is None:
+        args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
+    if args.output_dir is None:
+        args.output_dir = resolved_workspace / "out" / "harbor" / "supercon-mini-v2"
+    if not args.pdf_dir.is_absolute():
+        args.pdf_dir = resolved_workspace / args.pdf_dir
+    if not args.output_dir.is_absolute():
+        args.output_dir = resolved_workspace / args.output_dir
+
+    template_root = templates_dir()
+    if not template_root.exists():
+        raise FileNotFoundError(
+            f"Template not found: {template_root}. "
+            "Create it under the workspace or pass --template."
+        )
 
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
@@ -527,7 +575,7 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = Path(__file__).parent / "rubric.csv"
+    rubric_path = resolved_workspace / "rubric.csv"
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
@@ -577,12 +625,20 @@ def main() -> None:
             rows=rows,
             rubric_mapping=rubric_mapping,
         )
-        print(f"Wrote task {task_id} -> {task_dir.relative_to(repo_root())}")
+        try:
+            task_rel = task_dir.relative_to(resolved_workspace)
+        except ValueError:
+            task_rel = task_dir
+        print(f"Wrote task {task_id} -> {task_rel}")
 
     if args.write_job_config:
         job_path = task_root / "job.yaml"
-        write_job_config(tasks_dir, job_path)
-        print(f"Wrote job config -> {job_path.relative_to(repo_root())}")
+        write_job_config(tasks_dir, job_path, workspace=resolved_workspace)
+        try:
+            job_rel = job_path.relative_to(resolved_workspace)
+        except ValueError:
+            job_rel = job_path
+        print(f"Wrote job config -> {job_rel}")
 
     if args.upload_hf:
         _upload_tasks_after_build(
@@ -773,7 +829,7 @@ def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> 
     if args.hf_tasks_root is not None:
         tasks_root = Path(args.hf_tasks_root)
         if not tasks_root.is_absolute():
-            tasks_root = repo_root() / tasks_root
+            tasks_root = workspace_root() / tasks_root
 
     private: bool | None
     if args.hf_private:

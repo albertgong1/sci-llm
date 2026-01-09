@@ -1,7 +1,7 @@
 """Collect Harbor verifier outputs into PBench-style prediction JSON files.
 
 Usage:
-  uv run python src/pbench_containerized_eval/collect_harbor_results.py \
+  uv run python examples/harbor-workspace/collect_harbor_results.py \
     --trials-dir trials \
     --output-dir out/harbor/precedent-search/preds
 
@@ -14,16 +14,44 @@ import json
 from pathlib import Path
 
 
+def default_workspace_root() -> Path:
+    """Return the workspace root (directory containing this script)."""
+    return Path(__file__).resolve().parent
+
+
 def main() -> int:
     """Collect trial results and write one JSON file per trial."""
     parser = argparse.ArgumentParser(
         description="Collect Harbor results into PBench format."
     )
-    parser.add_argument("--trials-dir", type=Path, default="trials")
     parser.add_argument(
-        "--output-dir", type=Path, default="out/harbor/precedent-search/preds"
+        "--workspace",
+        type=Path,
+        default=None,
+        help="Workspace root (default: this script's directory).",
+    )
+    parser.add_argument(
+        "--trials-dir",
+        type=Path,
+        default=None,
+        help="Trials directory (default: <workspace>/trials).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Output directory (default: <workspace>/out/harbor/precedent-search/preds).",
     )
     args = parser.parse_args()
+
+    workspace = (args.workspace or default_workspace_root()).resolve()
+    if args.trials_dir is None:
+        args.trials_dir = workspace / "trials"
+    if args.output_dir is None:
+        args.output_dir = workspace / "out" / "harbor" / "precedent-search" / "preds"
+
+    if not args.trials_dir.exists():
+        raise SystemExit(f"Trials directory not found: {args.trials_dir}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 

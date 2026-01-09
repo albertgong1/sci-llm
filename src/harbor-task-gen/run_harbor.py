@@ -19,7 +19,7 @@ Extras bundled into this wrapper:
   `--push-run-to-hf` uploads that bundle to a HF dataset repo.
 
 Example:
-    uv run python src/pbench_containerized_eval/run_harbor.py trials start \\
+    uv run python src/harbor-task-gen/run_harbor.py trials start \\
       -p out/harbor/supercon-mini-v2/ground-template/tasks/jac2980051 \\
       -a gemini-cli -m gemini/gemini-2.5-flash
 
@@ -48,6 +48,26 @@ from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def _default_workspace_root() -> Path:
+    return _repo_root() / "examples" / "harbor-workspace"
+
+
+def _resolve_workspace_root(value: str | None) -> Path:
+    root = Path(value).expanduser() if value else _default_workspace_root()
+    return root.resolve()
+
+
+def _extract_workspace_arg(argv: list[str]) -> tuple[list[str], Path, bool]:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--workspace", type=str, default=None)
+    args, remaining = parser.parse_known_args(argv)
+    return (
+        remaining,
+        _resolve_workspace_root(args.workspace),
+        args.workspace is not None,
+    )
 
 
 def _parse_dotenv(path: Path) -> dict[str, str]:
@@ -114,13 +134,15 @@ class PostRunPlan:
         return self.compile_run or self.push_to_hf
 
 
-def _extract_post_run_args(argv: list[str]) -> tuple[list[str], PostRunPlan]:
+def _extract_post_run_args(
+    argv: list[str], *, workspace: Path
+) -> tuple[list[str], PostRunPlan]:
     """Strip post-run flags from argv and return a structured plan."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--compile-run", action="store_true")
     parser.add_argument(
         "--compile-out-dir",
-        default=str(_repo_root() / "out" / "harbor-runs"),
+        default=str(workspace / "out" / "harbor-runs"),
     )
     parser.add_argument("--compile-name", default=None)
     parser.add_argument("--compile-force", action="store_true")
@@ -186,9 +208,34 @@ def main() -> int:
     """Run Harbor or helper utilities with env prep + a small failure summary."""
     argv = sys.argv[1:]
     if not argv:
-        print("Usage: run_harbor.py <harbor args...>", file=sys.stderr)
+        print(
+            "Usage: run_harbor.py [--workspace PATH] <harbor args...>", file=sys.stderr
+        )
         print(
             "Example: run_harbor.py trials start -p <task> -a gemini-cli -m ...",
+            file=sys.stderr,
+        )
+        print(
+            "Default workspace: examples/harbor-workspace (override with --workspace).",
+            file=sys.stderr,
+        )
+        print(
+            "Utilities: run_harbor.py compile-run ... | run_harbor.py push-run-to-hf ...",
+            file=sys.stderr,
+        )
+        return 2
+
+    argv, workspace, workspace_explicit = _extract_workspace_arg(argv)
+    if not argv:
+        print(
+            "Usage: run_harbor.py [--workspace PATH] <harbor args...>", file=sys.stderr
+        )
+        print(
+            "Example: run_harbor.py trials start -p <task> -a gemini-cli -m ...",
+            file=sys.stderr,
+        )
+        print(
+            "Default workspace: examples/harbor-workspace (override with --workspace).",
             file=sys.stderr,
         )
         print(
@@ -198,11 +245,23 @@ def main() -> int:
         return 2
 
     if argv[0] == "compile-run":
-        return compile_run_cli(argv[1:])
+        forwarded = (
+            [*argv[1:], "--workspace", str(workspace)]
+            if workspace_explicit
+            else argv[1:]
+        )
+        return compile_run_cli(forwarded)
     if argv[0] == "push-run-to-hf":
-        return push_run_to_hf_cli(argv[1:])
-
-    argv, post_run = _extract_post_run_args(argv)
+        forwarded = (
+            [*argv[1:], "--workspace", str(workspace)]
+            if workspace_explicit
+            else argv[1:]
+        )
+        return push_run_to_hf_cli(forwarded)
+    if workspace.exists() and not workspace.is_dir():
+        raise SystemExit(f"--workspace must be a directory: {workspace}")
+    workspace.mkdir(parents=True, exist_ok=True)
+    argv, post_run = _extract_post_run_args(argv, workspace=workspace)
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
 
@@ -236,9 +295,9 @@ def main() -> int:
     argv = _rewrite_gemini_model(argv)
     argv = _apply_modal_defaults(argv, modal_requested)
     argv = _rewrite_env_flag(argv)
-    argv = _apply_hf_args(argv, hf_args)
+    argv = _apply_hf_args(argv, hf_args, workspace=workspace)
 
-    run_roots = _run_roots_from_args(argv, repo=_repo_root())
+    run_roots = _run_roots_from_args(argv, workspace=workspace)
     pre_run_mtime = _latest_run_mtime(run_roots) if post_run.enabled else None
 
     env = os.environ.copy()
@@ -251,16 +310,16 @@ def main() -> int:
             else src_path
         )
     command = [sys.executable, "-m", "harbor.cli.main", *argv]
-    result = subprocess.run(command, check=False, cwd=_repo_root(), env=env)
+    result = subprocess.run(command, check=False, cwd=workspace, env=env)
     if result.returncode != 0:
-        _summarize_failure(argv, repo=_repo_root())
+        _summarize_failure(argv, workspace=workspace)
 
     exit_code = int(result.returncode)
     if post_run.enabled:
         exit_code = _run_post_actions(
             argv=argv,
             plan=post_run,
-            repo=_repo_root(),
+            workspace=workspace,
             pre_run_mtime=pre_run_mtime,
             exit_code=exit_code,
         )
@@ -333,13 +392,13 @@ def _should_force_delete(argv: list[str]) -> bool:
     return "jobs" in argv or "trials" in argv
 
 
-def _run_roots_from_args(argv: list[str], *, repo: Path) -> list[Path]:
+def _run_roots_from_args(argv: list[str], *, workspace: Path) -> list[Path]:
     """Infer which Harbor output roots (jobs/trials) a command will use."""
     if "trials" in argv and "jobs" not in argv:
-        return [repo / "trials"]
+        return [workspace / "trials"]
     if "jobs" in argv or "run" in argv:
-        return [repo / "jobs"]
-    return [repo / "jobs", repo / "trials"]
+        return [workspace / "jobs"]
+    return [workspace / "jobs", workspace / "trials"]
 
 
 def _latest_run_mtime(roots: Iterable[Path]) -> float | None:
@@ -377,7 +436,7 @@ def _run_post_actions(
     *,
     argv: list[str],
     plan: PostRunPlan,
-    repo: Path,
+    workspace: Path,
     pre_run_mtime: float | None,
     exit_code: int,
 ) -> int:
@@ -385,7 +444,7 @@ def _run_post_actions(
     if not plan.enabled:
         return exit_code
 
-    run_root_candidates = _run_roots_from_args(argv, repo=repo)
+    run_root_candidates = _run_roots_from_args(argv, workspace=workspace)
     run_dir = _select_run_dir_after(run_root_candidates, pre_run_mtime)
     if run_dir is None:
         print("Post-run hook: no Harbor run directory found.", file=sys.stderr)
@@ -393,7 +452,7 @@ def _run_post_actions(
 
     compile_out_dir = plan.compile_out_dir
     if not compile_out_dir.is_absolute():
-        compile_out_dir = (repo / compile_out_dir).resolve()
+        compile_out_dir = (workspace / compile_out_dir).resolve()
 
     try:
         compiled = compile_run(
@@ -527,7 +586,9 @@ def _extract_hf_args(argv: list[str]) -> tuple[list[str], dict[str, str]]:
     return cleaned, hf_args
 
 
-def _apply_hf_args(argv: list[str], hf_args: dict[str, str]) -> list[str]:
+def _apply_hf_args(
+    argv: list[str], hf_args: dict[str, str], *, workspace: Path
+) -> list[str]:
     """Rewrite HF task flags into Harbor CLI arguments."""
     if not hf_args:
         return argv
@@ -576,6 +637,7 @@ def _apply_hf_args(argv: list[str], hf_args: dict[str, str]) -> list[str]:
                 repo_type=repo_type,
                 registry_path=registry_path,
                 token=_infer_hf_token(),
+                workspace=workspace,
             )
         if registry_path_local is not None:
             return [
@@ -673,7 +735,12 @@ def _download_hf_snapshot(
 
 
 def _download_hf_registry(
-    *, repo_id: str, repo_type: str, registry_path: str, token: str | None
+    *,
+    repo_id: str,
+    repo_type: str,
+    registry_path: str,
+    token: str | None,
+    workspace: Path,
 ) -> Path | None:
     """Download registry.json from HF and return a local path, if possible."""
     try:
@@ -694,7 +761,7 @@ def _download_hf_registry(
     if token:
         registry_data = _rewrite_registry_git_urls(registry_data, token=token)
 
-    cache_dir = _repo_root() / "out" / "harbor" / "registry-cache"
+    cache_dir = workspace / "out" / "harbor" / "registry-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     safe_repo = repo_id.replace("/", "__")
     local_path = cache_dir / f"{safe_repo}__{Path(registry_path).name}"
@@ -748,10 +815,10 @@ def _find_latest_run_dir(base: Path) -> Path | None:
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
-def _summarize_failure(argv: list[str], repo: Path) -> None:
+def _summarize_failure(argv: list[str], workspace: Path) -> None:
     """Print a small hint about where Harbor wrote errors."""
     if "jobs" in argv or "run" in argv:
-        jobs_dir = repo / "jobs"
+        jobs_dir = workspace / "jobs"
         latest = _find_latest_run_dir(jobs_dir)
         if not latest:
             return
@@ -797,7 +864,7 @@ def _summarize_failure(argv: list[str], repo: Path) -> None:
         return
 
     if "trials" in argv:
-        trials_dir = repo / "trials"
+        trials_dir = workspace / "trials"
         latest = _find_latest_run_dir(trials_dir)
         if not latest:
             return
@@ -1171,7 +1238,7 @@ def _maybe_upload_root_readme(
     readme = """\
 # Harbor run artifacts
 
-This dataset repository stores Harbor job/trial artifacts for the `src/pbench_containerized_eval` benchmark.
+This dataset repository stores Harbor job/trial artifacts for the `src/harbor-task-gen` benchmark.
 
 ## Layout
 
@@ -1265,6 +1332,12 @@ def compile_run_cli(argv: list[str]) -> int:
         description="Compile a Harbor job/trial run directory into a portable bundle."
     )
     parser.add_argument(
+        "--workspace",
+        type=str,
+        default=None,
+        help="Workspace root that contains jobs/ and trials/ (default: examples/harbor-workspace).",
+    )
+    parser.add_argument(
         "--run-dir",
         type=str,
         default=None,
@@ -1273,8 +1346,8 @@ def compile_run_cli(argv: list[str]) -> int:
     parser.add_argument(
         "--out-dir",
         type=str,
-        default=str(_repo_root() / "out" / "harbor-runs"),
-        help="Where to write bundled run folders (default: out/harbor-runs).",
+        default=None,
+        help="Where to write bundled run folders (default: <workspace>/out/harbor-runs).",
     )
     parser.add_argument(
         "--name",
@@ -1288,20 +1361,22 @@ def compile_run_cli(argv: list[str]) -> int:
         help="Overwrite the output bundle directory if it already exists.",
     )
     args = parser.parse_args(argv)
+    workspace = _resolve_workspace_root(args.workspace)
+    out_dir = Path(args.out_dir) if args.out_dir else workspace / "out" / "harbor-runs"
 
-    jobs_dir = _repo_root() / "jobs"
-    trials_dir = _repo_root() / "trials"
+    jobs_dir = workspace / "jobs"
+    trials_dir = workspace / "trials"
 
     if args.run_dir is None:
         run_dir = _find_latest_run_dir_in(jobs_dir, trials_dir)
     else:
         run_dir = Path(args.run_dir)
         if not run_dir.is_absolute():
-            run_dir = (_repo_root() / run_dir).resolve()
+            run_dir = (workspace / run_dir).resolve()
 
     compiled = compile_run(
         run_dir=run_dir,
-        out_dir=Path(args.out_dir),
+        out_dir=out_dir,
         name=args.name,
         force=bool(args.force),
     )
@@ -1314,6 +1389,12 @@ def push_run_to_hf_cli(argv: list[str]) -> int:
     """CLI entrypoint for compiling + uploading a run bundle to HF."""
     parser = argparse.ArgumentParser(
         description="Compile and upload Harbor run artifacts to the Hugging Face Hub."
+    )
+    parser.add_argument(
+        "--workspace",
+        type=str,
+        default=None,
+        help="Workspace root that contains jobs/ and trials/ (default: examples/harbor-workspace).",
     )
     parser.add_argument(
         "--repo-id",
@@ -1338,8 +1419,8 @@ def push_run_to_hf_cli(argv: list[str]) -> int:
     )
     parser.add_argument(
         "--out-dir",
-        default=str(_repo_root() / "out" / "harbor-runs"),
-        help="Where to write compiled bundles (default: out/harbor-runs).",
+        default=None,
+        help="Where to write compiled bundles (default: <workspace>/out/harbor-runs).",
     )
     parser.add_argument(
         "--path-in-repo",
@@ -1372,6 +1453,8 @@ def push_run_to_hf_cli(argv: list[str]) -> int:
         help="Overwrite local bundle directory if it already exists.",
     )
     args = parser.parse_args(argv)
+    workspace = _resolve_workspace_root(args.workspace)
+    out_dir = Path(args.out_dir) if args.out_dir else workspace / "out" / "harbor-runs"
 
     if args.private and args.public:
         raise SystemExit("Pass at most one of --private/--public.")
@@ -1389,7 +1472,7 @@ def push_run_to_hf_cli(argv: list[str]) -> int:
     if args.bundle_dir:
         bundle_dir = Path(args.bundle_dir)
         if not bundle_dir.is_absolute():
-            bundle_dir = _repo_root() / bundle_dir
+            bundle_dir = workspace / bundle_dir
         bundle_dir = bundle_dir.resolve()
         if not bundle_dir.exists():
             raise FileNotFoundError(f"--bundle-dir not found: {bundle_dir}")
@@ -1397,15 +1480,13 @@ def push_run_to_hf_cli(argv: list[str]) -> int:
         if args.run_dir:
             run_dir = Path(args.run_dir)
             if not run_dir.is_absolute():
-                run_dir = _repo_root() / run_dir
+                run_dir = workspace / run_dir
             run_dir = run_dir.resolve()
         else:
-            run_dir = _find_latest_run_dir_in(
-                _repo_root() / "jobs", _repo_root() / "trials"
-            )
+            run_dir = _find_latest_run_dir_in(workspace / "jobs", workspace / "trials")
         compiled = compile_run(
             run_dir=run_dir,
-            out_dir=Path(args.out_dir),
+            out_dir=out_dir,
             name=None,
             force=bool(args.force),
         )

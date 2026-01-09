@@ -59,26 +59,26 @@ Execute the agents on the generated tasks using Harbor.
 **Command (Run one task):**
 ```bash
 # From the root
-python src/pbench_containerized_eval/run_harbor.py trials start \
-  -p out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
+python src/harbor-task-gen/run_harbor.py trials start \
+  -p examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
   -a gemini-cli -m gemini/gemini-3-pro-preview
 ```
-- `<task_name>` is just the name of the task directories in `out/harbor/precedent-search/tc-precedent-search/tasks/`.
+- `<task_name>` is just the name of the task directories in `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`.
 
 **Command (Run all tasks):**
 ```bash
 # From the root
-python src/pbench_containerized_eval/run_harbor.py trials start \
-  -j out/harbor/precedent-search/tc-precedent-search/job.yaml \
+python src/harbor-task-gen/run_harbor.py trials start \
+  -j examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/job.yaml \
   -a gemini-cli -m gemini/gemini-3-pro-preview
 ```
 
 **Inputs:**
-- Task directories in `out/harbor/precedent-search/tc-precedent-search/tasks/`.
+- Task directories in `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`.
 - `job.yaml` (for batch execution).
 
 **Outputs:**
-- `trials/`: A directory containing execution logs and `predictions.json` for each run.
+- `examples/harbor-workspace/trials/`: A directory containing execution logs and `predictions.json` for each run.
 
 ### 4. Collect Results
 Consolidate the results from the `trials/` directory into a clean format for analysis.
@@ -86,12 +86,12 @@ Consolidate the results from the `trials/` directory into a clean format for ana
 **Command:**
 ```bash
 # From the root
-python src/pbench_containerized_eval/collect_harbor_results.py
+python examples/harbor-workspace/collect_harbor_results.py
 ```
 *(Note: This script typically looks in `trials/` and aggregates results based on the task metadata.)*
 
 **Outputs:**
-- `out/harbor/precedent-search/preds/*.json`: Consolidated prediction files.
+- `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: Consolidated prediction files.
 
 ### 5. Analyze Results
 Score the predictions against the ground truth and generate report tables and figures.
@@ -101,19 +101,19 @@ Score the predictions against the ground truth and generate report tables and fi
 # From the root
 python src/pbench_eval/score_task.py \
   --domain precedent-search \
-  --output_dir out/harbor \
+  --output_dir examples/harbor-workspace/out/harbor \
   --analyze
 ```
 
 **Inputs:**
-- `out/harbor/precedent-search/preds/*.json`: The collected JSON results.
+- `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: The collected JSON results.
 - `assets/hard/rubric.csv`: The scoring rubric.
 - `src/pbench_eval/utils.py`: The scoring logic.
 
 **Outputs:**
-- `out/harbor/precedent-search/scores/*.csv`: CSVs containing exact scores for every prediction.
-- `out/harbor/precedent-search/analysis/*.csv`: CSVs with aggregate statistics (Mean/Error by property).
-- `out/harbor/precedent-search/figures/*.pdf`: PDF plots of the analysis.
+- `examples/harbor-workspace/out/harbor/precedent-search/scores/*.csv`: CSVs containing exact scores for every prediction.
+- `examples/harbor-workspace/out/harbor/precedent-search/analysis/*.csv`: CSVs with aggregate statistics (Mean/Error by property).
+- `examples/harbor-workspace/out/harbor/precedent-search/figures/*.pdf`: PDF plots of the analysis.
 
 ```bash
 # Ensure you are running in an environment with 'pymatgen' and 'pandas' installed
