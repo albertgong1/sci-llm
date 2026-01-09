@@ -103,7 +103,21 @@ def build_task(task_dir: Path, row: dict[str, str], task_name: str) -> None:
     copy_template("tests/test.sh", tests_dir / "test.sh")
 
     # Copy shared scoring utils
-    shutil.copy2(pbench_eval_dir() / "utils.py", tests_dir / "pbench_eval_utils.py")
+    utils_path = tests_dir / "pbench_eval_utils.py"
+    shutil.copy2(pbench_eval_dir() / "utils.py", utils_path)
+    
+    # PATCH: Remove space_groups_normalized.json dependency for this specific task
+    # because we only need scorer_si and scorer_categorical
+    content = utils_path.read_text()
+    # Logic to identify and remove the loading block
+    # We look for the block starting with "ASSETS_DIR =" and ending with "json.load(f)"
+    # We'll just regex replace it or string replace safely
+    import re
+    # Pattern matches the import block down to the json load
+    pattern = r'ASSETS_DIR = Path\(__file__\)\.parent\.parent\.parent / "assets".*?SPACE_GROUPS = json\.load\(f\)'
+    # Replace with empty dict
+    patched_content = re.sub(pattern, 'SPACE_GROUPS = {}', content, flags=re.DOTALL)
+    utils_path.write_text(patched_content)
     
     # 7. Oracle Solution (solve.sh)
     # We construct a prediction matching the expected rows exactly
@@ -138,17 +152,27 @@ def write_job_config(tasks_dir: Path, job_path: Path) -> None:
     # must be relative to the repository root, not this script.
     repo_root = Path("../..").resolve()
     
+    workspace_root = (repo_root / "examples/harbor-workspace").resolve()
+    
     if not tasks_dir.is_absolute():
-        tasks_rel = (Path.cwd() / tasks_dir).resolve().relative_to(repo_root)
+        tasks_full = (Path.cwd() / tasks_dir).resolve()
     else:
-        tasks_rel = tasks_dir.resolve().relative_to(repo_root)
+        tasks_full = tasks_dir.resolve()
+        
+    try:
+        tasks_rel = tasks_full.relative_to(workspace_root)
+    except ValueError:
+        # Fallback if somehow tasks are outside workspace (e.g. absolute path usage)
+        # But for this script's purpose, it should be inside.
+        print(f"Warning: Tasks dir {tasks_full} is not within workspace {workspace_root}. Using repo-relative path.")
+        tasks_rel = tasks_full.relative_to(repo_root)
     job_yaml = f"""\
 jobs_dir: jobs
-n_attempts: 1
+n_attempts: 3
 timeout_multiplier: 1.0
 orchestrator:
   type: local
-  n_concurrent_trials: 2
+  n_concurrent_trials: 85
   quiet: false
 environment:
   type: docker
@@ -166,7 +190,7 @@ datasets:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv", type=Path, default=Path("SuperCon_Tc_Tcn_dev-set.csv"))
-    parser.add_argument("--output-dir", type=Path, default=Path("../../out/harbor/precedent-search"))
+    parser.add_argument("--output-dir", type=Path, default=Path("../../examples/harbor-workspace/out/harbor/precedent-search"))
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--write-job-config", action="store_true")
     parser.add_argument("--force", action="store_true")
