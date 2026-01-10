@@ -297,7 +297,7 @@ async def process_paper(
                 row_series["id"] = f"prop_{property_counter:03d}"
                 row_series["refno"] = refno
                 row_series["paper_pdf_path"] = str(paper_path)
-                row_series["validated"] = False
+                row_series["validated"] = None
                 row_series["validator_name"] = ""
                 row_series["validation_date"] = ""
                 row_series["flagged"] = False
