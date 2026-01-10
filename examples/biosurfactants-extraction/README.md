@@ -15,7 +15,7 @@
 
 ## Reproducing the Dataset Construction
 
-1. Download files (todo) and place in `data/Paper_DB`
+1. Download [Paper_DB.zip](https://drive.google.com/file/d/1XqosBMhqzUIx3U5Cfd0kO9co2KaKUErI/view?usp=share_link) and unzip to `data/Paper_DB`.
 
 2. Obtain candidate properties:
 
