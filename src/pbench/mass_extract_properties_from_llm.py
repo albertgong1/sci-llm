@@ -24,13 +24,14 @@ For this example, the results will be saved in `out/unsupervised_llm_extraction/
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import re
 from pathlib import Path
 
 import pandas as pd
-from tqdm import tqdm
+from tqdm.asyncio import tqdm
 import fitz  # PyMuPDF
 
 import llm_utils
@@ -187,7 +188,82 @@ def json_property_to_csv_row(prop: dict) -> pd.Series:
     )
 
 
-def process_paper(
+async def process_single_page(
+    page_num: int,
+    file: File,
+    prompt: str,
+    refno: str,
+    llm: llm_utils.LLMChat,
+    inf_gen_config: llm_utils.InferenceGenerationConfig,
+) -> list[dict]:
+    """Process a single page and extract properties.
+
+    Args:
+        page_num: Page number to process
+        file: File object for the paper
+        prompt: Extraction prompt text
+        refno: Reference number of the paper
+        llm: LLMChat instance
+        inf_gen_config: InferenceGenerationConfig instance
+
+    Returns:
+        List of property dicts (with page_num included for sorting later)
+
+    """
+    # Build conversation
+    page_prompt = f"""
+\n\n
+------FINAL INSTRUCTIONS------
+Now extract all properties in the research article that are on page number {page_num}.
+It is important to ONLY extract properties that are on page number {page_num}.
+DO NOT extract properties that are on other pages.
+--------------------------------
+    """
+    conv = Conversation(
+        messages=[
+            Message(role="user", content=[file, prompt, page_prompt]),
+        ]
+    )
+
+    try:
+        # Get LLM response
+        response: LLMChatResponse = await llm.generate_response_async(
+            conv, inf_gen_config
+        )
+
+        # Check for errors
+        if response.error:
+            logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
+            return []
+
+        # Parse JSON from response
+        json_data = parse_json_response(response.pred)
+        if json_data is None:
+            logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
+            return []
+
+        # Check for properties array
+        if "properties" not in json_data:
+            logger.warning(f"No 'properties' key in JSON for {refno} page {page_num}")
+            return []
+
+        properties = json_data["properties"]
+        if not isinstance(properties, list):
+            logger.warning(f"'properties' is not a list for {refno} page {page_num}")
+            return []
+
+        # Add page_num to each property for later sorting
+        for prop in properties:
+            prop["_page_num"] = page_num
+
+        return properties
+
+    except Exception as e:
+        logger.error(f"Error processing {refno} page {page_num}: {e}")
+        return []
+
+
+async def process_paper(
     paper_path: Path,
     prompt: str,
     llm: llm_utils.LLMChat,
@@ -217,97 +293,62 @@ def process_paper(
         doc.close()
     except Exception as e:
         logger.error(f"Failed to get number of pages from {paper_path}: {e}")
+        return []
 
+    # Create tasks for all pages
+    tasks = [
+        process_single_page(page_num, file, prompt, refno, llm, inf_gen_config)
+        for page_num in range(1, num_pages + 1)
+    ]
+
+    # Process all pages concurrently with progress bar
+    total_properties = 0
+    pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
+
+    page_results = []
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        page_results.append(result)
+        total_properties += len(result)
+        pbar.set_description(f"Processing {refno} ({total_properties} props)")
+        pbar.update(1)
+
+    pbar.close()
+
+    # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
     property_counter = 0
 
-    pbar = tqdm(
-        range(1, num_pages + 1),
-        total=num_pages,
-        desc=f"Processing {refno} pages",
-    )
-    for page_num in pbar:
-        # Build conversation
-        page_prompt = f"""
-\n\n
-------FINAL INSTRUCTIONS------
-Now extract all properties in the research article that are on page number {page_num}.
-It is important to ONLY extract properties that are on page number {page_num}.
-DO NOT extract properties that are on other pages.
---------------------------------
-        """
-        conv = Conversation(
-            messages=[
-                Message(role="user", content=[file, prompt, page_prompt]),
-            ]
-        )
+    for properties in page_results:
+        for prop in properties:
+            try:
+                # Remove the temporary page_num field before converting
+                prop.pop("_page_num", None)
 
-        try:
-            # Get LLM response
-            response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
+                row_series: pd.Series = json_property_to_csv_row(prop)
 
-            # Check for errors
-            if response.error:
-                logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
+                # Assign metadata
+                row_series["id"] = f"prop_{property_counter:03d}"
+                row_series["refno"] = refno
+                row_series["paper_pdf_path"] = str(paper_path)
+                row_series["validated"] = False
+                row_series["validator_name"] = ""
+                row_series["validation_date"] = ""
+                row_series["flagged"] = False
+
+                all_rows.append(row_series)
+                property_counter += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to convert property from {refno}: {e}")
                 continue
-
-            # Parse JSON from response
-            json_data = parse_json_response(response.pred)
-            if json_data is None:
-                logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
-                continue
-
-            # Check for properties array
-            if "properties" not in json_data:
-                logger.warning(
-                    f"No 'properties' key in JSON for {refno} page {page_num}"
-                )
-                continue
-
-            properties = json_data["properties"]
-            if not isinstance(properties, list):
-                logger.warning(
-                    f"'properties' is not a list for {refno} page {page_num}"
-                )
-                continue
-
-            logger.info(
-                f"Extracted {len(properties)} properties from {refno} page {page_num}"
-            )
-
-            # Convert each property to CSV row (pandas Series)
-            for prop in properties:
-                try:
-                    row_series: pd.Series = json_property_to_csv_row(prop)
-
-                    # Assign metadata
-                    row_series["id"] = f"prop_{property_counter:03d}"
-                    row_series["refno"] = refno
-                    row_series["paper_pdf_path"] = str(paper_path)
-                    row_series["validated"] = False
-                    row_series["validator_name"] = ""
-                    row_series["validation_date"] = ""
-                    row_series["flagged"] = False
-
-                    all_rows.append(row_series)
-                    property_counter += 1
-
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to convert property from {refno} page {page_num}: {e}"
-                    )
-                    continue
-
-        except Exception as e:
-            logger.error(f"Error processing {refno} page {page_num}: {e}")
-            continue
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
     return all_rows
 
 
-def extract_properties(args: argparse.Namespace) -> None:
+async def extract_properties(args: argparse.Namespace) -> None:
     """Main function to extract properties from all PDFs."""
     # Load extraction prompt (relative to current working directory)
     prompt_path = args.prompt_path
@@ -363,7 +404,7 @@ def extract_properties(args: argparse.Namespace) -> None:
             continue
 
         # Process the paper
-        rows = process_paper(pdf_path, prompt, llm, inf_gen_config)
+        rows = await process_paper(pdf_path, prompt, llm, inf_gen_config)
 
         # Save to CSV
         if len(rows) > 0:
@@ -400,7 +441,7 @@ def main() -> None:
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
 
-    extract_properties(args)
+    asyncio.run(extract_properties(args))
 
 
 if __name__ == "__main__":
