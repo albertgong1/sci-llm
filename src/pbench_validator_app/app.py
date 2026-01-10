@@ -1184,7 +1184,7 @@ def main() -> None:
             )
             st.markdown(f"**Evidence:** _{row['location.evidence']}_")
 
-            with st.expander("More info"):
+            with st.expander("More info", expanded=True):
                 # Define columns to exclude (displayed above + system cols)
                 displayed_cols = {
                     "property_name",
