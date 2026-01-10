@@ -28,13 +28,9 @@ uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTP
 > \[!NOTE\]
 > This step requires manual effort and is not fully reproducibile.
 
-<!-- ```bash
-uv sync --group validator
-uv run streamlit run src/pbench_validator_app/app.py -- --csv_folder OUTPUT_DIR/biosurfactants/unsupervised_llm_extraction --paper_folder data/biosurfactants/Paper_DB
-``` -->
 ```bash
 uv sync --group validator
-uv run streamlit run src/pbench_validator_app/app.py -- --csv_folder OUTPUT_DIR --paper_folder data/Paper_DB
+uv run streamlit run ../../src/pbench_validator_app/app.py -- --csv_folder OUTPUT_DIR/unsupervised_llm_extraction --paper_folder data/Paper_DB
 ```
 
 4. Construct Harbor tasks:
