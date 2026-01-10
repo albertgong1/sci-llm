@@ -187,14 +187,6 @@ def get_available_csv_files() -> list[str]:
     return sorted(csv_files)
 
 
-def get_available_pdf_files() -> list[str]:
-    """Returns a list of PDF files in the paper folder."""
-    if not os.path.exists(PAPER_FOLDER):
-        return []
-    pdf_files = [f for f in os.listdir(PAPER_FOLDER) if f.endswith(".pdf")]
-    return sorted(pdf_files)
-
-
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Ensures required columns exist in the dataframe.
 
@@ -807,68 +799,6 @@ def main() -> None:
                 if os.path.exists(csv_path):
                     st.session_state.df = load_data(csv_path)
 
-        # PDF File Selector
-        st.subheader("PDF Selection")  # Header close to CSV
-        available_pdf_files = get_available_pdf_files()
-
-        if not available_pdf_files:
-            st.warning(f"No PDF files found in {PAPER_FOLDER}")
-
-        # Initialize selected PDF in session state
-        if "selected_pdf" not in st.session_state:
-            # if INITIAL_PDF_PATH and os.path.basename(INITIAL_PDF_PATH) in available_pdf_files:
-            #      st.session_state.selected_pdf = os.path.basename(INITIAL_PDF_PATH)
-            # else:
-            current_pdf_path_in_df = None
-            # Safe check for df presence and columns
-            if (
-                st.session_state.df is not None
-                and not st.session_state.df.empty
-                and "paper_pdf_path" in st.session_state.df.columns
-            ):
-                first_path = st.session_state.df.iloc[0]["paper_pdf_path"]
-                if first_path and isinstance(first_path, str):
-                    current_pdf_path_in_df = os.path.basename(first_path)
-
-            if current_pdf_path_in_df and current_pdf_path_in_df in available_pdf_files:
-                st.session_state.selected_pdf = current_pdf_path_in_df
-            else:
-                st.session_state.selected_pdf = None
-
-        pdf_index = None
-        if st.session_state.selected_pdf in available_pdf_files:
-            pdf_index = available_pdf_files.index(st.session_state.selected_pdf)
-
-        selected_pdf = st.selectbox(
-            "Select PDF File",
-            available_pdf_files,
-            index=pdf_index,
-            placeholder="Choose a PDF file...",
-        )
-
-        if selected_pdf:
-            # Always sync session state
-            st.session_state.selected_pdf = selected_pdf
-
-            full_pdf_path = os.path.join(PAPER_FOLDER, selected_pdf)
-            need_update = False
-            if st.session_state.df is not None:
-                if "paper_pdf_path" not in st.session_state.df.columns:
-                    need_update = True
-                else:
-                    current_val = st.session_state.df.iloc[0].get("paper_pdf_path")
-                    if current_val != full_pdf_path:
-                        need_update = True
-
-            if need_update and st.session_state.df is not None:
-                with st.spinner(f"Updating all records to use {selected_pdf}..."):
-                    st.session_state.df["paper_pdf_path"] = full_pdf_path
-                    save_data(st.session_state.df)
-                    st.toast(f"Linked {selected_pdf} to this CSV!", icon="🔗")
-                    st.rerun()
-        else:
-            st.session_state.selected_pdf = None
-
         st.divider()
 
         # Validator Name
@@ -878,10 +808,8 @@ def main() -> None:
         st.session_state.validator_name = validator_name
 
     # Unified Stop Condition
-    if not st.session_state.selected_csv or not st.session_state.selected_pdf:
-        st.info(
-            "Please select a CSV file and corresponding PDF file from the sidebar to continue."
-        )
+    if not st.session_state.selected_csv:
+        st.info("Please select a CSV file from the sidebar to continue.")
         st.stop()
 
     csv_path = os.path.join(CSV_FOLDER, st.session_state.selected_csv)
