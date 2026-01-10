@@ -14,7 +14,7 @@ import llm_utils
 SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
 
 DOMAIN2HF_DATASET_NAME: dict[str, str] = {
-    "supercon": "kilian-group/supercon-mini",
+    "supercon": "kilian-group/supercon-mini-v2",
 }
 
 
