@@ -17,22 +17,37 @@
 
 1. Download files (todo) and place in `data/Paper_DB`
 
-2. Extract all properties from each PDF using an LLM:
+2. Obtain candidate properties:
 
+<details>
+    <summary>If extracting properties from scratch</summary>
+
+- Extract properties from PDFs using an LLM:
 ```bash
 uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
 ```
 
-3. Filter the irrelevant extracted properties so that we have a smaller set of properties to validate:
-
-Todo:
-- [ ] Move filtering logic to a script. (Note: currently we are just using a spreadsheet to filter the irrelevant extracted properties.)
+- Filter the irrelevant extracted properties so that we have a smaller set of properties to validate:
 
 ```bash
 uv run pbench-filter -od OUTPUT_DIR
 ```
 
-4. Launch the validator app and accept/reject the candidates.
+TODO:
+- [ ] Move filtering logic to a script. (Note: currently we are just using a spreadsheet to filter the irrelevant extracted properties.)
+
+</details>
+
+<details>
+    <summary>If using the already extracted properties</summary>
+
+- Export the list of candidate properties from this Google Sheet by clicking "File" -> "Download" -> "CSV".
+- Rename the CSV file to `extracted_properties_combined.csv`.
+- Place the CSV file in `OUTPUT_DIR/candidates/`.
+
+</details>
+
+3. Launch the validator app and accept/reject the candidates:
 
 > \[!NOTE\]
 > This step requires manual effort and is not fully reproducibile.
@@ -42,13 +57,15 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
-5. Construct Harbor tasks:
+## Sharing the dataset via HuggingFace
+
+1. Construct Harbor tasks:
 
 ```bash
 
 ```
 
-6. Push Harbor tasks to HuggingFace:
+2. Push Harbor tasks to HuggingFace:
 
 ```bash
 ```
