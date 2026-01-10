@@ -20,7 +20,7 @@
 2. Obtain candidate properties:
 
 <details>
-    <summary>**If using the already extracted properties (for Jiashuo)**</summary>
+    <summary><b>If using the already extracted properties (for Jiashuo)</b></summary>
 
 - Export the list of candidate properties from this Google Sheet by clicking "File" -> "Download" -> "CSV".
 - Rename the CSV file to `extracted_properties_combined.csv`.
