@@ -78,3 +78,6 @@ fixable = [
     "YTT",
 ]
 unfixable = []
+
+[lint.per-file-ignores]
+"src/harbor-task-gen/__init__.py" = ["N999"]
