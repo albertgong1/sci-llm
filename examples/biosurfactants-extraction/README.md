@@ -21,11 +21,18 @@
 
 ```bash
 uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
-# add data_type column and save to OUTPUT_DIR/candidates/
-uv run pbench-add-datatype -od OUTPUT_DIR
 ```
 
-3. Launch the validator app and accept/reject the candidates.
+3. Filter the irrelevant extracted properties so that we have a smaller set of properties to validate:
+
+Todo:
+- [ ] Move filtering logic to a script. (Note: currently we are just using a spreadsheet to filter the irrelevant extracted properties.)
+
+```bash
+uv run pbench-filter -od OUTPUT_DIR
+```
+
+4. Launch the validator app and accept/reject the candidates.
 
 > \[!NOTE\]
 > This step requires manual effort and is not fully reproducibile.
@@ -35,13 +42,13 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
-4. Construct Harbor tasks:
+5. Construct Harbor tasks:
 
 ```bash
 
 ```
 
-5. Push Harbor tasks to HuggingFace:
+6. Push Harbor tasks to HuggingFace:
 
 ```bash
 ```
