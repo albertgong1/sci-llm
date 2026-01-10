@@ -20,6 +20,15 @@
 2. Obtain candidate properties:
 
 <details>
+    <summary>**If using the already extracted properties (for Jiashuo)**</summary>
+
+- Export the list of candidate properties from this Google Sheet by clicking "File" -> "Download" -> "CSV".
+- Rename the CSV file to `extracted_properties_combined.csv`.
+- Place the CSV file in `OUTPUT_DIR/candidates/`.
+
+</details>
+
+<details>
     <summary>If extracting properties from scratch</summary>
 
 - Extract properties from PDFs using an LLM:
@@ -35,15 +44,6 @@ uv run pbench-filter -od OUTPUT_DIR
 
 TODO:
 - [ ] Move filtering logic to a script. (Note: currently we are just using a spreadsheet to filter the irrelevant extracted properties.)
-
-</details>
-
-<details>
-    <summary>If using the already extracted properties</summary>
-
-- Export the list of candidate properties from this Google Sheet by clicking "File" -> "Download" -> "CSV".
-- Rename the CSV file to `extracted_properties_combined.csv`.
-- Place the CSV file in `OUTPUT_DIR/candidates/`.
 
 </details>
 
