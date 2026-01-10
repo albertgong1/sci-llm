@@ -21,16 +21,18 @@
 
 ```bash
 uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
+# add data_type column and save to OUTPUT_DIR/candidates/
+uv run pbench-add-datatype -od OUTPUT_DIR
 ```
 
-3. Launch the validator app and accept/reject the proposed properties. For more information, please see [VALIDATOR_GUIDE.md](../../docs/VALIDATOR_GUIDE.md).
+3. Launch the validator app and accept/reject the candidates.
 
 > \[!NOTE\]
 > This step requires manual effort and is not fully reproducibile.
 
 ```bash
 uv sync --group validator
-uv run streamlit run ../../src/pbench_validator_app/app.py -- --csv_folder OUTPUT_DIR/unsupervised_llm_extraction --paper_folder data/Paper_DB
+uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
 4. Construct Harbor tasks:

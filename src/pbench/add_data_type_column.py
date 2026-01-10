@@ -14,7 +14,7 @@ classifies the value_string as:
   Examples: "good emulsifying ability", "rapidly adsorbing"
 
 The script reads CSV files from: <output_dir>/unsupervised_llm_extraction/
-And writes the updated files to: <output_dir>/validation_candidates/
+And writes the updated files to: <output_dir>/candidates/
 
 Usage (from within an examples subdirectory):
 ```bash
@@ -174,7 +174,7 @@ def main() -> None:
 
     # Define input and output directories
     input_dir = args.output_dir / "unsupervised_llm_extraction"
-    output_dir = args.output_dir / "validation_candidates"
+    output_dir = args.output_dir / "candidates"
 
     # Check if input directory exists
     if not input_dir.exists():
