@@ -8,10 +8,17 @@ Features:
 - Side-by-side view of extracted data and PDF source with highlighted evidence
 - AI-powered evidence search using Gemini for properties missing location information
 - Fuzzy text matching to locate evidence across PDF pages
-- Navigation with keyboard shortcuts (← →) and table selection
+- Navigation with keyboard shortcuts and table selection
 - Automatic page correction when evidence is found on different pages
 - Validation tracking with validator names, timestamps, and notes
 - Progress tracking with filter options (Pending, Valid, Invalid, Flagged)
+
+Keyboard Shortcuts:
+- ← (Left Arrow): Previous property
+- → (Right Arrow): Next property
+- V: Accept/Valid (marks property as valid and advances to next)
+- X: Reject/Invalid (marks property as invalid and advances to next)
+- F: Toggle flag/unflag and advance to next
 
 Usage:
 ```bash
@@ -835,11 +842,11 @@ def main() -> None:
     if filter_status == "Pending":
         filtered_indices = df[df["validated"].isna()].index
     elif filter_status == "Valid":
-        filtered_indices = df[df["validated"]].index  # type: ignore
+        filtered_indices = df[df["validated"] == True].index  # noqa: E712
     elif filter_status == "Invalid":
-        filtered_indices = df[not df["validated"]].index
+        filtered_indices = df[df["validated"] == False].index  # noqa: E712
     elif filter_status == "Flagged":
-        filtered_indices = df[df["flagged"]].index
+        filtered_indices = df[df["flagged"] == True].index  # noqa: E712
     else:
         filtered_indices = df.index
 
@@ -896,7 +903,7 @@ def main() -> None:
     nav_col1, nav_col2, nav_col3 = st.columns([1, 3, 1])
 
     with nav_col1:
-        if st.button("⬅️ Previous Property", width="stretch", key="prev_btn"):
+        if st.button("⬅️ Previous (←)", width="stretch", key="prev_btn"):
             if st.session_state.current_property_index > 0:
                 select_property(st.session_state.current_property_index - 1)
                 st.rerun()
@@ -908,7 +915,7 @@ def main() -> None:
         )
 
     with nav_col3:
-        if st.button("Next Property ➡️", width="stretch", key="next_btn"):
+        if st.button("Next (→) ➡️", width="stretch", key="next_btn"):
             if st.session_state.current_property_index < len(filtered_indices) - 1:
                 select_property(st.session_state.current_property_index + 1)
                 st.rerun()
@@ -950,12 +957,29 @@ def main() -> None:
 
         if (isTyping) return;
 
+        // Navigation shortcuts
         if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            findAndClickButton('Previous Property');
+            findAndClickButton('Previous');
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            findAndClickButton('Next Property');
+            findAndClickButton('Next');
+        }
+        // Validation shortcuts
+        else if (e.key === 'v' || e.key === 'V') {
+            e.preventDefault();
+            findAndClickButton('Valid');
+        }
+        else if (e.key === 'x' || e.key === 'X') {
+            e.preventDefault();
+            findAndClickButton('Invalid');
+        }
+        else if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            // Find the flag/unflag button
+            if (!findAndClickButton('Unflag')) {
+                findAndClickButton('Flag');
+            }
         }
     };
 
@@ -998,7 +1022,10 @@ def main() -> None:
         with col_valid:
             # Modifying Valid Button to Handle Pending AI Matches
             if st.button(
-                "✅ Valid", type=valid_type, width="stretch", disabled=not name_provided
+                "✅ Valid (V)",
+                type=valid_type,
+                width="stretch",
+                disabled=not name_provided,
             ):
                 # Check if there is a pending AI suggestion for this row
                 if (
@@ -1036,7 +1063,7 @@ def main() -> None:
 
         with col_invalid:
             if st.button(
-                "❌ Invalid",
+                "❌ Invalid (X)",
                 type=invalid_type,
                 width="stretch",
                 disabled=not name_provided,
@@ -1070,10 +1097,15 @@ def main() -> None:
                 st.rerun()
 
         with col_flag:
-            flag_label = "Unflag" if is_flagged else "Flag"
+            flag_label = "Unflag (F)" if is_flagged else "Flag (F)"
             if st.button(flag_label, type=flag_type, width="stretch"):
                 new_flag_state = not is_flagged
                 df.at[selected_index, "flagged"] = new_flag_state
+
+                # Auto-advance to next property
+                if st.session_state.current_property_index < len(filtered_indices) - 1:
+                    st.session_state.current_property_index += 1
+
                 save_data(df)
                 st.session_state.df = df
                 st.rerun()
