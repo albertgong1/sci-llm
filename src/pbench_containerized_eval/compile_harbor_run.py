@@ -1,7 +1,7 @@
 """Bundle a Harbor job/trial directory into a Hugging Face-friendly folder.
 
 Typical usage:
-  uv run python examples/containerized-extraction/compile_harbor_run.py \
+  uv run python src/pbench_containerized_eval/compile_harbor_run.py \
     --run-dir jobs/2025-12-18__15-40-56
 
 Outputs:

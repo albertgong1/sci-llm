@@ -7,14 +7,11 @@ import json
 import shutil
 from pathlib import Path
 
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
 def templates_dir() -> Path:
-    return Path(__file__).parent / "search-template"
+    return Path("search-template")
 
 def pbench_eval_dir() -> Path:
-    return repo_root() / "src/pbench_eval"
+    return Path("../../src/pbench_eval")
 
 def read_template(relative_path: str) -> str:
     return (templates_dir() / relative_path).read_text()
@@ -134,9 +131,17 @@ EOF
 
 
 def write_job_config(tasks_dir: Path, job_path: Path) -> None:
-    tasks_rel = (
-        tasks_dir.relative_to(repo_root()) if tasks_dir.is_absolute() else tasks_dir
-    )
+    # We assume we are running from examples/tc-precedent-search/
+    # So repo root is ../../
+    # We still need repo_root here because 'job.yaml' is used by the harbor runner
+    # which is executed from the repository root. Thus, the paths in job.yaml
+    # must be relative to the repository root, not this script.
+    repo_root = Path("../..").resolve()
+    
+    if not tasks_dir.is_absolute():
+        tasks_rel = (Path.cwd() / tasks_dir).resolve().relative_to(repo_root)
+    else:
+        tasks_rel = tasks_dir.resolve().relative_to(repo_root)
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
@@ -160,15 +165,15 @@ datasets:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", type=Path, default=repo_root() / "assets/SuperCon_Tc_Tcn_dev-set.csv")
-    parser.add_argument("--output-dir", type=Path, default=repo_root() / "out/harbor/precedent-search")
+    parser.add_argument("--csv", type=Path, default=Path("SuperCon_Tc_Tcn_dev-set.csv"))
+    parser.add_argument("--output-dir", type=Path, default=Path("../../out/harbor/precedent-search"))
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--write-job-config", action="store_true")
     parser.add_argument("--force", action="store_true")
     
     args = parser.parse_args()
     
-    task_root = args.output_dir / "search-template"
+    task_root = args.output_dir / "tc-precedent-search"
     tasks_dir = task_root / "tasks"
     
     if task_root.exists():

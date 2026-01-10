@@ -16,7 +16,7 @@ try:
 except ImportError:
     # During dev/testing, if simple python execution is tried without the copies
     import sys
-    sys.path.append(str(Path(__file__).parents[3] / "pbench_eval"))
+    sys.path.append(str(Path(__file__).parents[4] / "src" / "pbench_eval"))
     from utils import score_value, normalize_unicode, normalize_ws
 
 
@@ -207,11 +207,37 @@ def _as_prediction(raw: dict[str, Any]) -> Prediction:
     )
 
 
+def _flatten_and_convert(payload: Any) -> list[Prediction]:
+    """Convert payload to Predictions, flattening 'values' lists if present."""
+    raw_list = _coerce_predictions_payload(payload)
+    predictions: list[Prediction] = []
+    for raw in raw_list:
+        values = raw.get("values")
+        if isinstance(values, list):
+            if not values:
+                # Explicit empty list implies "N/A" (matches negative ground truth)
+                new_raw = raw.copy()
+                new_raw["pred_value"] = "N/A"
+                new_raw.pop("values", None)
+                predictions.append(_as_prediction(new_raw))
+            else:
+                # Expand list prediction into multiple candidates
+                for v in values:
+                    new_raw = raw.copy()
+                    new_raw["pred_value"] = str(v)
+                    # Remove collection key to safely map as single value
+                    new_raw.pop("values", None)
+                    predictions.append(_as_prediction(new_raw))
+        else:
+            predictions.append(_as_prediction(raw))
+    return predictions
+
+
 def load_predictions(predictions_path: Path) -> list[Prediction]:
     """Load predictions from disk or fall back to parsing agent logs."""
     if predictions_path.exists():
         payload = _load_json(predictions_path)
-        return [_as_prediction(p) for p in _coerce_predictions_payload(payload)]
+        return _flatten_and_convert(payload)
 
     agent_logs_dir = Path("/logs/agent")
     if agent_logs_dir.exists():
@@ -225,17 +251,11 @@ def load_predictions(predictions_path: Path) -> list[Prediction]:
 
             extracted_obj = _extract_first_json_object(text)
             if extracted_obj is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_obj)
-                ]
+                return _flatten_and_convert(extracted_obj)
 
             extracted_arr = _extract_first_json_array(text)
             if extracted_arr is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_arr)
-                ]
+                return _flatten_and_convert(extracted_arr)
 
     raise FileNotFoundError(
         f"Missing predictions file at {predictions_path} and could not parse JSON from /logs/agent/*.txt"

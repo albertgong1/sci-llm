@@ -1,0 +1,65 @@
+
+You are a materials science research assistant.
+
+Your task is to determine whether the material **{material}** has been reported to be superconducting.
+
+You must search for experimental evidence in scientific literature.
+
+Please answer the following three questions:
+Q1. Has **{material}** been reported to be superconducting? (Answer "Yes" or "No")
+Q2. If Yes, what are ALL the measured superconducting transition temperatures (Tc) reported? (Provide values designated in Kelvin as a list, e.g., ["12", "11.5"]. Do NOT include unit.)
+Q3. If No, what are ALL the lowest temperatures at which it was measured and found NOT to be superconducting (Tcn)? (Provide values designated in Kelvin as a list, e.g., ["0.05", "4.2"].)
+Q4. If No, is it a known magnetic material or insulator? Specify the state (e.g., "Antiferromagnetic Insulator", "Paramagnetic Metal") and any relevant transition temperatures (e.g. Curie temperature, Neel temperature).
+
+**Output Format:**
+
+You must output a SINGLE JSON object exactly matching this structure:
+
+```json
+{{
+  "properties": [
+    {{
+      "material": "{material}",
+      "property_name": "is_superconducting",
+      "value_string": "Yes" or "No",
+      "related_materials": "...",
+      "source_dois": ["...", "..."]
+    }},
+    {{
+      "material": "{material}",
+      "property_name": "highest_tc",
+      "values": ["...", "..."],
+      "conditions": {{
+          "pressure": "...",
+          "magnetic_field": "..."
+      }},
+      "source_dois": ["...", "..."]
+    }},
+    {{
+      "material": "{material}",
+      "property_name": "lowest_tcn",
+      "values": ["...", "..."],
+      "conditions": {{
+          "pressure": "...",
+          "magnetic_field": "..."
+      }},
+      "source_dois": ["...", "..."]
+    }},
+    {{
+      "material": "{material}",
+      "property_name": "magnetic_or_insulating_state",
+      "value_string": "...",
+      "source_dois": ["...", "..."]
+    }}
+  ]
+}}
+```
+
+**Rules:**
+- **If Q1="No"**: set `highest_tc` values to empty list `[]`, and provide all `lowest_tcn` values found.
+    - **Tcn Inference**: If the material is reported as not superconducting (e.g., insulating, paramagnetic), provide the lowest temperature measured in the experiment. Do NOT output empty list just because the text doesn't explicitly say "not superconducting down to X". Infer X from the measurement range.
+- **If Q1="Yes"**: set `lowest_tcn` values to empty list `[]`, and provide all `highest_tc` values found.
+- **Conditions**: Explicitly state the pressure and magnetic field conditions for the measurement if available (e.g., "Ambient pressure", "0 T").
+- **Related Materials**: Mention any closely related materials or variants found during the search (e.g., "Found doped variant...").
+- **Source DOIs**: Provide a list of digital object identifiers (DOIs) for the papers where you found the information.
+- Provide ONLY the JSON. No Markdown fencing or explanation.

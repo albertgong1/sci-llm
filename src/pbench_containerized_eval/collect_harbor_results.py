@@ -51,7 +51,10 @@ def main():
                 },
                 "rubric": row.get("rubric"),
                 "response": {
-                    "pred": row.get("pred_raw", {}).get("value_string", "") 
+                    "pred": row.get("pred_raw", {}).get("value_string", ""),
+                    "source_doi": row.get("pred_raw", {}).get("source_doi"),
+                    "conditions": row.get("pred_raw", {}).get("conditions"),
+                    "related_materials": row.get("pred_raw", {}).get("related_materials"),
                 },
                 # Add metadata to enable filtering in score_task.py
                 "metadata": {

@@ -1,23 +1,19 @@
 """Helper functions"""
 
 import re
-import math
 from pathlib import Path
-from typing import Any
 from pymatgen.core import Composition
 
 # Load normalized space groups
-try:
-    # Assuming this file is in the same directory as this script (examples/extraction)
-    # and assets is a subdirectory (examples/extraction/assets)
-    ASSETS_DIR = Path(__file__).parent / "assets"
-    SPACE_GROUPS_PATH = ASSETS_DIR / "space_groups_normalized.json"
+import json
 
-    with open(SPACE_GROUPS_PATH, "r") as f:
-        SPACE_GROUPS = json.load(f)
-except Exception as e:
-    # It is okay if this fails in the containerized environment if we don't need space groups
-    SPACE_GROUPS = {}
+# Assuming this file is in the same directory as this script (examples/extraction)
+# and assets is a subdirectory (examples/extraction/assets)
+ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
+SPACE_GROUPS_PATH = ASSETS_DIR / "hard" / "space_groups_normalized.json"
+
+with open(SPACE_GROUPS_PATH, "r") as f:
+    SPACE_GROUPS = json.load(f)
 
 
 _SUPERSCRIPT_MAP = str.maketrans(
@@ -155,6 +151,43 @@ def scorer_si(pred: float, answer: float, rel_tol: float = 0.001) -> bool:
     return abs(pred - answer) / abs(answer) <= rel_tol
 
 
+def scorer_space_group(pred: str, answer: str) -> bool:
+    """Score space group predictions.
+    The space group alphabet is {letters, numbers, /, -}.
+
+    1. Clean input (keep only {letters, numbers, /, -} and lowercase).
+    2. Map to ID.
+    3. Compare IDs.
+    """
+    if not SPACE_GROUPS:
+        return False
+
+    def get_norm_and_id(val: str) -> tuple[str, str | None]:
+        if not isinstance(val, str):
+            val = str(val)
+        cleaned = re.sub(r"[^a-zA-Z0-9/\-]", "", val)
+        norm = cleaned.lower()
+        return norm, SPACE_GROUPS.get(norm)
+
+    pred_norm, pred_id = get_norm_and_id(pred)
+    answer_norm, answer_id = get_norm_and_id(answer)
+
+    # Adding these two checks in case there's some alias we missed or haven't heard of
+    if pred_id is None:
+        print(
+            f"Warning: Predicted space group '{pred}' (clean: '{pred_norm}') not found in allowed keys."
+        )
+        return False
+
+    if answer_id is None:
+        print(
+            f"Warning: Answer space group '{answer}' (clean: '{answer_norm}') not found in allowed keys."
+        )
+        return False
+
+    return pred_id == answer_id
+
+
 def scorer_categorical(
     pred: str, answer: str, mapping: dict[str, str] | None = None
 ) -> bool:
@@ -203,6 +236,7 @@ def score_value(
         answer_value: The ground truth string.
         rubric: "0.1% SI", "pymatgen", or "categorical".
         mapping: Optional mapping for categorical clustering.
+
     """
     if rubric == "0.1% SI":
         # Check if ANY predicted candidate matches the first answer candidate
@@ -217,7 +251,7 @@ def score_value(
         return 0.0
 
     elif rubric == "pymatgen":
-        # Clean inputs before pymatgen parsing if needed? 
+        # Clean inputs before pymatgen parsing if needed?
         # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
         # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
         pv = normalize_unicode(pred_value).strip()
@@ -226,4 +260,8 @@ def score_value(
 
     else:
         # Default to categorical
-        return 1.0 if scorer_categorical(pred_value, answer_value, mapping=mapping) else 0.0
+        return (
+            1.0
+            if scorer_categorical(pred_value, answer_value, mapping=mapping)
+            else 0.0
+        )
