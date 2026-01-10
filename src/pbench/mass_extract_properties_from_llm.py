@@ -4,17 +4,23 @@
 This script processes all PDF papers and extracts comprehensive property data
 using an LLM with an unsupervised extraction prompt.
 
+The script expects to be run from a directory containing:
+- prompts/unsupervised_extraction_prompt.md (or custom prompt path)
+- data/Paper_DB/ (directory containing the PDF files to process)
+
 Usage:
 ```bash
-# Process all PDFs
-./src/pbench/mass_extract_properties_from_llm.py \
-    --domain supercon \
+# From examples/biosurfactants-extraction/ directory
+uv run pbench-extract \
     --server gemini \
-    --model_name gemini-2.5-flash \
-    -od out/
+    --model_name gemini-3-pro-preview \
+    -od out/ \
+    -pp prompts/unsupervised_extraction_prompt.md \
+    -dd data/ \
+    -log_level INFO
 ```
 
-For this example, the results will be saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
+For this example, the results will be saved in `out/unsupervised_llm_extraction/*.csv`.
 """
 
 import argparse
@@ -301,20 +307,18 @@ DO NOT extract properties that are on other pages.
     return all_rows
 
 
-def main(args: argparse.Namespace) -> None:
+def extract_properties(args: argparse.Namespace) -> None:
     """Main function to extract properties from all PDFs."""
-    # Load extraction prompt
-    prompt_path = (
-        pbench.ASSETS_DIR / args.domain / args.unsupervised_extraction_prompt_filename
-    )
+    # Load extraction prompt (relative to current working directory)
+    prompt_path = args.prompt_path
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
 
     logger.info(f"Loading prompt from {prompt_path}")
     prompt = load_prompt(prompt_path)
 
-    # Get list of PDFs
-    paper_dir = args.data_dir / args.domain / "Paper_DB"
+    # Get list of PDFs (relative to current working directory)
+    paper_dir = args.data_dir / "Paper_DB"
     if not paper_dir.exists():
         raise FileNotFoundError(f"Paper directory not found: {paper_dir}")
 
@@ -335,7 +339,7 @@ def main(args: argparse.Namespace) -> None:
     )
 
     # Setup output directory
-    preds_dir = args.output_dir / args.domain / "unsupervised_llm_extraction"
+    preds_dir = args.output_dir / "unsupervised_llm_extraction"
     preds_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize model name for filename
@@ -371,16 +375,18 @@ def main(args: argparse.Namespace) -> None:
             logger.warning(f"No properties extracted from {refno}")
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for console script."""
     parser = argparse.ArgumentParser(
         description="Mass extract properties from PDF files using unsupervised LLM extraction"
     )
     parser = pbench.add_base_args(parser)
     parser.add_argument(
-        "--unsupervised_extraction_prompt_filename",
-        type=str,
-        default="unsupervised_extraction_prompt.md",
-        help="Filename of the unsupervised extraction prompt (default: unsupervised_extraction_prompt.md)",
+        "--prompt_path",
+        "-pp",
+        type=Path,
+        default=Path("prompts/unsupervised_extraction_prompt.md"),
+        help="Path to the unsupervised extraction prompt (default: prompts/unsupervised_extraction_prompt.md)",
     )
 
     # LLM generation arguments
@@ -390,16 +396,12 @@ if __name__ == "__main__":
         default=65536,
         help="Maximum number of output tokens for LLM response (default: 65536)",
     )
-    parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Overwrite existing output files",
-    )
 
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
 
-    # assert args.domain == "supercon", "Only supercon domain is supported for now"
+    extract_properties(args)
 
-    main(args)
+
+if __name__ == "__main__":
+    main()

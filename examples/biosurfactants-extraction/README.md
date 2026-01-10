@@ -15,15 +15,12 @@
 
 ## Reproducing the Dataset Construction
 
-1. Download files (todo) and place in `data/biosurfactants/Paper_DB`
+1. Download files (todo) and place in `data/Paper_DB`
 
 2. Extract all properties from each PDF using an LLM:
 
-<!-- ```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain biosurfactants --model_name gemini-3-pro-preview -od OUTPUT_DIR
-``` -->
 ```bash
-./src/pbench/mass_extract_properties_from_llm.py --model_name gemini-3-pro-preview -od OUTPUT_DIR
+uv run pbench-extract --domain biosurfactants --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR
 ```
 
 3. Launch the validator app and accept/reject the proposed properties. For more information, please see [VALIDATOR_GUIDE.md](../../docs/VALIDATOR_GUIDE.md).
