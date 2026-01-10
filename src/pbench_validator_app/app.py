@@ -23,6 +23,7 @@ uv run streamlit run src/pbench_validator_app/app.py -- \
 The app expects:
 - CSVs in: `{output_dir}/candidates/*.csv`
 - PDFs in: `{data_dir}/Paper_DB/*.pdf`
+- Validated CSVs saved to: `{output_dir}/validated_candidates/*.csv`
 
 CLI Arguments (via pbench.add_base_args):
     --output_dir (Path): Output directory containing the 'candidates' folder with CSV files
@@ -179,11 +180,7 @@ def get_available_csv_files() -> list[str]:
     if not os.path.exists(CSV_FOLDER):
         return []
 
-    csv_files = [
-        f
-        for f in os.listdir(CSV_FOLDER)
-        if f.endswith(".csv") and not f.endswith("_validated.csv")
-    ]
+    csv_files = [f for f in os.listdir(CSV_FOLDER) if f.endswith(".csv")]
     return sorted(csv_files)
 
 
@@ -249,7 +246,7 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 def load_data(csv_path: Path) -> pd.DataFrame:
     """Loads the CSV. Implements 'Shadow Loader' pattern:
-    1. Checks for a validated copy (suffix '_validated.csv').
+    1. Checks for a validated copy in validated_candidates directory.
     2. If found, loads that instead.
     3. If not found, CREATES it (Copy-on-Load) and loads it.
     This ensures we never edit the original file, but preserve all original data (including PDF paths).
@@ -264,25 +261,26 @@ def load_data(csv_path: Path) -> pd.DataFrame:
         st.error(f"CSV not found at {csv_path}")
         return pd.DataFrame()
 
-    # Determine validated path
-    if csv_path.endswith("_validated.csv"):
-        validated_path = csv_path
-    else:
-        validated_path = csv_path.replace(".csv", "_validated.csv")
+    # Determine validated path in validated_candidates directory
+    csv_path_obj = Path(csv_path)
+    validated_dir = args.output_dir / "validated_candidates"
+    validated_path = validated_dir / csv_path_obj.name
 
     # Copy-on-Load Logic
     if not os.path.exists(validated_path):
+        # Create validated_candidates directory if it doesn't exist
+        validated_dir.mkdir(parents=True, exist_ok=True)
         # Read original
         original_df = pd.read_csv(csv_path)
         # Save immediately to validated path
         original_df.to_csv(validated_path, index=False)
-        st.toast(f"Created working copy: {os.path.basename(validated_path)}", icon="🆕")
+        st.toast(f"Created working copy: {validated_path}", icon="🆕")
 
     # Always load from the validated path (which now guaranteed exists)
     df = pd.read_csv(validated_path)
 
     # Store the WORKING path in session state so we know where to save
-    st.session_state.current_working_csv_path = validated_path
+    st.session_state.current_working_csv_path = str(validated_path)
 
     return preprocess_dataframe(df)
 
