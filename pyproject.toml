@@ -46,7 +46,7 @@ validator = [
 
 [project.scripts]
 pbench-extract = "pbench.mass_extract_properties_from_llm:main"
-pbench-add-datatype = "pbench.add_data_type_column:main"
+pbench-filter = "pbench.filter_candidates:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
