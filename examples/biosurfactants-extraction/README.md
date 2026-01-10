@@ -20,7 +20,7 @@
 2. Extract all properties from each PDF using an LLM:
 
 ```bash
-uv run pbench-extract --domain biosurfactants --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR
+uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
 ```
 
 3. Launch the validator app and accept/reject the proposed properties. For more information, please see [VALIDATOR_GUIDE.md](../../docs/VALIDATOR_GUIDE.md).
