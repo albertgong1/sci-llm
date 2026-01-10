@@ -235,6 +235,7 @@ async def process_paper(
     prompt: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
+    model_name: str,
 ) -> list[pd.Series]:
     """Process a single paper by prompting the LLM one page at a time to extract properties.
 
@@ -243,6 +244,7 @@ async def process_paper(
         prompt: Extraction prompt text
         llm: LLMChat instance
         inf_gen_config: InferenceGenerationConfig instance
+        model_name: Name of the LLM model used for extraction
 
     Returns:
         List of pandas Series (one per extracted property)
@@ -297,6 +299,7 @@ async def process_paper(
                 row_series["id"] = f"prop_{property_counter:03d}"
                 row_series["refno"] = refno
                 row_series["paper_pdf_path"] = str(paper_path)
+                row_series["model_name"] = model_name
                 row_series["validated"] = None
                 row_series["validator_name"] = ""
                 row_series["validation_date"] = ""
@@ -374,7 +377,9 @@ async def extract_properties(args: argparse.Namespace) -> None:
             continue
 
         # Process the paper
-        rows = await process_paper(pdf_path, prompt, llm, inf_gen_config)
+        rows = await process_paper(
+            pdf_path, prompt, llm, inf_gen_config, args.model_name
+        )
 
         # Save to CSV
         if len(rows) > 0:
