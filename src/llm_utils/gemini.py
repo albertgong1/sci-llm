@@ -121,6 +121,11 @@ class GeminiChat(LLMChat):
         else:
             raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
 
+        # Disable automatic function calling
+        gen_kwargs["automatic_function_calling"] = (
+            genai_types.AutomaticFunctionCallingConfig(disable=True)
+        )
+
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
         if messages and messages[0]["role"] == "system":
