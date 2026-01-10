@@ -40,6 +40,9 @@ import pbench
 
 logger = logging.getLogger(__name__)
 
+# Maximum number of conditions to store in CSV
+MAX_CONDITIONS = 10
+
 
 def load_prompt(prompt_path: Path) -> str:
     """Load the extraction prompt from a markdown file.
@@ -90,53 +93,6 @@ def parse_json_response(response_text: str) -> dict | None:
     return None
 
 
-def map_conditions(json_conditions: dict) -> dict:
-    """Map JSON conditions object to CSV condition columns.
-
-    Args:
-        json_conditions: Conditions dict from JSON
-
-    Returns:
-        Dict with CSV condition column names and values
-
-    """
-    csv_conditions = {
-        "conditions.field_orientation": "",
-        "conditions.current_direction": "",
-        "conditions.field": "",
-        "conditions.temperature": "",
-        "conditions.field_range": "",
-        "conditions.temperature_range": "",
-    }
-
-    if not json_conditions:
-        return csv_conditions
-
-    # Map orientation to field_orientation
-    if orientation := json_conditions.get("orientation", ""):
-        csv_conditions["conditions.field_orientation"] = orientation
-
-    # Map field
-    if field_val := json_conditions.get("field", ""):
-        csv_conditions["conditions.field"] = field_val
-        # Check if it's a range
-        if any(indicator in str(field_val) for indicator in ["–", "-", "to", "~"]):
-            csv_conditions["conditions.field_range"] = field_val
-            csv_conditions["conditions.field"] = ""
-
-    # Map temperature
-    if temp_val := json_conditions.get("temperature", ""):
-        csv_conditions["conditions.temperature"] = temp_val
-        # Check if it's a range
-        if any(
-            indicator in str(temp_val) for indicator in ["–", "-", "to", "~", "<", ">"]
-        ):
-            csv_conditions["conditions.temperature_range"] = temp_val
-            csv_conditions["conditions.temperature"] = ""
-
-    return csv_conditions
-
-
 def json_property_to_csv_row(prop: dict) -> pd.Series:
     """Convert a JSON property object to a CSV row as pandas Series.
 
@@ -144,48 +100,59 @@ def json_property_to_csv_row(prop: dict) -> pd.Series:
         prop: Property dict from JSON response
 
     Returns:
-        pandas Series with all 27 CSV columns
+        pandas Series with CSV columns
 
     """
-    # Map conditions
-    conditions = map_conditions(prop.get("conditions", {}))
+    # Get conditions and flatten them
+    conditions = prop.get("conditions") or prop.get("critical_matrix") or {}
+
+    # Create a dict to hold the flattened condition columns
+    condition_cols = {}
+    for i in range(1, MAX_CONDITIONS + 1):
+        condition_cols[f"condition{i}_name"] = ""
+        condition_cols[f"condition{i}_value"] = ""
+
+    # Fill in the conditions that exist
+    if isinstance(conditions, dict):
+        for idx, (cond_name, cond_value) in enumerate(conditions.items(), start=1):
+            if idx <= MAX_CONDITIONS:
+                condition_cols[f"condition{idx}_name"] = str(cond_name)
+                condition_cols[f"condition{idx}_value"] = str(cond_value)
 
     # Get location info
     location = prop.get("location", {})
 
     # Build Series
-    return pd.Series(
-        {
-            # "id": "", # NOTE: will be automatically assigned when writing to CSV
-            # "refno": refno, # NOTE: will be automatically assigned when writing to CSV
-            "material_or_system": prop.get("material_or_system", ""),
-            "sample_label": prop.get("sample_label", ""),
-            "property_name": prop.get("property_name", ""),
-            "category": prop.get("category", ""),
-            "value_string": prop.get("value_string", ""),
-            "value_number": "",
-            "units": "",
-            "method": prop.get("method", ""),
-            "notes": prop.get("notes", ""),
-            "location.page": location.get("page", ""),
-            "location.section": location.get("section", ""),
-            "location.source_type": location.get("source_type", ""),
-            "location.evidence": location.get("evidence", ""),
-            "location.figure_or_table": location.get("figure_or_table", ""),
-            "conditions.field_orientation": conditions["conditions.field_orientation"],
-            "conditions.current_direction": conditions["conditions.current_direction"],
-            "conditions.field": conditions["conditions.field"],
-            "conditions.temperature": conditions["conditions.temperature"],
-            "conditions.field_range": conditions["conditions.field_range"],
-            "conditions.temperature_range": conditions["conditions.temperature_range"],
-            # NOTE: values below will be populated later by the validator app
-            # "paper_pdf_path": "",
-            # "validated": False,
-            # "validator_name": "",
-            # "validation_date": "",
-            # "flagged": False,
-        }
-    )
+    row_data = {
+        # "id": "", # NOTE: will be automatically assigned when writing to CSV
+        # "refno": refno, # NOTE: will be automatically assigned when writing to CSV
+        "material_or_system": prop.get("material_or_system", ""),
+        "sample_label": prop.get("sample_label", ""),
+        "property_name": prop.get("property_name", ""),
+        "category": prop.get("category", ""),
+        "value_string": prop.get("value_string", ""),
+        "value_number": "",
+        "units": "",
+        "method": prop.get("method", ""),
+        "notes": prop.get("notes", ""),
+        "location.page": location.get("page", ""),
+        "location.section": location.get("section", ""),
+        "location.source_type": location.get("source_type", ""),
+        "location.evidence": location.get("evidence", ""),
+        "location.figure_or_table": location.get("figure_or_table", ""),
+    }
+
+    # Add the flattened condition columns
+    row_data.update(condition_cols)
+
+    # NOTE: values below will be populated later by the validator app
+    # "paper_pdf_path": "",
+    # "validated": False,
+    # "validator_name": "",
+    # "validation_date": "",
+    # "flagged": False,
+
+    return pd.Series(row_data)
 
 
 async def process_single_page(
@@ -324,7 +291,6 @@ async def process_paper(
             try:
                 # Remove the temporary page_num field before converting
                 prop.pop("_page_num", None)
-
                 row_series: pd.Series = json_property_to_csv_row(prop)
 
                 # Assign metadata
@@ -387,7 +353,11 @@ async def extract_properties(args: argparse.Namespace) -> None:
     model_name_safe = args.model_name.replace("/", "--")
 
     # Process each PDF
-    for pdf_path in tqdm(pdf_files, desc="Processing PDFs"):
+    for i, pdf_path in enumerate(tqdm(pdf_files, desc="Processing PDFs")):
+        # Skip if file_no is specified and this isn't it
+        if args.file_no is not None and i + 1 != args.file_no:
+            continue
+
         refno = pdf_path.stem
 
         # Construct output path
@@ -428,6 +398,13 @@ def main() -> None:
         type=Path,
         default=Path("prompts/unsupervised_extraction_prompt.md"),
         help="Path to the unsupervised extraction prompt (default: prompts/unsupervised_extraction_prompt.md)",
+    )
+    parser.add_argument(
+        "--file_no",
+        "-fn",
+        type=int,
+        default=None,
+        help="Specific file number to process (1-indexed). If None, process all files",
     )
 
     # LLM generation arguments
