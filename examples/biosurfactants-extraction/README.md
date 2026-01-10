@@ -24,7 +24,7 @@
 
 - Export the list of candidate properties from [this Google Sheet](https://docs.google.com/spreadsheets/d/1IbiFwHcjTNi2tGCkQO_eOD_pTkL1Qetk_6r3xIq4B6c/edit?gid=0#gid=0) (ping Albert Gong on Slack or email ag2435@cornell.edu for access) by clicking "File" -> "Download" -> "CSV".
 - Rename the CSV file to `extracted_properties_combined.csv`.
-- Place the CSV file in `OUTPUT_DIR/candidates/`.
+- Place the CSV file in `OUTPUT_DIR/candidates/` (you may need to create the directory if it doesn't exist).
 
 </details>
 
