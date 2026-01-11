@@ -214,6 +214,14 @@ async def main(args: argparse.Namespace) -> None:
         df_pred = pd.read_csv(pred_properties_file)
         assert len(df_pred["refno"].unique()) == 1, "Expected only one refno per file"
         refno = df_pred["refno"].unique()[0]
+        pred_matches_path = (
+            matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
+        )
+        gt_matches_path = matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+        if pred_matches_path.exists() and gt_matches_path.exists() and not force:
+            logging.info(f"Skipping refno {refno} because pred matches already exist")
+            continue
+
         # Obtain the ground truth properties for this refno
         df_gt_refno = pd.DataFrame(df_gt.loc[refno]["properties"].tolist())
         # Obtain the embeddings for the predicted and ground truth properties
@@ -232,151 +240,138 @@ async def main(args: argparse.Namespace) -> None:
             on="property_name",
             how="left",
         )
+
+        # -- Get top-k matches for each predicted property name (to compute precision) --
         # Compute the similarity matrix between the predicted and ground truth properties
         similarity_matrix = cosine_similarity(
             np.vstack(df_pred["embedding"].values),
             np.vstack(df_gt_embeddings["embedding"].values),
         )
-
-        # Get top-k matches for each predicted property name (to compute precision)
-        pred_matches_path = (
-            matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
+        top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
+            :, :top_k
+        ]
+        pred_matches = []
+        for i in tqdm(range(len(df_pred)), desc=f"Processing refno {refno}"):
+            pred = df_pred.iloc[i].to_dict()
+            # get the top-k matches from the ground truth embeddings
+            top_k_matches = df_gt_embeddings.iloc[top_k_matches_indices[i]][
+                "property_name"
+            ].tolist()
+            df_gt_top_k = df_gt_refno[df_gt_refno["property_name"].isin(top_k_matches)]
+            # Create async tasks for all unique matches
+            tasks = OrderedDict()
+            idx_to_task_id = {}
+            for idx, gt in df_gt_top_k.iterrows():
+                name1 = pred["property_name"]
+                context1 = pred["location.evidence"]
+                name2 = gt["property_name"]
+                context2 = json.dumps(
+                    {
+                        k: v
+                        for k, v in gt.items()
+                        if k.startswith("conditions.") or k == "value_unit"
+                    }
+                )
+                task_id = (name1, context1, name2, context2)
+                idx_to_task_id[idx] = task_id
+                if task_id not in tasks:
+                    task = check_if_same_property(
+                        llm, inf_gen_config, name1, context1, name2, context2
+                    )
+                    tasks[task_id] = task
+            # Execute all tasks concurrently
+            results = await asyncio.gather(*tasks.values())
+            results = {
+                task_id: result for task_id, result in zip(tasks.keys(), results)
+            }
+            # Combine the results with the predicted and ground truth properties
+            for idx, gt in df_gt_top_k.iterrows():
+                result = results[idx_to_task_id[idx]]
+                pred_matches.append(
+                    {
+                        **pred,
+                        **result,
+                        "gt_id": idx,  # use this to join the results with the ground truth properties
+                    }
+                )
+        # save pred_matches to csv
+        df_pred_matches = pd.DataFrame(pred_matches)
+        df_pred_matches = df_pred_matches.merge(
+            df_gt_refno,
+            left_on="gt_id",
+            right_index=True,
+            how="left",
+            suffixes=("_pred", "_gt"),
         )
-        if True:  # pred_matches_path.exists() and not force:
-            logging.info(f"Skipping refno {refno} because pred matches already exist")
-        else:
-            top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
-                :, :top_k
-            ]
-            pred_matches = []
-            for i in tqdm(range(len(df_pred)), desc=f"Processing refno {refno}"):
-                pred = df_pred.iloc[i].to_dict()
-                # get the top-k matches from the ground truth embeddings
-                top_k_matches = df_gt_embeddings.iloc[top_k_matches_indices[i]][
-                    "property_name"
-                ].tolist()
-                df_gt_top_k = df_gt_refno[
-                    df_gt_refno["property_name"].isin(top_k_matches)
-                ]
-                # Create async tasks for all unique matches
-                tasks = OrderedDict()
-                idx_to_task_id = {}
-                for idx, gt in df_gt_top_k.iterrows():
-                    name1 = pred["property_name"]
-                    context1 = pred["location.evidence"]
-                    name2 = gt["property_name"]
-                    context2 = json.dumps(
-                        {
-                            k: v
-                            for k, v in gt.items()
-                            if k.startswith("conditions.") or k == "value_unit"
-                        }
-                    )
-                    task_id = (name1, context1, name2, context2)
-                    idx_to_task_id[idx] = task_id
-                    if task_id not in tasks:
-                        task = check_if_same_property(
-                            llm, inf_gen_config, name1, context1, name2, context2
-                        )
-                        tasks[task_id] = task
-                # Execute all tasks concurrently
-                results = await asyncio.gather(*tasks.values())
-                results = {
-                    task_id: result for task_id, result in zip(tasks.keys(), results)
-                }
-                # Combine the results with the predicted and ground truth properties
-                for idx, gt in df_gt_top_k.iterrows():
-                    result = results[idx_to_task_id[idx]]
-                    pred_matches.append(
-                        {
-                            **pred,
-                            **result,
-                            "gt_id": idx,  # use this to join the results with the ground truth properties
-                        }
-                    )
-            # save pred_matches to csv
-            df_pred_matches = pd.DataFrame(pred_matches)
-            df_pred_matches = df_pred_matches.merge(
-                df_gt_refno,
-                left_on="gt_id",
-                right_index=True,
-                how="left",
-                suffixes=("_pred", "_gt"),
-            )
-            df_pred_matches.to_csv(pred_matches_path, index=False)
-            logging.info(f"Saved pred matches to {pred_matches_path}")
+        df_pred_matches.to_csv(pred_matches_path, index=False)
+        logging.info(f"Saved pred matches to {pred_matches_path}")
 
+        # -- Get top-k matches for each ground truth property name (to compute recall) --
+        # Compute the similarity matrix between the ground truth and predicted properties
         similarity_matrix = cosine_similarity(
             np.vstack(df_gt_refno["embedding"].values),
             np.vstack(df_pred_embeddings["embedding"].values),
         )
-        # Get top-k matches for each ground truth property name (to compute recall)
-        gt_matches_path = matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
-        if gt_matches_path.exists() and not force:
-            logging.info(f"Skipping refno {refno} because gt matches already exist")
-        else:
-            top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
-                :, :top_k
-            ]
-            gt_matches = []
-            for i in tqdm(
-                range(len(df_gt_refno)), desc=f"Processing refno {refno} (gt)"
-            ):
-                gt = df_gt_refno.iloc[i].to_dict()
-                # get the top-k matches from the predicted embeddings
-                top_k_matches = df_pred_embeddings.iloc[top_k_matches_indices[i]][
-                    "property_name"
-                ].tolist()
-                df_pred_top_k = df_pred[df_pred["property_name"].isin(top_k_matches)]
-                # Create async tasks for all unique matches
-                tasks = OrderedDict()
-                idx_to_task_id = {}
-                for idx, pred in df_pred_top_k.iterrows():
-                    # NOTE: use the same order of property 1 and property 2 as in the previous code block
-                    # TODO (Albert): does this have an impact on the results (even though the classification task should be symmetric)?
-                    name1 = pred["property_name"]
-                    context1 = pred["location.evidence"]
-                    name2 = gt["property_name"]
-                    context2 = json.dumps(
-                        {
-                            k: v
-                            for k, v in gt.items()
-                            if k.startswith("conditions.") or k == "value_unit"
-                        }
+        top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
+            :, :top_k
+        ]
+        gt_matches = []
+        for i in tqdm(range(len(df_gt_refno)), desc=f"Processing refno {refno} (gt)"):
+            gt = df_gt_refno.iloc[i].to_dict()
+            # get the top-k matches from the predicted embeddings
+            top_k_matches = df_pred_embeddings.iloc[top_k_matches_indices[i]][
+                "property_name"
+            ].tolist()
+            df_pred_top_k = df_pred[df_pred["property_name"].isin(top_k_matches)]
+            # Create async tasks for all unique matches
+            tasks = OrderedDict()
+            idx_to_task_id = {}
+            for idx, pred in df_pred_top_k.iterrows():
+                # NOTE: use the same order of property 1 and property 2 as in the previous code block
+                # TODO (Albert): does this have an impact on the results (even though the classification task should be symmetric)?
+                name1 = pred["property_name"]
+                context1 = pred["location.evidence"]
+                name2 = gt["property_name"]
+                context2 = json.dumps(
+                    {
+                        k: v
+                        for k, v in gt.items()
+                        if k.startswith("conditions.") or k == "value_unit"
+                    }
+                )
+                task_id = (name1, context1, name2, context2)
+                idx_to_task_id[idx] = task_id
+                if task_id not in tasks:
+                    task = check_if_same_property(
+                        llm, inf_gen_config, name1, context1, name2, context2
                     )
-                    task_id = (name1, context1, name2, context2)
-                    idx_to_task_id[idx] = task_id
-                    if task_id not in tasks:
-                        task = check_if_same_property(
-                            llm, inf_gen_config, name1, context1, name2, context2
-                        )
-                        tasks[task_id] = task
-                # Execute all tasks concurrently
-                results = await asyncio.gather(*tasks.values())
-                results = {
-                    task_id: result for task_id, result in zip(tasks.keys(), results)
-                }
-                # Combine the results with the ground truth and predicted properties
-                for idx, pred in df_pred_top_k.iterrows():
-                    result = results[idx_to_task_id[idx]]
-                    gt_matches.append(
-                        {
-                            **gt,
-                            **result,
-                            "pred_id": idx,  # use this to join the results with the predicted properties
-                        }
-                    )
-            # save gt_matches to csv
-            df_gt_matches = pd.DataFrame(gt_matches)
-            df_gt_matches = df_gt_matches.merge(
-                df_pred,
-                left_on="pred_id",
-                right_index=True,
-                how="left",
-                suffixes=("_gt", "_pred"),
-            )
-            df_gt_matches.to_csv(gt_matches_path, index=False)
-            logging.info(f"Saved gt matches to {gt_matches_path}")
+                    tasks[task_id] = task
+            # Execute all tasks concurrently
+            results = await asyncio.gather(*tasks.values())
+            results = {
+                task_id: result for task_id, result in zip(tasks.keys(), results)
+            }
+            # Combine the results with the ground truth and predicted properties
+            for idx, pred in df_pred_top_k.iterrows():
+                result = results[idx_to_task_id[idx]]
+                gt_matches.append(
+                    {
+                        **gt,
+                        **result,
+                        "pred_id": idx,  # use this to join the results with the predicted properties
+                    }
+                )
+        # save gt_matches to csv
+        df_gt_matches = pd.DataFrame(gt_matches)
+        df_gt_matches = df_gt_matches.merge(
+            df_pred,
+            left_on="pred_id",
+            right_index=True,
+            how="left",
+            suffixes=("_gt", "_pred"),
+        )
+        df_gt_matches.to_csv(gt_matches_path, index=False)
+        logging.info(f"Saved gt matches to {gt_matches_path}")
 
 
 if __name__ == "__main__":
