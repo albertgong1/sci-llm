@@ -67,8 +67,6 @@ There are more instructions in `docs/VALIDATOR_GUIDE.md`.
 
 ### Validating the dataset construction (SuperCon only)
 
-**Computing recall:**
-
 1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
@@ -79,25 +77,22 @@ uv run python generate_gt_embeddings.py -od OUTPUT_DIR
 2. Query LLM to determine best match between generated and ground-truth property name:
 
 ```bash
-uv run python verify_aliases.py -od OUTPUT_DIR -m gemini-3-pro-preview
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-pro-preview
 ```
 
-3. Apply property-specific scoring rules and compute overall recall:
+3. Compute recall:
 
 ```bash
-uv run python score_pr.py -od OUTPUT_DIR --dataset kilian-group/supercon-mini-v2
+uv run python score_recall.py -od OUTPUT_DIR
 ```
 
-**Computing precision:**
-
-1. To compute precision w.r.t. the human annotations, please run the following command:
+4. Compute precision:
 
 ```bash
+uv run python score_precision.py -od OUTPUT_DIR
 ```
 
-**Computing inter-annotator agreement:**
-
-1. To compute inter-annotator agreement, please run the following command:
+5. Compute inter-annotator agreement:
 
 ```bash
 ```
