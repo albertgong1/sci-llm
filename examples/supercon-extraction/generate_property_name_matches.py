@@ -196,8 +196,10 @@ async def main(args: argparse.Namespace) -> None:
     #
     # Main Loop
     #
-    matches_dir = output_dir / "matches"
-    matches_dir.mkdir(parents=True, exist_ok=True)
+    pred_matches_dir = output_dir / "pred_matches"
+    pred_matches_dir.mkdir(parents=True, exist_ok=True)
+    gt_matches_dir = output_dir / "gt_matches"
+    gt_matches_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize LLM
     llm = get_llm(args.server, model_name)
@@ -215,11 +217,13 @@ async def main(args: argparse.Namespace) -> None:
         assert len(df_pred["refno"].unique()) == 1, "Expected only one refno per file"
         refno = df_pred["refno"].unique()[0]
         pred_matches_path = (
-            matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
+            pred_matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
         )
-        gt_matches_path = matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+        gt_matches_path = (
+            gt_matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+        )
         if pred_matches_path.exists() and gt_matches_path.exists() and not force:
-            logging.info(f"Skipping refno {refno} because pred matches already exist")
+            logger.info(f"Skipping refno {refno} because pred matches already exist")
             continue
 
         # Obtain the ground truth properties for this refno
@@ -304,7 +308,7 @@ async def main(args: argparse.Namespace) -> None:
             suffixes=("_pred", "_gt"),
         )
         df_pred_matches.to_csv(pred_matches_path, index=False)
-        logging.info(f"Saved pred matches to {pred_matches_path}")
+        logger.info(f"Saved pred matches to {pred_matches_path}")
 
         # -- Get top-k matches for each ground truth property name (to compute recall) --
         # Compute the similarity matrix between the ground truth and predicted properties
@@ -371,7 +375,7 @@ async def main(args: argparse.Namespace) -> None:
             suffixes=("_gt", "_pred"),
         )
         df_gt_matches.to_csv(gt_matches_path, index=False)
-        logging.info(f"Saved gt matches to {gt_matches_path}")
+        logger.info(f"Saved gt matches to {gt_matches_path}")
 
 
 if __name__ == "__main__":
