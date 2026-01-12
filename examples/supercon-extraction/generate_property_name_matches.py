@@ -28,75 +28,14 @@ from pathlib import Path
 # llm imports
 from llm_utils import (
     get_llm,
-    LLMChat,
     InferenceGenerationConfig,
-    Conversation,
-    Message,
-    LLMChatResponse,
 )
 
 # pbench imports
 import pbench
+from pbench_eval.match import check_if_same_property
 
 logger = logging.getLogger(__name__)
-
-
-async def check_if_same_property(
-    llm: LLMChat,
-    inf_gen_config: InferenceGenerationConfig,
-    name1: str,
-    context1: str,
-    name2: str,
-    context2: str,
-    prompt_template: str,
-) -> dict:
-    """Check if two property names are the same using an LLM.
-
-    Args:
-        llm: LLM instance
-        inf_gen_config: Inference generation configuration
-        name1: name of the first property
-        context1: context of the first property
-        name2: name of the second property
-        context2: context of the second property
-        prompt_template: prompt template to use
-
-    Returns:
-        dict: Dictionary containing the result of the check
-
-    """
-    # Build conversation
-    prompt = prompt_template.format(
-        name1=name1,
-        context1=context1,  # use the evidence field as the context
-        name2=name2,
-        context2=context2,
-    )
-    conv = Conversation(messages=[Message(role="user", content=[prompt])])
-
-    # Generate response
-    response: LLMChatResponse = await llm.generate_response_async(conv, inf_gen_config)
-    if response.pred:
-        is_match = response.pred.get("is_match", False)
-        reason = response.pred.get("reason", "No reason provided")
-        confidence = response.pred.get("confidence")
-        matched_via = response.pred.get("matched_via")
-    else:
-        is_match = False
-        reason = "Empty response from LLM"
-        confidence = None
-        matched_via = None
-
-    result = {
-        "is_match": is_match,
-        "reason": reason,
-        "confidence": confidence,
-        "matched_via": matched_via,
-        "model": llm.model_name,
-        "prompt": prompt,
-    }
-
-    return result
 
 
 async def main(args: argparse.Namespace) -> None:
