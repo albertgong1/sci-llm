@@ -23,6 +23,7 @@ import asyncio
 from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from collections import OrderedDict
+from pathlib import Path
 
 # llm imports
 from llm_utils import (
@@ -39,61 +40,6 @@ import pbench
 
 logger = logging.getLogger(__name__)
 
-PROMPT_TEMPLATE = """
-You are an expert material scientist with years of experience in material science and physics.
-You have a multiple top-tier publications in high-impact journals like Science, Nature, and PNAS.
-Your task is to determine if two property names refer to the exact same physical property.
-
-Property 1: "{s1}"
-Property 2: "{s2}"
-
-Context:
-- Property 1 was extracted from a scientific paper by an automated system.
-- Property 2 is a standard label from a curated database (Ground Truth).
-- They might differ in capitalization, abbreviations (e.g., "Tc" vs "Critical Temperature"), or terminology.
-- However, if Property 1 is seemingly related but technically different (e.g. "Tc onset" vs "Tc zero", or "lattice constant a" vs "lattice constant c"), they are NOT the same.
-
-Question: Are these two property names refer to the exact same physical property?
-Return JSON only: {{ "is_match": boolean, "reason": "concise explanation" }}
-"""
-
-PROMPT_TEMPLATE_2 = """\
-You are an expert condensed matter physicist evaluating whether two property descriptions refer to the same physical measurement.
-
-## Property 1
-- Name: "{name1}"
-- Context: "{context1}"
-
-## Property 2
-- Name: "{name2}"
-- Context: "{context2}"
-
-## Matching Rules:
-
-**SAME property if:**
-- Names are synonymous (e.g., "Tc" = "Critical Temperature" = "Superconducting Transition Temperature")
-- Abbreviation differences only (e.g., "Jc" = "Critical Current Density")
-- Capitalization/formatting differences
-
-**DIFFERENT properties if:**
-- Technically distinct measurements:
-  - "Tc onset" ≠ "Tc zero" ≠ "Tc midpoint"
-  - "Jc" ≠ "Ic" (density vs absolute current)
-  - "lattice constant a" ≠ "lattice constant c"
-  - "upper critical field Hc2" ≠ "lower critical field Hc1"
-- Different measurement orientations when orientation matters (e.g., "resistivity (c-axis)" ≠ "resistivity (ab-plane)")
-- Different conditions not reconcilable (e.g., "Tc at 0 GPa" ≠ "Tc at 10 GPa" unless pressure is tracked separately)
-
-## Response Format:
-Return JSON only:
-{{
-  "is_match": boolean,
-  "confidence": "high" | "medium" | "low",
-  "reason": "concise explanation",
-  "matched_via": "direct" | "synonym" | "abbreviation" | "condition_reconciliation" | null
-}}
-"""
-
 
 async def check_if_same_property(
     llm: LLMChat,
@@ -102,6 +48,7 @@ async def check_if_same_property(
     context1: str,
     name2: str,
     context2: str,
+    prompt_template: str,
 ) -> dict:
     """Check if two property names are the same using an LLM.
 
@@ -112,13 +59,14 @@ async def check_if_same_property(
         context1: context of the first property
         name2: name of the second property
         context2: context of the second property
+        prompt_template: prompt template to use
 
     Returns:
         dict: Dictionary containing the result of the check
 
     """
     # Build conversation
-    prompt = PROMPT_TEMPLATE_2.format(
+    prompt = prompt_template.format(
         name1=name1,
         context1=context1,  # use the evidence field as the context
         name2=name2,
@@ -157,6 +105,11 @@ async def main(args: argparse.Namespace) -> None:
     model_name = args.model_name
     top_k = 3
     force = args.force
+
+    # Load prompt template from markdown file
+    prompt_path = Path("prompts") / "property_matching_prompt.md"
+    with open(prompt_path, "r") as f:
+        prompt_template = f.read()
 
     #
     # Load embeddings
@@ -280,7 +233,13 @@ async def main(args: argparse.Namespace) -> None:
                 idx_to_task_id[idx] = task_id
                 if task_id not in tasks:
                     task = check_if_same_property(
-                        llm, inf_gen_config, name1, context1, name2, context2
+                        llm,
+                        inf_gen_config,
+                        name1,
+                        context1,
+                        name2,
+                        context2,
+                        prompt_template,
                     )
                     tasks[task_id] = task
             # Execute all tasks concurrently
@@ -347,7 +306,13 @@ async def main(args: argparse.Namespace) -> None:
                 idx_to_task_id[idx] = task_id
                 if task_id not in tasks:
                     task = check_if_same_property(
-                        llm, inf_gen_config, name1, context1, name2, context2
+                        llm,
+                        inf_gen_config,
+                        name1,
+                        context1,
+                        name2,
+                        context2,
+                        prompt_template,
                     )
                     tasks[task_id] = task
             # Execute all tasks concurrently
