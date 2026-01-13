@@ -9,7 +9,6 @@ import asyncio
 import json
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from pathlib import Path
 
 # llm imports
 from google import genai
@@ -62,34 +61,20 @@ def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
 async def check_if_same_property(
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
-    name1: str,
-    context1: str,
-    name2: str,
-    context2: str,
-    prompt_template: str,
+    prompt: str,
 ) -> dict:
     """Check if two property names are the same using an LLM.
 
     Args:
         llm: LLM instance
         inf_gen_config: Inference generation configuration
-        name1: name of the first property
-        context1: context of the first property
-        name2: name of the second property
-        context2: context of the second property
-        prompt_template: prompt template to use
+        prompt: input to the LLM
 
     Returns:
         dict: Dictionary containing the result of the check
 
     """
     # Build conversation
-    prompt = prompt_template.format(
-        name1=name1,
-        context1=context1,  # use the evidence field as the context
-        name2=name2,
-        context2=context2,
-    )
     conv = Conversation(messages=[Message(role="user", content=[prompt])])
 
     # Generate response
@@ -118,95 +103,91 @@ async def check_if_same_property(
 
 
 async def generate_property_name_matches(
-    df_pred: pd.DataFrame,
-    df_gt_embeddings: pd.DataFrame,
-    refno: str,
-    df_gt_refno: pd.DataFrame,
-    pred_matches_path: Path,
+    df1: pd.DataFrame,
+    df2: pd.DataFrame,
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
+    prompt_template: str,
+    top_k: int = TOP_K,
+    left_on: list[str] = ["property_name", "context"],
+    right_on: list[str] = ["property_name", "context"],
 ) -> pd.DataFrame:
-    """Get top-k matches for each predicted property name (to compute precision)
-
-    We should take in df_pred and df_gt.
-    Then take the unique property names from each.
-    Then generate embeddings for each of the unique pred and gt property names.
-    Then join on the unique property names.
-    Compute the similarity matrix between the embeddings.
+    """For each row in df1, find the top-k matches in df2 based on property name and context
 
     Args:
-        df_pred: DataFrame of predicted properties.
-        df_gt_embeddings: DataFrame of ground truth embeddings.
-        refno: Reference number of the properties.
-        df_gt_refno: DataFrame of ground truth properties.
-        pred_matches_path: Path to save the predicted matches.
+        df1: DataFrame of properties 1 with columns "embedding" and those in `left_on`.
+        df2: DataFrame of properties 2 with columns "embedding" and those in `right_on`.
         llm: LLM to use for matching.
         inf_gen_config: Inference generation configuration.
+        prompt_template: Prompt template to use for matching.
+        top_k: Number of top matches to return.
+        left_on: Columns to join on for df1.
+        right_on: Columns to join on for df2.
 
     Returns:
-        DataFrame of predicted matches.
+        DataFrame containing top_k * len(df1) rows with columns from df1 and df2.
 
     """
-    # Compute the similarity matrix between the predicted and ground truth properties
+    # import pdb; pdb.set_trace()
+    # initial match on property name only using embedding similarity
+    X = df1.drop_duplicates(subset=["property_name"])
+    Y = df2.drop_duplicates(subset=["property_name"])
+    # Compute the similarity matrix between property names from df1 and df2
     similarity_matrix = cosine_similarity(
-        np.vstack(df_pred["embedding"].values),
-        np.vstack(df_gt_embeddings["embedding"].values),
+        np.vstack(X["embedding"].values),
+        np.vstack(Y["embedding"].values),
     )
-    top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :TOP_K]
-    pred_matches = []
-    for i in tqdm(range(len(df_pred)), desc=f"Processing refno {refno}"):
-        pred = df_pred.iloc[i].to_dict()
-        # get the top-k matches from the ground truth embeddings
-        top_k_matches = df_gt_embeddings.iloc[top_k_matches_indices[i]][
-            "property_name"
-        ].tolist()
-        df_gt_top_k = df_gt_refno[df_gt_refno["property_name"].isin(top_k_matches)]
-        # Create async tasks for all unique matches
+    top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :top_k]
+
+    # further match on additional context using LLM
+    matches = []
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        # Step 1. Find the rows in Y whose property name is in the top_k matches for x
+        # NOTE: this may yield more than k matches since some rows share property name, but not context
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
+        logger.info(f"Found {len(df2_top_k)} matches for {x['property_name']}")
+        # Step 2. Construct async tasks, reusing the same task for rows with the same property name and context
         tasks = OrderedDict()
         idx_to_task_id = {}
-        for idx, gt in df_gt_top_k.iterrows():
-            name1 = pred["property_name"]
-            context1 = pred["location.evidence"]
-            name2 = gt["property_name"]
-            context2 = json.dumps(
-                {
-                    k: v
-                    for k, v in gt.items()
-                    if k.startswith("conditions.") or k == "value_unit"
-                }
-            )
-            task_id = (name1, context1, name2, context2)
+        for idx, y in df2_top_k.iterrows():
+            # NOTE: rename the variables to avoid conflicts when substituting them into the prompt template
+            x_variables = {k + "_1": x[k] for k in left_on}
+            y_variables = {k + "_2": y[k] for k in right_on}
+            task_id = (json.dumps(x_variables), json.dumps(y_variables))
             idx_to_task_id[idx] = task_id
             if task_id not in tasks:
-                task = check_if_same_property(
-                    llm, inf_gen_config, name1, context1, name2, context2
+                prompt = prompt_template.format(
+                    **x_variables,
+                    **y_variables,
                 )
+                task = check_if_same_property(llm, inf_gen_config, prompt)
                 tasks[task_id] = task
         # Execute all tasks concurrently
+        # import pdb; pdb.set_trace()
         results = await asyncio.gather(*tasks.values())
         results = {task_id: result for task_id, result in zip(tasks.keys(), results)}
-        # Combine the results with the predicted and ground truth properties
-        for idx, gt in df_gt_top_k.iterrows():
+        # Step 3. Combine the results with the rows in df2_top_k
+        for idx, y in df2_top_k.iterrows():
             result = results[idx_to_task_id[idx]]
-            pred_matches.append(
+            matches.append(
                 {
-                    **pred,
+                    **x,
                     **result,
-                    "gt_id": idx,  # use this to join the results with the ground truth properties
+                    "y_id": idx,  # later use this to join the results with df2 to get the remaining columns in df2
                 }
             )
-    # save pred_matches to csv
-    df_pred_matches = pd.DataFrame(pred_matches)
-    df_pred_matches = df_pred_matches.merge(
-        df_gt_refno,
-        left_on="gt_id",
+    # Step 4. Merge the results with df2 to get the remaining columns in df2
+    df_matches = pd.DataFrame(matches)
+    df_matches = df_matches.merge(
+        df2,
+        left_on="y_id",
         right_index=True,
         how="left",
-        suffixes=("_pred", "_gt"),
+        suffixes=("_x", "_y"),
     )
-    # df_pred_matches.to_csv(pred_matches_path, index=False)
-    # logging.info(f"Saved pred matches to {pred_matches_path}")
-    return df_pred_matches
+    return df_matches
 
 
 #

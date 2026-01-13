@@ -1,12 +1,12 @@
 You are an expert condensed matter physicist evaluating whether two property descriptions refer to the same physical measurement.
 
 ## Property 1
-- Name: "{name1}"
-- Context: "{context1}"
+- Name: "{property_name_1}"
+- Context: "{context_1}"
 
 ## Property 2
-- Name: "{name2}"
-- Context: "{context2}"
+- Name: "{property_name_2}"
+- Context: "{context_2}"
 
 ## Matching Rules:
 
