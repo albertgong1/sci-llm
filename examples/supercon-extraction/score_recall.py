@@ -111,16 +111,16 @@ for material_gt, group in grouped:
         for row in matching_rows:
             # Skip if values are missing
             if (
-                pd.isna(row["value_pred"])
-                or pd.isna(row["value_gt"])
+                pd.isna(row["value_string_pred"])
+                or pd.isna(row["value_string_gt"])
                 or pd.isna(row["rubric"])
             ):
                 continue
 
             # Calculate score
             score = score_value(
-                pred_value=str(row["value_pred"]),
-                answer_value=str(row["value_gt"]),
+                pred_value=str(row["value_string_pred"]),
+                answer_value=str(row["value_string_gt"]),
                 rubric=str(row["rubric"]),
                 mapping=None,
             )
