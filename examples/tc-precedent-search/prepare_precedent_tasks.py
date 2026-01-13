@@ -1,9 +1,9 @@
-
 """Generate Harbor tasks for the SuperCon precedent search (dev set)."""
 
 import argparse
 import csv
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -103,7 +103,21 @@ def build_task(task_dir: Path, row: dict[str, str], task_name: str) -> None:
     copy_template("tests/test.sh", tests_dir / "test.sh")
 
     # Copy shared scoring utils
-    shutil.copy2(pbench_eval_dir() / "utils.py", tests_dir / "pbench_eval_utils.py")
+    utils_path = tests_dir / "pbench_eval_utils.py"
+    shutil.copy2(pbench_eval_dir() / "utils.py", utils_path)
+    
+    # PATCH: Remove space_groups_normalized.json dependency for this specific task
+    # because we only need scorer_si and scorer_categorical
+    content = utils_path.read_text()
+    # Logic to identify and remove the loading block
+    # We look for the block starting with "ASSETS_DIR =" and ending with "json.load(f)"
+    # We'll just regex replace it or string replace safely
+    import re
+    # Pattern matches the import block down to the json load
+    pattern = r'ASSETS_DIR = Path\(__file__\)\.parent\.parent\.parent / "assets".*?SPACE_GROUPS = json\.load\(f\)'
+    # Replace with empty dict
+    patched_content = re.sub(pattern, 'SPACE_GROUPS = {}', content, flags=re.DOTALL)
+    utils_path.write_text(patched_content)
     
     # 7. Oracle Solution (solve.sh)
     # We construct a prediction matching the expected rows exactly
@@ -138,17 +152,31 @@ def write_job_config(tasks_dir: Path, job_path: Path) -> None:
     # must be relative to the repository root, not this script.
     repo_root = Path("../..").resolve()
     
+    workspace_root = (repo_root / "examples/harbor-workspace").resolve()
+    
     if not tasks_dir.is_absolute():
-        tasks_rel = (Path.cwd() / tasks_dir).resolve().relative_to(repo_root)
+        tasks_full = (Path.cwd() / tasks_dir).resolve()
     else:
-        tasks_rel = tasks_dir.resolve().relative_to(repo_root)
+        tasks_full = tasks_dir.resolve()
+        
+    try:
+        tasks_rel = tasks_full.relative_to(workspace_root)
+    except ValueError:
+        # Fallback if somehow tasks are outside workspace (e.g. absolute path usage)
+        # But for this script's purpose, it should be inside.
+        print(f"Warning: Tasks dir {tasks_full} is not within workspace {workspace_root}. Using repo-relative path.")
+        tasks_rel = tasks_full.relative_to(repo_root)
+
+    # Standard job config name
+    job_filename = "job.yaml"
+
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
 timeout_multiplier: 1.0
 orchestrator:
   type: local
-  n_concurrent_trials: 2
+  n_concurrent_trials: 10
   quiet: false
 environment:
   type: docker
@@ -157,24 +185,32 @@ environment:
 agents:
   - name: oracle
 datasets:
-  - path: {tasks_rel.as_posix()}
+  - path: {tasks_rel}
 """
-    job_path.parent.mkdir(parents=True, exist_ok=True)
-    job_path.write_text(job_yaml)
+    job_config_path = tasks_dir.parent / job_filename
+    job_config_path.parent.mkdir(parents=True, exist_ok=True)
+    with job_config_path.open("w") as f:
+        f.write(job_yaml)
+    print(f"Wrote job config -> {job_config_path}")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv", type=Path, default=Path("SuperCon_Tc_Tcn_dev-set.csv"))
-    parser.add_argument("--output-dir", type=Path, default=Path("../../out/harbor/precedent-search"))
+    parser.add_argument("--output-dir", type=Path, default=Path("../../examples/harbor-workspace/out/harbor/precedent-search"))
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--write-job-config", action="store_true")
     parser.add_argument("--force", action="store_true")
     
     args = parser.parse_args()
     
+    # Standard task generation
+    input_csv = args.csv
+    print(f"Using input CSV: {input_csv}")
+
     task_root = args.output_dir / "tc-precedent-search"
-    tasks_dir = task_root / "tasks"
+    tasks_dir_name = "tasks"
+    tasks_dir = task_root / tasks_dir_name
     
     if task_root.exists():
         if args.force:
@@ -185,8 +221,8 @@ def main():
 
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Reading CSV: {args.csv}")
-    with args.csv.open() as f:
+    print(f"Reading CSV: {input_csv}")
+    with input_csv.open() as f:
         reader = csv.DictReader(f)
         rows = list(reader)
         
@@ -197,8 +233,14 @@ def main():
     
     for row in rows:
         material = row["material"]
-        task_id = slugify(material)
-        task_dir = tasks_dir / task_id
+        # Sanitize material name for directory/sandbox usage
+        # Replace + with plus, and other invalid chars with _
+        safe_material = material.replace("+", "plus")
+        safe_material = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", safe_material).lower()
+        
+        # Task directory name
+        task_dir_name = safe_material
+        task_dir = tasks_dir / task_dir_name
         task_dir.mkdir(parents=True, exist_ok=True)
         
         build_task(task_dir, row, "precedent-search")
