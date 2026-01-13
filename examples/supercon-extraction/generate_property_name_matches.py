@@ -160,7 +160,7 @@ async def main(args: argparse.Namespace) -> None:
     """Main function to verify alias candidates using Gemini LLM."""
     output_dir = args.output_dir
     model_name = args.model_name
-    top_k = 3
+    top_k = args.top_k
     force = args.force
 
     # Load prompt template from markdown file
@@ -221,11 +221,11 @@ async def main(args: argparse.Namespace) -> None:
     )
 
     for i, pred_properties_file in enumerate(pred_properties_files):
-        if args.file_no is not None and i != args.file_no - 1:
-            continue
         df_pred = pd.read_csv(pred_properties_file)
         assert len(df_pred["refno"].unique()) == 1, "Expected only one refno per file"
         refno = df_pred["refno"].unique()[0]
+        if args.refno is not None and refno != args.refno:
+            continue
         pred_matches_path = (
             pred_matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
         )
@@ -261,7 +261,7 @@ async def main(args: argparse.Namespace) -> None:
             lambda row: construct_context(row), axis=1
         )
 
-        if True:
+        if False:
             # -- Get top-k matches for each predicted property name (to compute precision) --
             # Compute the similarity matrix between the predicted and ground truth properties
             similarity_matrix = cosine_similarity(
@@ -338,13 +338,14 @@ async def main(args: argparse.Namespace) -> None:
                 llm,
                 inf_gen_config,
                 prompt_template,
+                top_k=top_k,
                 left_on=["property_name", "context"],
                 right_on=["property_name", "context"],
             )
         df_pred_matches.to_csv(pred_matches_path, index=False)
         logger.info(f"Saved pred matches to {pred_matches_path}")
 
-        if True:
+        if False:
             # -- Get top-k matches for each ground truth property name (to compute recall) --
             # Compute the similarity matrix between the ground truth and predicted properties
             similarity_matrix = cosine_similarity(
@@ -423,6 +424,7 @@ async def main(args: argparse.Namespace) -> None:
                 llm,
                 inf_gen_config,
                 prompt_template,
+                top_k=top_k,
                 left_on=["property_name", "context"],
                 right_on=["property_name", "context"],
             )
@@ -439,10 +441,16 @@ if __name__ == "__main__":
     )
     parser = pbench.add_base_args(parser)
     parser.add_argument(
-        "--file_no",
-        type=int,
+        "--refno",
+        type=str,
         default=None,
-        help="File number to process (1-indexed). If None, process all files",
+        help="Refno to process. If None, process all refnos",
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=3,
+        help="Number of top matches to return (default: 3)",
     )
 
     # LLM generation arguments

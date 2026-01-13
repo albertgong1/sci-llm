@@ -129,12 +129,13 @@ async def generate_property_name_matches(
 
     """
     # import pdb; pdb.set_trace()
+    # TODO: group df1 on left_on columns, so that we can skip some LLM calls,
+    # then expand the groups to get the full df1 before returning the result
     # initial match on property name only using embedding similarity
-    X = df1.drop_duplicates(subset=["property_name"])
     Y = df2.drop_duplicates(subset=["property_name"])
     # Compute the similarity matrix between property names from df1 and df2
     similarity_matrix = cosine_similarity(
-        np.vstack(X["embedding"].values),
+        np.vstack(df1["embedding"].values),
         np.vstack(Y["embedding"].values),
     )
     top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :top_k]
@@ -142,6 +143,9 @@ async def generate_property_name_matches(
     # further match on additional context using LLM
     matches = []
     for i in tqdm(range(len(df1)), desc="Processing df1"):
+        # if i < 74:
+        #     continue
+        # import pdb; pdb.set_trace()
         x = df1.iloc[i].to_dict()
         # Step 1. Find the rows in Y whose property name is in the top_k matches for x
         # NOTE: this may yield more than k matches since some rows share property name, but not context
