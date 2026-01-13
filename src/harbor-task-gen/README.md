@@ -99,6 +99,12 @@ Example: `modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TO
 Use `--env modal` or the wrapper flag `--modal` (which also enables cleanup defaults).
 Modal environments are deleted after each run by default (`--delete`); pass
 `--no-delete` only when you want to keep a sandbox for debugging.
+Modal setup defaults:
+- Agent setup timeout is increased to 900s for Modal runs. Override with
+  `--agent-setup-timeout-sec 1200` or `HARBOR_AGENT_SETUP_TIMEOUT_SEC=1200`.
+  Set the value to `0` to keep Harbor's default (360s).
+- Log download is bounded to avoid hangs with
+  `HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC` (default: 300). Set to `0` to disable.
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \

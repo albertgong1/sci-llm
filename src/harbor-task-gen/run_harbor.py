@@ -261,6 +261,26 @@ def _patch_modal_download_logs(timeout_sec: int) -> None:
     Trial._maybe_download_logs = patched  # type: ignore[assignment]
 
 
+def _extract_agent_setup_timeout(
+    argv: list[str],
+) -> tuple[list[str], int | None]:
+    """Strip --agent-setup-timeout-sec from argv."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--agent-setup-timeout-sec", type=int, default=None)
+    args, remaining = parser.parse_known_args(argv)
+    return remaining, args.agent_setup_timeout_sec
+
+
+def _patch_agent_setup_timeout(timeout_sec: int) -> None:
+    """Override Harbor's default agent setup timeout (seconds)."""
+    try:
+        from harbor.trial.trial import Trial
+    except Exception:
+        return
+
+    Trial._AGENT_SETUP_TIMEOUT_SEC = timeout_sec
+
+
 def _run_harbor_cli_in_process(argv: list[str], *, workspace: Path) -> int:
     """Invoke Harbor's Typer app in-process so runtime patches take effect."""
     from harbor.cli.main import app
@@ -340,6 +360,7 @@ def main() -> int:
     argv, post_run = _extract_post_run_args(argv, workspace=workspace)
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
+    argv, agent_setup_override = _extract_agent_setup_timeout(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -394,6 +415,17 @@ def main() -> int:
             except ValueError:
                 timeout_sec = 300
             _patch_modal_download_logs(timeout_sec)
+        setup_timeout_raw = (
+            str(agent_setup_override)
+            if agent_setup_override is not None
+            else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
+        ).strip()
+        if setup_timeout_raw and setup_timeout_raw != "0":
+            try:
+                setup_timeout_sec = int(setup_timeout_raw)
+            except ValueError:
+                setup_timeout_sec = 900
+            _patch_agent_setup_timeout(setup_timeout_sec)
         exit_code = _run_harbor_cli_in_process(argv, workspace=workspace)
     else:
         command = [sys.executable, "-m", "harbor.cli.main", *argv]
