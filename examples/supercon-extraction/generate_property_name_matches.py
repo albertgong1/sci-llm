@@ -341,6 +341,8 @@ async def main(args: argparse.Namespace) -> None:
                 top_k=top_k,
                 left_on=["property_name", "context"],
                 right_on=["property_name", "context"],
+                left_suffix="_pred",
+                right_suffix="_gt",
             )
         df_pred_matches.to_csv(pred_matches_path, index=False)
         logger.info(f"Saved pred matches to {pred_matches_path}")
@@ -427,6 +429,8 @@ async def main(args: argparse.Namespace) -> None:
                 top_k=top_k,
                 left_on=["property_name", "context"],
                 right_on=["property_name", "context"],
+                left_suffix="_gt",
+                right_suffix="_pred",
             )
         df_gt_matches.to_csv(gt_matches_path, index=False)
         logger.info(f"Saved gt matches to {gt_matches_path}")

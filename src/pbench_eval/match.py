@@ -9,6 +9,8 @@ import asyncio
 import json
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+from pathlib import Path
+from joblib import Memory
 
 # llm imports
 from google import genai
@@ -58,10 +60,42 @@ def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
     return embeddings
 
 
+# Initialize joblib Memory for persistent caching
+_cache_dir = Path(".cache/property_matching")
+_cache_dir.mkdir(parents=True, exist_ok=True)
+memory = Memory(_cache_dir, verbose=0)
+
+
+@memory.cache
+def _store_property_check_result(
+    model_name: str,
+    prompt: str,
+    config_json: str,
+    result: dict,
+) -> dict:
+    """Store and retrieve cached property check results.
+
+    This is a simple pass-through function that joblib caches.
+    When called with the same inputs, it returns the cached result.
+
+    Args:
+        model_name: Name of the LLM model
+        prompt: Input prompt
+        config_json: JSON string of inference config
+        result: Result dictionary to cache
+
+    Returns:
+        The result dictionary
+
+    """
+    return result
+
+
 async def check_if_same_property(
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
     prompt: str,
+    use_cache: bool = True,
 ) -> dict:
     """Check if two property names are the same using an LLM.
 
@@ -69,11 +103,33 @@ async def check_if_same_property(
         llm: LLM instance
         inf_gen_config: Inference generation configuration
         prompt: input to the LLM
+        use_cache: Whether to use caching (default: True)
 
     Returns:
         dict: Dictionary containing the result of the check
 
     """
+    # Create cache key from hashable parameters
+    config_json = json.dumps(inf_gen_config.model_dump())
+
+    # Try to get from cache - we pass a dummy result to check if it's cached
+    if use_cache:
+        try:
+            # Use call_and_shelve to check cache without executing
+            cached = _store_property_check_result.call_and_shelve(
+                llm.model_name,
+                prompt,
+                config_json,
+                {},  # dummy result
+            )
+            result = cached.get()
+            # If we got a non-empty cached result, return it
+            if result and result.get("model"):
+                logger.debug(f"Cache hit for prompt: {prompt[:50]}...")
+                return result
+        except Exception as e:
+            logger.debug(f"Cache miss or error: {e}")
+
     # Build conversation
     conv = Conversation(messages=[Message(role="user", content=[prompt])])
 
@@ -99,6 +155,19 @@ async def check_if_same_property(
         "prompt": prompt,
     }
 
+    # Store in cache by calling the cached function with the real result
+    if use_cache:
+        try:
+            _store_property_check_result(
+                llm.model_name,
+                prompt,
+                config_json,
+                result,
+            )
+            logger.debug(f"Cached result for prompt: {prompt[:50]}...")
+        except Exception as e:
+            logger.warning(f"Failed to cache result: {e}")
+
     return result
 
 
@@ -111,6 +180,8 @@ async def generate_property_name_matches(
     top_k: int = TOP_K,
     left_on: list[str] = ["property_name", "context"],
     right_on: list[str] = ["property_name", "context"],
+    left_suffix: str = "_x",
+    right_suffix: str = "_y",
 ) -> pd.DataFrame:
     """For each row in df1, find the top-k matches in df2 based on property name and context
 
@@ -123,6 +194,8 @@ async def generate_property_name_matches(
         top_k: Number of top matches to return.
         left_on: Columns to join on for df1.
         right_on: Columns to join on for df2.
+        left_suffix: Suffix for columns in df1.
+        right_suffix: Suffix for columns in df2.
 
     Returns:
         DataFrame containing top_k * len(df1) rows with columns from df1 and df2.
@@ -189,7 +262,7 @@ async def generate_property_name_matches(
         left_on="y_id",
         right_index=True,
         how="left",
-        suffixes=("_x", "_y"),
+        suffixes=(left_suffix, right_suffix),
     )
     return df_matches
 
