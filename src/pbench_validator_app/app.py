@@ -974,13 +974,6 @@ def main() -> None:
             e.preventDefault();
             findAndClickButton('Invalid');
         }
-        else if (e.key === 'f' || e.key === 'F') {
-            e.preventDefault();
-            // Find the flag/unflag button
-            if (!findAndClickButton('Unflag')) {
-                findAndClickButton('Flag');
-            }
-        }
     };
 
     streamlitDoc.addEventListener('keydown', streamlitDoc.navKeyHandler);
