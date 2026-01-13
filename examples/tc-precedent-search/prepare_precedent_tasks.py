@@ -236,7 +236,7 @@ def main():
         # Sanitize material name for directory/sandbox usage
         # Replace + with plus, and other invalid chars with _
         safe_material = material.replace("+", "plus")
-        safe_material = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", safe_material)
+        safe_material = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", safe_material).lower()
         
         # Task directory name
         task_dir_name = safe_material
