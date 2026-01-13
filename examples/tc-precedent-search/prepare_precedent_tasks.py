@@ -1,9 +1,9 @@
-
 """Generate Harbor tasks for the SuperCon precedent search (dev set)."""
 
 import argparse
 import csv
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -166,13 +166,17 @@ def write_job_config(tasks_dir: Path, job_path: Path) -> None:
         # But for this script's purpose, it should be inside.
         print(f"Warning: Tasks dir {tasks_full} is not within workspace {workspace_root}. Using repo-relative path.")
         tasks_rel = tasks_full.relative_to(repo_root)
+
+    # Standard job config name
+    job_filename = "job.yaml"
+
     job_yaml = f"""\
 jobs_dir: jobs
-n_attempts: 3
+n_attempts: 1
 timeout_multiplier: 1.0
 orchestrator:
   type: local
-  n_concurrent_trials: 85
+  n_concurrent_trials: 10
   quiet: false
 environment:
   type: docker
@@ -181,10 +185,13 @@ environment:
 agents:
   - name: oracle
 datasets:
-  - path: {tasks_rel.as_posix()}
+  - path: {tasks_rel}
 """
-    job_path.parent.mkdir(parents=True, exist_ok=True)
-    job_path.write_text(job_yaml)
+    job_config_path = tasks_dir.parent / job_filename
+    job_config_path.parent.mkdir(parents=True, exist_ok=True)
+    with job_config_path.open("w") as f:
+        f.write(job_yaml)
+    print(f"Wrote job config -> {job_config_path}")
 
 
 def main():
@@ -197,8 +204,13 @@ def main():
     
     args = parser.parse_args()
     
+    # Standard task generation
+    input_csv = args.csv
+    print(f"Using input CSV: {input_csv}")
+
     task_root = args.output_dir / "tc-precedent-search"
-    tasks_dir = task_root / "tasks"
+    tasks_dir_name = "tasks"
+    tasks_dir = task_root / tasks_dir_name
     
     if task_root.exists():
         if args.force:
@@ -209,8 +221,8 @@ def main():
 
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Reading CSV: {args.csv}")
-    with args.csv.open() as f:
+    print(f"Reading CSV: {input_csv}")
+    with input_csv.open() as f:
         reader = csv.DictReader(f)
         rows = list(reader)
         
@@ -221,8 +233,14 @@ def main():
     
     for row in rows:
         material = row["material"]
-        task_id = slugify(material)
-        task_dir = tasks_dir / task_id
+        # Sanitize material name for directory/sandbox usage
+        # Replace + with plus, and other invalid chars with _
+        safe_material = material.replace("+", "plus")
+        safe_material = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", safe_material)
+        
+        # Task directory name
+        task_dir_name = safe_material
+        task_dir = tasks_dir / task_dir_name
         task_dir.mkdir(parents=True, exist_ok=True)
         
         build_task(task_dir, row, "precedent-search")
