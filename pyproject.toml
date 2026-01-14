@@ -24,6 +24,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "pymatgen",
+    "pyyaml",
     "tqdm",
     "google-genai",
     "openai",
@@ -53,3 +54,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+pbench = ["*.yaml"]
