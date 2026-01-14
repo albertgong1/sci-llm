@@ -77,7 +77,7 @@ uv run python generate_gt_embeddings.py -od OUTPUT_DIR
 2. Query LLM to determine best match between generated and ground-truth property name:
 
 ```bash
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-pro-preview
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
 ```
 
 3. Compute recall:
