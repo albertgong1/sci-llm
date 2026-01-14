@@ -57,15 +57,27 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
-## Sharing the dataset via HuggingFace
-
-1. Construct Harbor tasks:
+4. Create HuggingFace dataset:
 
 ```bash
-
+uv run python create_huggingface_dataset.py --output_dir out-0113-for-jiashuo --repo_name kilian-group/biosurfactants-mini --tag_name v0.0.0
 ```
 
-2. Push Harbor tasks to HuggingFace:
+## Constructing Harbor tasks
+
+1. Create Harbor template:
 
 ```bash
+# Copy the Harbor workspace template
+cp -r ../harbor-workspace/ground-template .
+# Add placeholder variable to the start of the prompt
+{ echo '{paper_at_command}'; echo; cat prompts/benchmark_soft_prompt_00.md; } > ground-template/instruction.md.template
+```
+
+2. Instantiate the Harbor tasks using the template for all papers:
+
+```bash
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
+    --pdf-dir data/Paper_DB --output-dir out-0114-harbor --workspace . --domain biosurfactants \
+    --force
 ```
