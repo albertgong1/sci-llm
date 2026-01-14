@@ -83,13 +83,16 @@ missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
     logger.warning(f"{missing_rubric} rows have no matching rubric")
 
-# Group by ground truth material and calculate recall scores
-grouped = df.groupby("material_or_system_gt")
-logger.info(f"Processing {len(grouped)} unique ground truth materials...")
+# Group by ground truth material AND property name to calculate recall scores
+grouped = df.groupby(["material_or_system_gt", "property_name_gt"])
+logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
 
 results = []
 
-for material_gt, group in grouped:
+for (material_gt, property_gt), group in grouped:
+    # if material_gt != "Hf1Rh0.7Pd0.3Si1":
+    #     continue
+    # import pdb; pdb.set_trace()
     # Check which rows have matching materials using scorer_pymatgen
     matching_rows = []
 
@@ -132,30 +135,56 @@ for material_gt, group in grouped:
     results.append(
         {
             "material_or_system_gt": material_gt,
-            "num_total_rows": len(group),
-            "num_material_matches": num_matches,
+            "property_name_gt": property_gt,
+            "value_string_gt": ", ".join(
+                list(set([str(row["value_string_gt"]) for _, row in group.iterrows()]))
+            ),
+            "num_property_matches": len(group),
+            "num_property_material_matches": num_matches,
+            "material_or_system_pred": ", ".join(
+                list(
+                    set(
+                        [
+                            str(row["material_or_system_pred"])
+                            for _, row in group.iterrows()
+                        ]
+                    )
+                )
+            ),
             "recall_score": recall_score,
+            "matches": ", ".join(
+                [
+                    f"{row['property_name_pred']}: {row['value_string_pred']}"
+                    for row in matching_rows
+                ]
+            ),
         }
     )
 
 df_results = pd.DataFrame(results)
 
 # Print results
-logger.info("=" * 60)
-logger.info("RECALL SCORES")
-logger.info("=" * 60)
+# logger.info("=" * 60)
+# logger.info("RECALL SCORES")
+# logger.info("=" * 60)
 
-for _, row in df_results.iterrows():
-    print(f"\nMaterial: {row['material_or_system_gt']}")
-    print(f"  Total rows: {row['num_total_rows']}")
-    print(f"  Material matches: {row['num_material_matches']}")
-    print(f"  Recall score: {row['recall_score']:.3f}")
+# for _, row in df_results.iterrows():
+#     print(f"\nMaterial: {row['material_or_system_gt']}")
+#     print(f"  Property: {row['property_name_gt']}")
+#     print(f"  Total rows: {row['num_total_rows']}")
+#     print(f"  Matches: {row['num_matches']}")
+#     print(f"  Recall score: {row['recall_score']:.3f}")
 
 # Summary statistics
 logger.info("=" * 60)
 logger.info("SUMMARY")
 logger.info("=" * 60)
-print(f"Total materials: {len(df_results)}")
-print(f"Materials with matches: {(df_results['num_material_matches'] > 0).sum()}")
+print(f"Total (material, property) pairs: {len(df_results)}")
+print(f"Pairs with matches: {(df_results['num_property_material_matches'] > 0).sum()}")
 print(f"Average recall score: {df_results['recall_score'].mean():.3f}")
 print(f"Median recall score: {df_results['recall_score'].median():.3f}")
+
+# save results to csv
+score_dir = args.output_dir / "scores"
+score_dir.mkdir(parents=True, exist_ok=True)
+df_results.to_csv(score_dir / "score_recall.csv", index=False)
