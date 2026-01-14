@@ -185,6 +185,8 @@ async def generate_property_name_matches(
 ) -> pd.DataFrame:
     """For each row in df1, find the top-k matches in df2 based on property name and context
 
+    NOTE: this queries the Gemini API and requires setting up GOOGLE_API_KEY environment variable.
+
     Args:
         df1: DataFrame of properties 1 with columns "embedding" and those in `left_on`.
         df2: DataFrame of properties 2 with columns "embedding" and those in `right_on`.

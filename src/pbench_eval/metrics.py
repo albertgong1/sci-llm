@@ -14,6 +14,15 @@ SERVER = "gemini"
 MODEL_NAME = "gemini-3-flash-preview"
 MAX_OUTPUT_TOKENS = 4096
 
+# Initialize LLM that will be used for all property matching
+llm = get_llm(SERVER, MODEL_NAME)
+
+# Create inference config
+inf_gen_config = InferenceGenerationConfig(
+    max_output_tokens=MAX_OUTPUT_TOKENS,
+    output_format="json",
+)
+
 
 #
 # Property extraction metrics
@@ -235,6 +244,8 @@ def compute_precision_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
 def add_property_name_embeddings(df: pd.DataFrame) -> pd.DataFrame:
     """Add embeddings and context to a dataframe of properties.
 
+    NOTE: this queries the Gemini API and requires setting up GOOGLE_API_KEY environment variable.
+
     Args:
         df: DataFrame with properties.
 
@@ -271,13 +282,11 @@ async def compute_mean_recall_precision(
         tuple[float, float]: Mean recall and precision.
 
     """
-    # Initialize LLM
-    llm = get_llm(SERVER, MODEL_NAME)
-
-    # Create inference config
-    inf_gen_config = InferenceGenerationConfig(
-        max_output_tokens=MAX_OUTPUT_TOKENS,
-        output_format="json",
+    assert len(df_pred["refno"].unique()) == 1, "Expected only one refno per file"
+    assert len(df_gt["refno"].unique()) == 1, "Expected only one refno per file"
+    # assert that df_gt contains the necessary columns
+    assert "rubric" in df_gt.columns, (
+        "Ground truth dataframe must contain a 'rubric' column"
     )
 
     # -- Generate embeddings for predicted properties --
