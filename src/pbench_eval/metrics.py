@@ -37,7 +37,7 @@ def construct_context(row: pd.Series) -> str:
     )
 
 
-def compute_material_property_recall(df: pd.DataFrame) -> pd.DataFrame:
+def compute_recall_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
     """Score recall for a dataframe of predicted-ground truth pairs.
 
     We use the following formula to score recall for each (material, property) pair:
@@ -142,7 +142,7 @@ def compute_material_property_recall(df: pd.DataFrame) -> pd.DataFrame:
     return df_results
 
 
-def compute_material_property_precision(df: pd.DataFrame) -> pd.DataFrame:
+def compute_precision_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
     """Score precision for a dataframe of predicted-ground truth pairs.
 
     Args:
@@ -300,7 +300,7 @@ async def compute_mean_recall_precision(
         left_suffix="_pred",
         right_suffix="_gt",
     )
-    df_recall = compute_material_property_recall(df_pred_matches)
+    df_recall = compute_recall_per_material_property(df_pred_matches)
 
     # -- Core functionality to compute precision --
     # Generate matches between predicted and ground truth properties
@@ -316,7 +316,7 @@ async def compute_mean_recall_precision(
         left_suffix="_gt",
         right_suffix="_pred",
     )
-    df_precision = compute_material_property_precision(df_gt_matches)
+    df_precision = compute_precision_per_material_property(df_gt_matches)
 
     # Compute mean recall and precision
     mean_recall = df_recall["recall_score"].mean()

@@ -19,7 +19,7 @@ import pandas as pd
 
 # pbench imports
 import pbench
-from pbench_eval.metrics import compute_material_property_recall
+from pbench_eval.metrics import compute_recall_per_material_property
 from pbench_eval.utils import scorer_pymatgen, score_value
 import logging
 
@@ -171,7 +171,7 @@ if False:
 
     df_results = pd.DataFrame(results)
 else:
-    df_results = compute_material_property_recall(df)
+    df_results = compute_recall_per_material_property(df)
 
 # Print results
 # logger.info("=" * 60)
