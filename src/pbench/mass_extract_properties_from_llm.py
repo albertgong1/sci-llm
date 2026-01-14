@@ -333,6 +333,20 @@ async def extract_properties(args: argparse.Namespace) -> None:
         raise FileNotFoundError(f"Paper directory not found: {paper_dir}")
 
     pdf_files = sorted(paper_dir.glob("*.pdf"))
+
+    # Filter out excluded files if exclude list is provided
+    if args.exclude_list and args.exclude_list.exists():
+        logger.info(f"Loading exclude list from {args.exclude_list}")
+        with open(args.exclude_list, "r") as f:
+            excluded_filenames = {line.strip() for line in f if line.strip()}
+
+        original_count = len(pdf_files)
+        pdf_files = [pdf for pdf in pdf_files if pdf.name not in excluded_filenames]
+        excluded_count = original_count - len(pdf_files)
+
+        if excluded_count > 0:
+            logger.info(f"Excluded {excluded_count} PDF file(s) based on exclude list")
+
     num_pdfs = len(pdf_files)
     logger.info(f"Found {num_pdfs} PDF files in {paper_dir}")
 
@@ -410,6 +424,13 @@ def main() -> None:
         type=int,
         default=None,
         help="Specific file number to process (1-indexed). If None, process all files",
+    )
+    parser.add_argument(
+        "--exclude_list",
+        "-el",
+        type=Path,
+        default=None,
+        help="Path to file containing list of PDF filenames to exclude (one per line)",
     )
 
     # LLM generation arguments
