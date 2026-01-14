@@ -8,9 +8,16 @@
 
 ## Experiments
 
-1. Generate predictions using Harbor/Modal:
+1. Generate predictions using Harbor + Modal:
+
+> \[!TIP\]
+> To run on Modal, add `--modal` to the command. Note: this allows you to run more concurrent tasks (e.g., 10) than the default of 4.
 
 ```bash
+uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  -c out-0114-harbor/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace .
 ```
 
 ## Reproducing the Dataset Construction
