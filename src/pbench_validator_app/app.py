@@ -754,6 +754,21 @@ def main() -> None:
     """Main function to run the app."""
     st.title("Property Validator")
 
+    # Custom CSS to make the PDF viewer fill available viewport height
+    st.markdown(
+        """
+        <style>
+        /* Target the PDF container and make it fill viewport */
+        [data-testid="stVerticalBlockBorderWrapper"]:has([data-testid="stImage"]) {
+            height: calc(100vh - 220px) !important;
+            max-height: calc(100vh - 220px) !important;
+            overflow-y: auto !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Remove legacy widget state keys to avoid Streamlit conflicts
     st.session_state.pop("property_selector", None)
 
@@ -804,6 +819,56 @@ def main() -> None:
                 if os.path.exists(csv_path):
                     st.session_state.df = load_data(csv_path)
 
+        # PDF Filter - allows filtering properties by PDF file
+        st.divider()
+        st.subheader("PDF Filter")
+
+        # Get available PDFs from the dataframe
+        available_pdfs = []
+        if (
+            st.session_state.df is not None
+            and not st.session_state.df.empty
+            and "paper_pdf_path" in st.session_state.df.columns
+        ):
+            # Extract unique PDF filenames from the dataframe
+            pdf_paths = st.session_state.df["paper_pdf_path"].dropna().unique()
+            available_pdfs = sorted(
+                [os.path.basename(p) for p in pdf_paths if p and isinstance(p, str)]
+            )
+
+        # Initialize selected PDF in session state
+        if "selected_pdf" not in st.session_state:
+            st.session_state.selected_pdf = None
+
+        # Reset PDF selection when CSV changes
+        if "last_csv_for_pdf" not in st.session_state:
+            st.session_state.last_csv_for_pdf = st.session_state.selected_csv
+        elif st.session_state.last_csv_for_pdf != st.session_state.selected_csv:
+            st.session_state.selected_pdf = None
+            st.session_state.last_csv_for_pdf = st.session_state.selected_csv
+
+        # PDF selector dropdown
+        pdf_index = None
+        if (
+            st.session_state.selected_pdf
+            and st.session_state.selected_pdf in available_pdfs
+        ):
+            pdf_index = available_pdfs.index(st.session_state.selected_pdf)
+
+        selected_pdf = st.selectbox(
+            "Filter by PDF",
+            options=[None] + available_pdfs,
+            index=0 if pdf_index is None else pdf_index + 1,
+            format_func=lambda x: "All PDFs" if x is None else x,
+            placeholder="Choose a PDF file...",
+        )
+
+        # Update session state if changed
+        if selected_pdf != st.session_state.selected_pdf:
+            st.session_state.selected_pdf = selected_pdf
+            st.session_state.current_property_index = 0  # Reset to first property
+            st.rerun()
+
         st.divider()
 
         # Validator Name
@@ -828,8 +893,20 @@ def main() -> None:
 
     # Continue with sidebar metrics
     with st.sidebar:
-        st.metric("Total Properties", len(st.session_state.df))
-        validated_count = st.session_state.df["validated"].notna().sum()
+        # Calculate metrics based on PDF filter if applied
+        metrics_df = st.session_state.df
+        if st.session_state.get("selected_pdf"):
+            selected_pdf_basename = st.session_state.selected_pdf
+            pdf_mask = metrics_df["paper_pdf_path"].apply(
+                lambda x: os.path.basename(str(x)) == selected_pdf_basename
+                if pd.notna(x)
+                else False
+            )
+            metrics_df = metrics_df[pdf_mask]
+            st.caption(f"Filtered by: {selected_pdf_basename}")
+
+        st.metric("Total Properties", len(metrics_df))
+        validated_count = metrics_df["validated"].notna().sum()
         st.metric("Validated", validated_count)
 
         # Filter controls
@@ -839,6 +916,19 @@ def main() -> None:
 
     # Filter Data based on selection
     df = st.session_state.df
+
+    # First, filter by PDF if one is selected
+    if st.session_state.get("selected_pdf"):
+        selected_pdf_basename = st.session_state.selected_pdf
+        # Filter to only rows where paper_pdf_path ends with the selected PDF filename
+        pdf_mask = df["paper_pdf_path"].apply(
+            lambda x: os.path.basename(str(x)) == selected_pdf_basename
+            if pd.notna(x)
+            else False
+        )
+        df = df[pdf_mask]
+
+    # Then filter by validation status
     if filter_status == "Pending":
         filtered_indices = df[df["validated"].isna()].index
     elif filter_status == "Valid":
@@ -1000,125 +1090,8 @@ def main() -> None:
         if not name_provided:
             st.warning("Please enter your name in the sidebar to begin validation.")
 
-        # Validation Controls
-        # Give more weight to Valid/Invalid to prevent wrapping
-        col_valid, col_invalid, col_flag, col_reset = st.columns([1.5, 1.5, 1.1, 1.1])
-
         is_validated = row["validated"]
         is_flagged = row["flagged"]
-
-        # Determine button styles based on state
-        valid_type = "primary" if is_validated is True else "secondary"
-        invalid_type = "primary" if is_validated is False else "secondary"
-        flag_type = "primary" if is_flagged else "secondary"
-
-        with col_valid:
-            # Modifying Valid Button to Handle Pending AI Matches
-            if st.button(
-                "✅ Valid (V)",
-                type=valid_type,
-                width="stretch",
-                disabled=not name_provided,
-            ):
-                # Check if there is a pending AI suggestion for this row
-                if (
-                    "pending_ai_match" in st.session_state
-                    and st.session_state.pending_ai_match.get("index") == selected_index
-                ):
-                    suggestion = st.session_state.pending_ai_match
-                    df.at[selected_index, "location.page"] = suggestion["page"]
-                    df.at[selected_index, "location.evidence"] = suggestion["evidence"]
-                    df.at[selected_index, "location.section"] = "AI Discovered"
-                    df.at[selected_index, "location.source_type"] = "text"
-
-                    # Clear the pending match after accepting
-                    del st.session_state.pending_ai_match
-
-                df.at[selected_index, "validated"] = True
-                df.at[selected_index, "validator_name"] = (
-                    st.session_state.validator_name
-                )
-                df.at[selected_index, "validation_date"] = datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-                # Auto-advance if filter preserves the item (All, Flagged, etc)
-                if filter_status in ["All", "Flagged"]:
-                    current_pos = st.session_state.current_property_index
-                    for i in range(current_pos + 1, len(filtered_indices)):
-                        idx = filtered_indices[i]
-                        if pd.isna(df.at[idx, "validated"]):
-                            st.session_state.current_property_index = i
-                            break
-
-                save_data(df)
-                st.session_state.df = df
-                st.rerun()
-
-        with col_invalid:
-            if st.button(
-                "❌ Invalid (X)",
-                type=invalid_type,
-                width="stretch",
-                disabled=not name_provided,
-            ):
-                df.at[selected_index, "validated"] = False
-                df.at[selected_index, "validator_name"] = (
-                    st.session_state.validator_name
-                )
-                df.at[selected_index, "validation_date"] = datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-
-                # Also clear pending AI match if invalidated? Maybe user rejected the AI suggestion implicitly.
-                if (
-                    "pending_ai_match" in st.session_state
-                    and st.session_state.pending_ai_match.get("index") == selected_index
-                ):
-                    del st.session_state.pending_ai_match
-
-                # Auto-advance if filter preserves the item (All, Flagged, etc)
-                if filter_status in ["All", "Flagged"]:
-                    current_pos = st.session_state.current_property_index
-                    for i in range(current_pos + 1, len(filtered_indices)):
-                        idx = filtered_indices[i]
-                        if pd.isna(df.at[idx, "validated"]):
-                            st.session_state.current_property_index = i
-                            break
-
-                save_data(df)
-                st.session_state.df = df
-                st.rerun()
-
-        with col_flag:
-            flag_label = "Unflag (F)" if is_flagged else "Flag (F)"
-            if st.button(flag_label, type=flag_type, width="stretch"):
-                new_flag_state = not is_flagged
-                df.at[selected_index, "flagged"] = new_flag_state
-
-                # Auto-advance to next property
-                if st.session_state.current_property_index < len(filtered_indices) - 1:
-                    st.session_state.current_property_index += 1
-
-                save_data(df)
-                st.session_state.df = df
-                st.rerun()
-
-        with col_reset:
-            if st.button("Reset", type="secondary", width="stretch"):
-                df.at[selected_index, "validated"] = None
-                df.at[selected_index, "validator_name"] = ""
-                df.at[selected_index, "validation_date"] = ""
-
-                # Clear pending match
-                if (
-                    "pending_ai_match" in st.session_state
-                    and st.session_state.pending_ai_match.get("index") == selected_index
-                ):
-                    del st.session_state.pending_ai_match
-
-                save_data(df)
-                st.session_state.df = df
-                st.rerun()
 
         if is_flagged:
             st.warning("This property is flagged for review.")
@@ -1166,14 +1139,134 @@ def main() -> None:
                     ):
                         st.markdown(f"**{col_name}:** `{val}`")
 
-            # st.write("---")
+            # Validation Controls
+            # Give more weight to Valid/Invalid to prevent wrapping
+            col_valid, col_invalid, col_flag, col_reset = st.columns(
+                [1.5, 1.5, 1.1, 1.1]
+            )
+
+            # Determine button styles based on state
+            valid_type = "primary" if is_validated is True else "secondary"
+            invalid_type = "primary" if is_validated is False else "secondary"
+            flag_type = "primary" if is_flagged else "secondary"
+
+            with col_valid:
+                # Modifying Valid Button to Handle Pending AI Matches
+                if st.button(
+                    "✅ Valid (V)",
+                    type=valid_type,
+                    width="stretch",
+                    disabled=not name_provided,
+                ):
+                    # Check if there is a pending AI suggestion for this row
+                    if (
+                        "pending_ai_match" in st.session_state
+                        and st.session_state.pending_ai_match.get("index")
+                        == selected_index
+                    ):
+                        suggestion = st.session_state.pending_ai_match
+                        df.at[selected_index, "location.page"] = suggestion["page"]
+                        df.at[selected_index, "location.evidence"] = suggestion[
+                            "evidence"
+                        ]
+                        df.at[selected_index, "location.section"] = "AI Discovered"
+                        df.at[selected_index, "location.source_type"] = "text"
+
+                        # Clear the pending match after accepting
+                        del st.session_state.pending_ai_match
+
+                    df.at[selected_index, "validated"] = True
+                    df.at[selected_index, "validator_name"] = (
+                        st.session_state.validator_name
+                    )
+                    df.at[selected_index, "validation_date"] = datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    # Auto-advance if filter preserves the item (All, Flagged, etc)
+                    if filter_status in ["All", "Flagged"]:
+                        current_pos = st.session_state.current_property_index
+                        for i in range(current_pos + 1, len(filtered_indices)):
+                            idx = filtered_indices[i]
+                            if pd.isna(df.at[idx, "validated"]):
+                                st.session_state.current_property_index = i
+                                break
+
+                    save_data(df)
+                    st.session_state.df = df
+                    st.rerun()
+
+            with col_invalid:
+                if st.button(
+                    "❌ Invalid (X)",
+                    type=invalid_type,
+                    width="stretch",
+                    disabled=not name_provided,
+                ):
+                    df.at[selected_index, "validated"] = False
+                    df.at[selected_index, "validator_name"] = (
+                        st.session_state.validator_name
+                    )
+                    df.at[selected_index, "validation_date"] = datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                    # Also clear pending AI match if invalidated
+                    if (
+                        "pending_ai_match" in st.session_state
+                        and st.session_state.pending_ai_match.get("index")
+                        == selected_index
+                    ):
+                        del st.session_state.pending_ai_match
+
+                    # Auto-advance if filter preserves the item (All, Flagged, etc)
+                    if filter_status in ["All", "Flagged"]:
+                        current_pos = st.session_state.current_property_index
+                        for i in range(current_pos + 1, len(filtered_indices)):
+                            idx = filtered_indices[i]
+                            if pd.isna(df.at[idx, "validated"]):
+                                st.session_state.current_property_index = i
+                                break
+
+                    save_data(df)
+                    st.session_state.df = df
+                    st.rerun()
+
+            with col_flag:
+                flag_label = "Unflag (F)" if is_flagged else "Flag (F)"
+                if st.button(flag_label, type=flag_type, width="stretch"):
+                    new_flag_state = not is_flagged
+                    df.at[selected_index, "flagged"] = new_flag_state
+
+                    # Auto-advance to next property
+                    if (
+                        st.session_state.current_property_index
+                        < len(filtered_indices) - 1
+                    ):
+                        st.session_state.current_property_index += 1
+
+                    save_data(df)
+                    st.session_state.df = df
+                    st.rerun()
+
+            with col_reset:
+                if st.button("Reset", type="secondary", width="stretch"):
+                    df.at[selected_index, "validated"] = None
+                    df.at[selected_index, "validator_name"] = ""
+                    df.at[selected_index, "validation_date"] = ""
+
+                    # Clear pending match
+                    if (
+                        "pending_ai_match" in st.session_state
+                        and st.session_state.pending_ai_match.get("index")
+                        == selected_index
+                    ):
+                        del st.session_state.pending_ai_match
+
+                    save_data(df)
+                    st.session_state.df = df
+                    st.rerun()
+
             # Notes Section
-
-            # Use text_area with on_change callback or just check for change
-            # We use key=f"note_{selected_index}" to ensure uniqueness if we want,
-            # but simpler is just to bind to a stable key and handle updates.
-            # Actually, `st.text_area` works best if we just use the current value.
-
             current_note = row.get("validator_note", "")
             if pd.isna(current_note):
                 current_note = ""
@@ -1459,7 +1552,7 @@ def main() -> None:
             # Render Images
             if pdf_images:
                 # Create a scrollable container
-                with st.container(height=800):
+                with st.container(height=1500):
                     for i, (img_bytes, caption) in enumerate(pdf_images):
                         # Add an anchor for Javascript to target
                         # The page_num is user-facing (1-based), so we use that index logic
@@ -1503,7 +1596,7 @@ def main() -> None:
                 # Try one more time without highlights
                 pdf_images, _ = get_pdf_images(pdf_path)
                 if pdf_images:
-                    with st.container(height=800):
+                    with st.container(height=1500):
                         for img_bytes, caption in pdf_images:
                             st.image(img_bytes, caption=caption, width="stretch")
 
