@@ -9,7 +9,7 @@ This run is specifically for the paper(attached as a pdf):
 
 Gao, Yuan, Chun-Xia Zhao, and Frank Sainsbury. "Droplet shape control using microfluidics and designer biosurfactants." Journal of Colloid and Interface Science 584 (2021): 528-538.
 
-Missing information rule: You are required to extract a list of TARGET properties that are given below in the below session "TARGET PROPERTIES FOR THIS PAPER",
+Missing information rule: You are required to extract a list of TARGET properties that are given below in the below section "TARGET PROPERTIES FOR THIS PAPER",
 To ensure that the property extraction is precise and scientifically actionable, you need to capture not just the numerical value, but the Critical Matrix Variables—the "metadata" that gives the value meaning.
 Each property has its own critical matrix, which include all the CONDITIONS that we need to describe this property. You must list all the CONDITIONS in the critical_matrix when you find a property.
 If any CONDITIONS in the critical_matrix is not stated in the paper, still create an entry for that property and leave that CONDITIONS blank.
@@ -20,7 +20,7 @@ If any CONDITIONS in the critical_matrix is not stated in the paper, still creat
   You MUST:
   - Scan the ENTIRE paper: every page, every section, every table,
     and every figure/caption.
-  - Extract TARGET property that appears, which is defined in the following session "TARGET PROPERTIES FOR THIS PAPER".
+  - Extract TARGET property that appears, which is defined in the following section "TARGET PROPERTIES FOR THIS PAPER".
   - Include borderline or ambiguous cases instead of skipping them.
   - NOT stop early because you feel "enough" has been extracted.
   - NOT downsample, summarize, or merge distinct entries for brevity.
@@ -220,7 +220,7 @@ Rules:
 • No units.
 • All quantities appear only inside value_string.
 • location.page is mandatory; all other fields may be omitted if not present.
-• In the format above, the name and number of CONDITIONS within the critical_matrix varies according to the TARGET PROPERTY, as described in the above session "TARGET PROPERTIES FOR THIS PAPER",
+• In the format above, the name and number of CONDITIONS within the critical_matrix varies according to the TARGET PROPERTY, as described in the above section "TARGET PROPERTIES FOR THIS PAPER",
 each property has different name and number of CONDITIONS described in their own "critical_matrix", you should create unique "critical_matrix" for each entry and accordingly find their own CONDITIONS.
 
 ------------------------------------------------------------
