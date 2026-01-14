@@ -340,6 +340,35 @@ def _extract_text_from_jsonlines_log(text: str) -> str | None:
     return combined or None
 
 
+def _extract_codex_text_from_log(text: str) -> str | None:
+    """Extract agent message text from Codex JSONL logs."""
+    decoded_parts: list[str] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        item = obj.get("item")
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "agent_message":
+            continue
+        message_text = item.get("text")
+        if isinstance(message_text, str) and message_text.strip():
+            decoded_parts.append(message_text)
+
+    combined = "\n\n".join(
+        part.strip() for part in decoded_parts if part and part.strip()
+    )
+    return combined or None
+
+
 @dataclass(frozen=True)
 class Prediction:
     """Normalized view of one predicted property record."""
@@ -409,6 +438,8 @@ def load_predictions(predictions_path: Path) -> list[Prediction]:
             except Exception:
                 continue
             decoded = _extract_text_from_jsonlines_log(content)
+            if decoded is None:
+                decoded = _extract_codex_text_from_log(content)
             text = decoded or content
 
             extracted_obj = _extract_first_json_object(text)

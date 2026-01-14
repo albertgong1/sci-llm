@@ -39,7 +39,6 @@ def _looks_like_workspace(path: Path) -> bool:
         path / "README.md",
         path / "rubric.csv",
         path / "ground-template",
-        path / "ground-template-easy",
         path / "data",
     ]
     return any(marker.exists() for marker in markers)

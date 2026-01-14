@@ -23,11 +23,11 @@ Example (from repo root):
     uv run python src/harbor-task-gen/run_harbor.py jobs start \\
       -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
 
-    # To use the guided template:
+    # To use a custom template:
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
-      --task tc --template ground-template-easy --force
+      --task tc --template my-template --force
     uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template-easy/job.yaml -a oracle
+      -c out/harbor/supercon-mini-v2/my-template/job.yaml -a oracle
 """
 
 from __future__ import annotations

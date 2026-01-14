@@ -31,7 +31,7 @@ PDF corpus lives at `examples/harbor-workspace/data/Paper_DB/<refno>.pdf` (15 PD
 
 Templates live in `examples/harbor-workspace/`:
 - `ground-template` (default free-form)
-- `ground-template-easy` (the base template, but prompted with each property it needs to look for, better for testing if the LLM is following instructions)
+- Add custom templates by copying `ground-template/` and passing `--template <name>`
 
 Build tasks for all properties with the default template (no task alias needed):
 ```bash
@@ -43,12 +43,6 @@ with a `job.yaml`.
 
 If you want to filter to a task alias (e.g., only Tc rows), pass `--task tc`. This
 changes the output path to `examples/harbor-workspace/out/harbor/supercon-mini-v2/tc/<template>/`.
-
-Easier template:
-```bash
-uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
-  --template ground-template-easy --write-job-config --force
-```
 
 Build a single paper while iterating:
 ```bash
@@ -106,8 +100,6 @@ uv run python src/harbor-task-gen/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a claude-code
 ```
-
-To use `ground-template-easy`, swap the template name in the path.
 
 Single-task trials:
 Pick a task id from:

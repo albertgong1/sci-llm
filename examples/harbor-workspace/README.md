@@ -5,7 +5,8 @@ PDFs, rubrics, and all run outputs live here. The library code lives in
 `src/harbor-task-gen/`.
 
 ## Layout
-- `ground-template/` and `ground-template-easy/`: task templates copied into tasks
+- `ground-template/`: default task template copied into tasks
+- Custom templates can be added as sibling folders and referenced via `--template`
 - `rubric.csv`: scoring rubric for verifier logic
 - `data/Paper_DB/`: PDF corpus (<refno>.pdf)
 - `out/`: generated tasks and compiled run bundles (created by scripts)
