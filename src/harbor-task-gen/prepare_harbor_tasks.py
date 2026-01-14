@@ -1,4 +1,4 @@
-r"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
+r"""Compile Harbor tasks from a (PDF, ground-truth) dataset.
 
 This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
 each with:
@@ -7,27 +7,29 @@ each with:
   - `tests/`: verifier that scores predictions using rubric tolerances
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
 
-The source of truth for the benchmark is the Hugging Face dataset
-`kilian-group/supercon-mini-v2`, grouped by `refno` (one Harbor task per paper).
+By default the dataset is pulled from Hugging Face (currently
+`kilian-group/supercon-mini-v2`), grouped by `refno` (one Harbor task per paper).
+All dataset/schema fields are configurable via CLI flags so the framework can
+support other task families.
 
 Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
 and write a `registry.json` so Harbor can pull tasks directly from the Hub.
 
 By default this script writes tasks under
-`examples/harbor-workspace/out/harbor/supercon-mini-v2/<task>/<template>/` so the
+`examples/harbor-workspace/out/harbor/<dataset>/<task>/<template>/` so the
 repository stays clean until you build.
 
 Example (from repo root):
     # Default template is `ground-template`.
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force
     uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
+      -c out/harbor/<dataset>/ground-template/job.yaml -a oracle
 
     # To use a custom template:
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
       --task tc --template my-template --force
     uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/my-template/job.yaml -a oracle
+      -c out/harbor/<dataset>/my-template/job.yaml -a oracle
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ import re
 import shutil
 import textwrap
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, cast
 
@@ -72,21 +75,35 @@ def templates_dir() -> Path:
 _TEMPLATES_SUBDIR = "ground-template"
 _WORKSPACE_ROOT: Path | None = None
 
-_TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
-    # Default task: superconducting critical temperature recommended for the sample.
+DEFAULT_TASK_PROPERTY_FILTERS: dict[str, set[str]] = {
+    # SuperCon-specific alias: superconducting critical temperature recommended for the sample.
     "tc": {"Tc (of this sample) recommended"},
 }
 
+DEFAULT_QUESTION_TEMPLATE = (
+    "[{index}]\n"
+    "Question: What is the {property_name} for {material}?{definition_text}\n"
+    "Answer:"
+)
 
-def read_template(relative_path: str) -> str:
-    """Read a template file relative to the workspace template folder."""
-    return (templates_dir() / relative_path).read_text()
+
+def _resolve_template_path(path: str | Path) -> Path:
+    """Resolve a template path relative to the template root unless absolute."""
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    return templates_dir() / candidate
 
 
-def copy_template(relative_path: str, dest_path: Path) -> None:
-    """Copy a template file relative to the workspace template folder."""
+def read_template(path: str | Path) -> str:
+    """Read a template file (relative to template root unless absolute)."""
+    return _resolve_template_path(path).read_text()
+
+
+def copy_template(source_path: str | Path, dest_path: Path) -> None:
+    """Copy a template file (relative to template root unless absolute)."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(templates_dir() / relative_path, dest_path)
+    shutil.copy2(_resolve_template_path(source_path), dest_path)
 
 
 _LBRACE_SENTINEL = "\0LBRACE\0"
@@ -141,8 +158,10 @@ def slugify(value: str) -> str:
     )
 
 
-def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
+def load_rubric_mapping(rubric_path: Path | None) -> dict[str, str]:
     """Load the property_name -> rubric mapping from the rubric CSV."""
+    if rubric_path is None or not rubric_path.exists():
+        return {}
     mapping: dict[str, str] = {}
     with rubric_path.open(newline="") as f:
         reader = csv.DictReader(f)
@@ -154,8 +173,10 @@ def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
     return mapping
 
 
-def load_definitions(rubric_path: Path) -> dict[str, str]:
+def load_definitions(rubric_path: Path | None) -> dict[str, str]:
     """Load property_name -> definition mapping from the rubric CSV (if present)."""
+    if rubric_path is None or not rubric_path.exists():
+        return {}
     definitions: dict[str, str] = {}
     with rubric_path.open(newline="") as f:
         reader = csv.DictReader(f)
@@ -167,8 +188,8 @@ def load_definitions(rubric_path: Path) -> dict[str, str]:
     return definitions
 
 
-def dockerfile_contents() -> str:
-    """Render the task environment Dockerfile.
+def dockerfile_contents_from_template(dockerfile_template: Path) -> str:
+    """Render the task environment Dockerfile from the given template.
 
     The environment always includes the PDF at `/app/paper.pdf`.
     The container includes `pdftotext` (poppler-utils) so agents can extract text
@@ -183,53 +204,165 @@ def dockerfile_contents() -> str:
     )
 
     return _format_template(
-        read_template("environment/Dockerfile"),
+        read_template(dockerfile_template),
         {"install_pdf_tools": install_pdf_tools},
     )
 
 
-def resolve_property_filter(task: str | None) -> set[str] | None:
-    """Return the set of property_names to keep for a given task alias (or None for all)."""
+def _load_property_filter_file(path: Path) -> set[str]:
+    """Load property_name filters from a text or CSV file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Property filter file not found: {path}")
+    if path.suffix.lower() == ".csv":
+        with path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            values = [
+                str(row.get("property_name") or "").strip() for row in reader if row
+            ]
+        return {value for value in values if value}
+    values = [line.strip() for line in path.read_text().splitlines()]
+    return {value for value in values if value}
+
+
+def _load_task_filter_map(path: Path) -> dict[str, set[str]]:
+    """Load task -> property_name mapping from a JSON or CSV file."""
+    if not path.exists():
+        raise FileNotFoundError(f"Task filter map not found: {path}")
+
+    if path.suffix.lower() == ".json":
+        payload = json.loads(path.read_text())
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "Task filter JSON must map task -> list of property names."
+            )
+        mapping: dict[str, set[str]] = {}
+        for key, value in payload.items():
+            if not key:
+                continue
+            if isinstance(value, list):
+                props = {str(item).strip() for item in value if str(item).strip()}
+            else:
+                props = {str(value).strip()} if str(value).strip() else set()
+            if props:
+                mapping[str(key).strip().lower()] = props
+        return mapping
+
+    mapping = defaultdict(set)
+    with path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            task = str(row.get("task") or "").strip().lower()
+            prop = str(row.get("property_name") or "").strip()
+            if task and prop:
+                mapping[task].add(prop)
+    return dict(mapping)
+
+
+def resolve_property_filter(
+    task: str | None,
+    *,
+    explicit_filter: set[str] | None,
+    task_filter_map: dict[str, set[str]] | None,
+) -> set[str] | None:
+    """Return the set of property_names to keep (or None for all)."""
+    if explicit_filter:
+        return explicit_filter
     if task is None:
         return None
-    return _TASK_PROPERTY_FILTERS.get(task.strip().lower())
+    mapping = task_filter_map or DEFAULT_TASK_PROPERTY_FILTERS
+    return mapping.get(task.strip().lower())
+
+
+@dataclass(frozen=True)
+class DatasetSchema:
+    """Field mapping for dataset rows and nested properties."""
+
+    refno_field: str
+    properties_field: str | None
+    material_field: str
+    property_name_field: str
+    value_field: str
+    unit_field: str | None
+    definition_field: str | None
+
+
+@dataclass(frozen=True)
+class TemplateFiles:
+    """Resolved template paths used when building tasks."""
+
+    instruction: Path
+    task_toml: Path
+    dockerfile: Path
+    check_prediction: Path
+    test_script: Path
+
+
+def _resolve_template_override(
+    value: str,
+    *,
+    template_root: Path,
+    label: str,
+) -> Path:
+    """Resolve and validate a template path override."""
+    candidate = Path(value)
+    resolved = candidate if candidate.is_absolute() else template_root / candidate
+    if not resolved.exists():
+        raise FileNotFoundError(f"{label} not found: {resolved}")
+    return resolved
 
 
 def flatten_dataset(
     dataset: Iterable[dict[str, Any]],
     *,
+    schema: DatasetSchema,
     definitions: Mapping[str, str],
     property_filter: set[str] | None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Flatten HF rows (refno + properties list) into per-property rows grouped by refno."""
+    """Flatten dataset rows into per-property rows grouped by refno."""
     grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
 
     for row in dataset:
-        refno = str(row.get("refno") or "").strip()
+        refno = str(row.get(schema.refno_field) or "").strip()
         if not refno:
             continue
 
-        props = row.get("properties") or []
-        if not isinstance(props, list):
+        props: list[dict[str, Any]] = []
+        if schema.properties_field:
+            raw_props = row.get(schema.properties_field) or []
+            if not isinstance(raw_props, list):
+                continue
+            props = [prop for prop in raw_props if isinstance(prop, dict)]
+        else:
+            if isinstance(row, dict):
+                props = [row]
+        if not props:
             continue
 
         for prop in props:
-            if not isinstance(prop, dict):
-                continue
-            prop_name = str(prop.get("property_name") or "").strip()
+            prop_name = str(prop.get(schema.property_name_field) or "").strip()
             if not prop_name:
                 continue
             if property_filter and prop_name not in property_filter:
                 continue
+            unit_value = (
+                str(prop.get(schema.unit_field) or "").strip()
+                if schema.unit_field
+                else ""
+            )
+            definition = (
+                str(prop.get(schema.definition_field) or "").strip()
+                if schema.definition_field
+                else ""
+            )
 
             grouped[refno].append(
                 {
-                    "material": str(prop.get("material_or_system") or ""),
+                    "material": str(prop.get(schema.material_field) or ""),
                     "property_name": prop_name,
                     # value_string already contains any unit; keep unit empty to avoid double-parsing.
-                    "property_value": str(prop.get("value_string") or ""),
-                    "property_unit": "",
-                    "definition": definitions.get(prop_name, ""),
+                    "property_value": str(prop.get(schema.value_field) or ""),
+                    "property_unit": unit_value,
+                    "definition": definition or definitions.get(prop_name, ""),
                 }
             )
     return grouped
@@ -273,6 +406,8 @@ def build_task(
     refno: str,
     rows: list[dict[str, str]],
     rubric_mapping: dict[str, str],
+    question_template: str,
+    template_files: TemplateFiles,
 ) -> None:
     """Build a single Harbor task directory (one paper, many questions)."""
     env_dir = task_dir / "environment"
@@ -321,21 +456,33 @@ def build_task(
     }
     (env_dir / "task_meta.json").write_text(json.dumps(task_meta, indent=2))
 
-    question_blocks = "\n\n".join(
-        textwrap.dedent(
-            f"""\
-            [{idx}]
-            Question: What is the {item["property_name"]} recommended for {item["material"]}? Here, "{item["property_name"]}" is defined as "{item["definition"]}".
-            Answer:
-            """
-        ).strip()
-        for idx, item in enumerate(questions)
-    )
+    question_blocks: list[str] = []
+    for idx, item in enumerate(questions):
+        definition = str(item.get("definition", "") or "").strip()
+        definition_text = f' Definition: "{definition}".' if definition else ""
+        question_blocks.append(
+            textwrap.dedent(
+                _format_template(
+                    question_template,
+                    {
+                        "index": idx,
+                        "idx": idx,
+                        "property_name": item["property_name"],
+                        "material": item["material"],
+                        "definition": definition,
+                        "definition_text": definition_text,
+                        "task": task_name,
+                        "refno": refno,
+                    },
+                )
+            ).strip()
+        )
+    question_blocks = "\n\n".join(question_blocks)
     gemini_at_commands = "`@paper.pdf`"
     paper_at_command = "@paper.pdf"
     claude_file_examples = "`/app/paper.pdf`"
 
-    instruction_template = read_template("instruction.md.template")
+    instruction_template = read_template(template_files.instruction)
     instruction_values = {
         # Identifiers
         "task": task_name,
@@ -359,14 +506,16 @@ def build_task(
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
 
     task_toml = _format_template(
-        read_template("task.toml.template"),
+        read_template(template_files.task_toml),
         {"task_name": task_name, "task": task_name},
     )
     (task_dir / "task.toml").write_text(task_toml)
 
-    (env_dir / "Dockerfile").write_text(dockerfile_contents())
-    copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
-    copy_template("tests/test.sh", tests_dir / "test.sh")
+    (env_dir / "Dockerfile").write_text(
+        dockerfile_contents_from_template(template_files.dockerfile)
+    )
+    copy_template(template_files.check_prediction, tests_dir / "check_prediction.py")
+    copy_template(template_files.test_script, tests_dir / "test.sh")
 
     solution_predictions = [
         {
@@ -404,7 +553,7 @@ def main() -> None:
     global _TEMPLATES_SUBDIR
 
     parser = argparse.ArgumentParser(
-        description="Generate Harbor tasks for the superconductor extraction benchmark."
+        description="Generate Harbor tasks from a PDF + labeled dataset."
     )
     parser.add_argument(
         "--workspace",
@@ -419,10 +568,172 @@ def main() -> None:
         help="Template folder under the workspace (default: ground-template).",
     )
     parser.add_argument(
+        "--instruction-template",
+        type=str,
+        default="instruction.md.template",
+        help="Instruction template path (relative to template root unless absolute).",
+    )
+    parser.add_argument(
+        "--task-toml-template",
+        type=str,
+        default="task.toml.template",
+        help="task.toml template path (relative to template root unless absolute).",
+    )
+    parser.add_argument(
+        "--dockerfile-template",
+        type=str,
+        default="environment/Dockerfile",
+        help="Dockerfile template path (relative to template root unless absolute).",
+    )
+    parser.add_argument(
+        "--scoring-script",
+        type=str,
+        default="tests/check_prediction.py",
+        help=(
+            "Verifier script path (relative to template root unless absolute). "
+            "Copied to tests/check_prediction.py in each task."
+        ),
+    )
+    parser.add_argument(
+        "--test-script",
+        type=str,
+        default="tests/test.sh",
+        help=(
+            "Test runner script path (relative to template root unless absolute). "
+            "Copied to tests/test.sh in each task."
+        ),
+    )
+    parser.add_argument(
+        "--question-template",
+        type=str,
+        default=None,
+        help="Template for each question block (default: built-in).",
+    )
+    parser.add_argument(
+        "--question-template-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional file containing a question template (overrides --question-template). "
+            "Relative paths are resolved from the template root."
+        ),
+    )
+    parser.add_argument(
+        "--rubric-path",
+        type=Path,
+        default=None,
+        help=(
+            "Rubric CSV path used to annotate expected.json with rubrics/definitions. "
+            "Defaults to <workspace>/<template>/rubric.csv (fallback: <workspace>/rubric.csv)."
+        ),
+    )
+    parser.add_argument(
         "--task",
         type=str,
         default=None,
-        help="Task alias for filtering property_names (e.g., tc). If omitted, include all properties.",
+        help=(
+            "Task alias for filtering property_names (e.g., tc). "
+            "If omitted, include all properties."
+        ),
+    )
+    parser.add_argument(
+        "--task-filter-map",
+        type=Path,
+        default=None,
+        help=(
+            "Optional JSON/CSV mapping of task alias -> property_name list. "
+            "Overrides built-in task filters."
+        ),
+    )
+    parser.add_argument(
+        "--property-filter",
+        action="append",
+        default=None,
+        help=(
+            "Explicit property_name to include (repeatable). "
+            "Overrides --task filter mapping when provided."
+        ),
+    )
+    parser.add_argument(
+        "--property-filter-file",
+        type=Path,
+        default=None,
+        help="Path to a text/CSV file listing property_name values to include.",
+    )
+    parser.add_argument(
+        "--dataset-repo",
+        type=str,
+        default="kilian-group/supercon-mini-v2",
+        help="Hugging Face dataset repo id (default: kilian-group/supercon-mini-v2).",
+    )
+    parser.add_argument(
+        "--dataset-split",
+        type=str,
+        default="test",
+        help="Dataset split name (default: test).",
+    )
+    parser.add_argument(
+        "--dataset-revision",
+        type=str,
+        default=None,
+        help="Dataset revision/commit (default: repo default).",
+    )
+    parser.add_argument(
+        "--dataset-config",
+        type=str,
+        default=None,
+        help="Optional dataset config name for multi-config datasets.",
+    )
+    parser.add_argument(
+        "--dataset-refno-field",
+        type=str,
+        default="refno",
+        help="Row field holding the paper refno (default: refno).",
+    )
+    parser.add_argument(
+        "--dataset-properties-field",
+        type=str,
+        default="properties",
+        help=(
+            "Row field holding the list of properties (default: properties). "
+            "Set to '-' to treat each row as a property."
+        ),
+    )
+    parser.add_argument(
+        "--dataset-material-field",
+        type=str,
+        default="material_or_system",
+        help="Property field for material/system (default: material_or_system).",
+    )
+    parser.add_argument(
+        "--dataset-property-name-field",
+        type=str,
+        default="property_name",
+        help="Property field for property_name (default: property_name).",
+    )
+    parser.add_argument(
+        "--dataset-value-field",
+        type=str,
+        default="value_string",
+        help="Property field for value string (default: value_string).",
+    )
+    parser.add_argument(
+        "--dataset-unit-field",
+        type=str,
+        default="",
+        help=(
+            "Property field for units (default: empty). "
+            "Leave empty if units are embedded in the value string."
+        ),
+    )
+    parser.add_argument(
+        "--dataset-definition-field",
+        type=str,
+        default="",
+        help=(
+            "Property field for definitions (default: empty). "
+            "If empty, definitions are pulled from the rubric CSV when available."
+        ),
     )
     parser.add_argument(
         "--pdf-dir",
@@ -436,7 +747,7 @@ def main() -> None:
         default=None,
         help=(
             "Where to write generated Harbor tasks "
-            "(default: <workspace>/out/harbor/supercon-mini-v2)."
+            "(default: <workspace>/out/harbor/<dataset>)."
         ),
     )
     parser.add_argument(
@@ -542,7 +853,8 @@ def main() -> None:
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
     if args.output_dir is None:
-        args.output_dir = resolved_workspace / "out" / "harbor" / "supercon-mini-v2"
+        dataset_slug = args.dataset_repo.split("/")[-1]
+        args.output_dir = resolved_workspace / "out" / "harbor" / dataset_slug
     if not args.pdf_dir.is_absolute():
         args.pdf_dir = resolved_workspace / args.pdf_dir
     if not args.output_dir.is_absolute():
@@ -554,6 +866,47 @@ def main() -> None:
             f"Template not found: {template_root}. "
             "Create it under the workspace or pass --template."
         )
+
+    template_files = TemplateFiles(
+        instruction=_resolve_template_override(
+            args.instruction_template,
+            template_root=template_root,
+            label="Instruction template",
+        ),
+        task_toml=_resolve_template_override(
+            args.task_toml_template,
+            template_root=template_root,
+            label="task.toml template",
+        ),
+        dockerfile=_resolve_template_override(
+            args.dockerfile_template,
+            template_root=template_root,
+            label="Dockerfile template",
+        ),
+        check_prediction=_resolve_template_override(
+            args.scoring_script,
+            template_root=template_root,
+            label="Scoring script",
+        ),
+        test_script=_resolve_template_override(
+            args.test_script,
+            template_root=template_root,
+            label="Test script",
+        ),
+    )
+
+    question_template = args.question_template or DEFAULT_QUESTION_TEMPLATE
+    if args.question_template_file:
+        question_path = (
+            args.question_template_file
+            if args.question_template_file.is_absolute()
+            else template_root / args.question_template_file
+        )
+        if not question_path.exists():
+            raise FileNotFoundError(
+                f"Question template file not found: {question_path}"
+            )
+        question_template = question_path.read_text()
 
     if not args.pdf_dir.exists():
         raise FileNotFoundError(f"PDF directory not found at {args.pdf_dir}")
@@ -575,16 +928,78 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = resolved_workspace / "rubric.csv"
+    rubric_path = None
+    if args.rubric_path:
+        rubric_path = (
+            args.rubric_path
+            if args.rubric_path.is_absolute()
+            else resolved_workspace / args.rubric_path
+        )
+    else:
+        template_rubric = template_root / "rubric.csv"
+        workspace_rubric = resolved_workspace / "rubric.csv"
+        if template_rubric.exists():
+            rubric_path = template_rubric
+        elif workspace_rubric.exists():
+            rubric_path = workspace_rubric
+
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
-    dataset = load_dataset(
-        "kilian-group/supercon-mini-v2", split="test", revision="v2.0.1"
+    properties_field_raw = (args.dataset_properties_field or "").strip().lower()
+    properties_field = (
+        None
+        if properties_field_raw in {"", "-", "none", "null"}
+        else args.dataset_properties_field
     )
-    property_filter = resolve_property_filter(args.task)
+    unit_field = args.dataset_unit_field.strip() or None
+    definition_field = args.dataset_definition_field.strip() or None
+
+    schema = DatasetSchema(
+        refno_field=args.dataset_refno_field,
+        properties_field=properties_field,
+        material_field=args.dataset_material_field,
+        property_name_field=args.dataset_property_name_field,
+        value_field=args.dataset_value_field,
+        unit_field=unit_field,
+        definition_field=definition_field,
+    )
+
+    dataset_kwargs: dict[str, Any] = {"split": args.dataset_split}
+    if args.dataset_config:
+        dataset_kwargs["name"] = args.dataset_config
+    if args.dataset_revision:
+        dataset_kwargs["revision"] = args.dataset_revision
+    dataset = load_dataset(args.dataset_repo, **dataset_kwargs)
+
+    explicit_filter: set[str] | None = None
+    if args.property_filter:
+        explicit_filter = {value.strip() for value in args.property_filter if value}
+    if args.property_filter_file:
+        filter_path = (
+            args.property_filter_file
+            if args.property_filter_file.is_absolute()
+            else resolved_workspace / args.property_filter_file
+        )
+        explicit_filter = _load_property_filter_file(filter_path)
+
+    task_filter_map = None
+    if args.task_filter_map:
+        map_path = (
+            args.task_filter_map
+            if args.task_filter_map.is_absolute()
+            else resolved_workspace / args.task_filter_map
+        )
+        task_filter_map = _load_task_filter_map(map_path)
+
+    property_filter = resolve_property_filter(
+        args.task,
+        explicit_filter=explicit_filter,
+        task_filter_map=task_filter_map,
+    )
     grouped = flatten_dataset(
         cast(Iterable[dict[str, Any]], dataset),
+        schema=schema,
         definitions=definitions,
         property_filter=property_filter,
     )
@@ -624,6 +1039,8 @@ def main() -> None:
             refno=refno,
             rows=rows,
             rubric_mapping=rubric_mapping,
+            question_template=question_template,
+            template_files=template_files,
         )
         try:
             task_rel = task_dir.relative_to(resolved_workspace)

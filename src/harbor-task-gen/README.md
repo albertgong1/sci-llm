@@ -1,7 +1,8 @@
-# SuperCon Property Extraction (Harbor)
+# Harbor Task Generator
 
 > Harbor tasks can be run with `gemini-cli` or `claude-code` agents. Make sure the repo
-> root `.env` has your API keys.
+> root `.env` has your API keys. The default examples use the SuperCon dataset, but
+> every dataset/schema/prompt/scoring input is configurable.
 
 Workspace assets (templates, PDFs, outputs) live under `examples/harbor-workspace/`.
 - All commands default to that workspace; override with `--workspace /path/to/workspace`
@@ -26,23 +27,58 @@ export MODAL_TOKEN_SECRET="as-..."
 Claude Code also supports `CLAUDE_CODE_OAUTH_TOKEN=...`.
 
 PDF corpus lives at `examples/harbor-workspace/data/Paper_DB/<refno>.pdf` (15 PDFs).
+Override with `--pdf-dir` when using a different corpus layout.
 
-## Build Harbor Tasks (supercon-mini-v2)
+## Build Harbor Tasks (default: supercon-mini-v2)
 
 Templates live in `examples/harbor-workspace/`:
 - `ground-template` (default free-form)
 - Add custom templates by copying `ground-template/` and passing `--template <name>`
+  - Each template owns its scoring logic (`tests/check_prediction.py`) and rubric (`rubric.csv`).
+  - You can also override individual template files without copying the whole folder:
+    `--instruction-template`, `--scoring-script`, `--test-script`,
+    `--task-toml-template`, `--dockerfile-template` (paths resolve relative to the
+    template root unless absolute).
+  - Overrides are source paths; generated tasks still write to
+    `tests/check_prediction.py` and `tests/test.sh`.
+
+Question formatting can be customized with `--question-template` or
+`--question-template-file` (paths resolve relative to the template root unless
+absolute). Task filtering can be customized with `--task-filter-map`
+(JSON/CSV mapping) or explicit `--property-filter` values.
 
 Build tasks for all properties with the default template (no task alias needed):
 ```bash
 uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
   --write-job-config --force
 ```
-Outputs go to `examples/harbor-workspace/out/harbor/supercon-mini-v2/ground-template/`
-with a `job.yaml`.
+Outputs go to `examples/harbor-workspace/out/harbor/<dataset>/ground-template/`
+with a `job.yaml` (for the default dataset, `<dataset>` is `supercon-mini-v2`).
 
 If you want to filter to a task alias (e.g., only Tc rows), pass `--task tc`. This
-changes the output path to `examples/harbor-workspace/out/harbor/supercon-mini-v2/tc/<template>/`.
+changes the output path to `examples/harbor-workspace/out/harbor/<dataset>/tc/<template>/`.
+
+Customize the dataset and schema (defaults shown):
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --dataset-repo kilian-group/supercon-mini-v2 \
+  --dataset-split test \
+  --dataset-revision v2.0.1 \
+  --dataset-refno-field refno \
+  --dataset-properties-field properties \
+  --dataset-material-field material_or_system \
+  --dataset-property-name-field property_name \
+  --dataset-value-field value_string \
+  --dataset-unit-field "" \
+  --dataset-definition-field "" \
+  --write-job-config --force
+```
+If your dataset is already one-row-per-property, set `--dataset-properties-field -`.
+If your dataset does not need a pinned revision, omit `--dataset-revision`.
+
+Use a rubric CSV from elsewhere with:
+`--rubric-path path/to/rubric.csv` (defaults to `<workspace>/<template>/rubric.csv`).
+Rubrics are consumed at task-build time to annotate `tests/expected.json`.
 
 Build a single paper while iterating:
 ```bash
@@ -68,6 +104,8 @@ in `.env` (or `HUGGINGFACE_HUB_TOKEN` / `HF_API_TOKEN`).
 `{predictions_path}`, `{paper_at_command}`, `{gemini_at_commands}`,
 `{claude_file_examples}`, `{question_blocks}`, `{questions_json}`,
 `{task_meta_json}`.
+`{question_blocks}` is generated from `--question-template`; the default supports
+`{index}`, `{property_name}`, `{material}`, `{definition}`, and `{definition_text}`.
 
 ## Run Harbor
 
@@ -84,43 +122,43 @@ Full jobs (ground-template):
 - Oracle:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
+  -c out/harbor/<dataset>/ground-template/job.yaml -a oracle
 ```
 
 - Gemini CLI:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash
 ```
 
 - Claude Code:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a claude-code
 ```
 
 Single-task trials:
 Pick a task id from:
 ```bash
-ls out/harbor/supercon-mini-v2/ground-template/tasks
+ls out/harbor/<dataset>/ground-template/tasks
 ```
 - Oracle:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> -a oracle
+  -p out/harbor/<dataset>/ground-template/tasks/<task-id> -a oracle
 ```
 - Gemini CLI:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
+  -p out/harbor/<dataset>/ground-template/tasks/<task-id> \
   -a gemini-cli -m gemini/gemini-2.5-flash
 ```
 - Claude Code:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
+  -p out/harbor/<dataset>/ground-template/tasks/<task-id> \
   -a claude-code
 ```
 
@@ -131,7 +169,7 @@ kwargs are defined on each agent's `__init__` in Harbor.
 - Terminus 2 (multi-turn, capped):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a terminus-2 -m openai/gpt-4o-mini \
   --agent-kwarg max_turns=1
 ```
@@ -139,7 +177,7 @@ uv run python src/harbor-task-gen/run_harbor.py jobs start \
 - Terminus 2 via OpenRouter (Qwen Coder 3+):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a terminus-2 -m openrouter/qwen/qwen3-coder-32b \
   --agent-kwarg max_turns=1
 ```
@@ -149,7 +187,7 @@ Qwen Coder 3+ listing you want to use.
 - OpenHands (disable tool calls):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a openhands -m openai/gpt-4o-mini \
   --agent-kwarg disable_tool_calls=true
 ```
@@ -157,8 +195,15 @@ uv run python src/harbor-task-gen/run_harbor.py jobs start \
 - SWE-agent (installed agent wrapper):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a swe-agent -m openai/gpt-4o-mini
+```
+
+- Codex (OpenAI Codex CLI):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  -p out/harbor/<dataset>/ground-template/tasks/pr05001178 \
+  -a codex -m openai/gpt-4.1-mini
 ```
 
 Other built-ins include: `oracle`, `nop`, `claude-code`, `cline-cli`, `aider`,
@@ -179,7 +224,7 @@ Modal setup defaults:
   `HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC` (default: 300). Set to `0` to disable.
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -c out/harbor/<dataset>/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash \
   --modal --n-concurrent 4
 ```
@@ -187,7 +232,7 @@ uv run python src/harbor-task-gen/run_harbor.py jobs start \
 Single-task trial on Modal:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
+  -p out/harbor/<dataset>/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini-2.5-flash \
   --modal
 ```
@@ -198,7 +243,7 @@ adjusting `[environment]` in `task.toml.template`.
 Quick single-task test (Modal + overrides):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
+  -p out/harbor/<dataset>/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini-2.5-flash \
   --modal --override-storage-mb 1024 --override-memory-mb 1024
 ```
@@ -267,7 +312,7 @@ uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
   --write-job-config --force
 
 uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
+  -p out/harbor/<dataset>/ground-template/tasks/pr05001178 \
   -a gemini-cli -m gemini/gemini-2.5-flash
 
 WORKSPACE=examples/harbor-workspace
@@ -310,3 +355,62 @@ The verifier entrypoint (`tests/test.sh`) copies `/app/output/` into
 `/logs/verifier/app_output/` **even when the verifier fails**, so agent-written artifacts
 survive Harbor's container cleanup. Rebuild tasks with `prepare_harbor_tasks.py --force`
 to apply template changes.
+
+## More examples
+
+Custom template + rubric:
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --template my-template \
+  --rubric-path examples/harbor-workspace/my-template/rubric.csv \
+  --write-job-config --force
+```
+
+Dataset where each row is already a property:
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --dataset-repo your-org/your-dataset \
+  --dataset-properties-field - \
+  --dataset-refno-field paper_id \
+  --dataset-material-field material \
+  --dataset-property-name-field name \
+  --dataset-value-field value \
+  --write-job-config --force
+```
+
+Run a single task from HF with a custom registry path:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  --hf-tasks-repo YOUR_ORG/your-harbor-tasks \
+  --hf-task <task-id> \
+  --hf-registry-path path/to/registry.json \
+  -a gemini-cli -m gemini/gemini-2.5-flash
+```
+
+Override template files without copying a folder:
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --template ground-template \
+  --instruction-template prompts/new-instruction.md.template \
+  --scoring-script tests/custom_check_prediction.py \
+  --test-script tests/custom_test.sh \
+  --write-job-config --force
+```
+
+Use a custom question template:
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --template ground-template \
+  --question-template-file question.txt \
+  --write-job-config --force
+```
+
+Task alias map (JSON or CSV):
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --task materials \
+  --task-filter-map examples/harbor-workspace/task_filters.json \
+  --write-job-config --force
+```
+JSON format: `{"materials": ["density", "hardness"]}` or CSV with columns
+`task,property_name`.

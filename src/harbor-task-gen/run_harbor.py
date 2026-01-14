@@ -20,7 +20,7 @@ Extras bundled into this wrapper:
 
 Example:
     uv run python src/harbor-task-gen/run_harbor.py trials start \\
-      -p out/harbor/supercon-mini-v2/ground-template/tasks/jac2980051 \\
+      -p out/harbor/<dataset>/ground-template/tasks/<task-id> \\
       -a gemini-cli -m gemini/gemini-2.5-flash
 
 """
