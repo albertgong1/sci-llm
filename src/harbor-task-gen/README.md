@@ -3,12 +3,10 @@
 > Harbor tasks can be run with `gemini-cli` or `claude-code` agents. Make sure the repo
 > root `.env` has your API keys.
 
-Workspace assets (templates, PDFs, outputs) live under
-`examples/harbor-workspace/`. All commands below default to that workspace; pass
-`--workspace /path/to/workspace` to override. The workspace README includes a
-template authoring guide.
-To clean generated outputs, use
-`examples/harbor-workspace/clean_harbor_workspace.py`.
+Workspace assets (templates, PDFs, outputs) live under `examples/harbor-workspace/`.
+- All commands default to that workspace; override with `--workspace /path/to/workspace`
+- Template authoring guide: `examples/harbor-workspace/README.md`
+- Clean outputs: `examples/harbor-workspace/clean_harbor_workspace.py`
 
 ## Setup (uv + Harbor)
 
@@ -17,10 +15,11 @@ To clean generated outputs, use
 uv sync
 ```
 
-1) Add keys (export or put in `.env` at repo root):
+2) Add keys (export or put in `.env` at repo root):
 ```bash
 export GOOGLE_API_KEY="..."
 export ANTHROPIC_API_KEY="..."
+export OPENROUTER_API_KEY="..."
 export MODAL_TOKEN_ID="ak-..."
 export MODAL_TOKEN_SECRET="as-..."
 ```
@@ -80,19 +79,100 @@ in `.env` (or `HUGGINGFACE_HUB_TOKEN` / `HF_API_TOKEN`).
 
 Always use `run_harbor.py` so `.env` is loaded and keys are mapped.
 Templates start with `@paper.pdf`, so `gemini-cli` auto-attaches the PDF.
-Parallelism for jobs is set with `--n-concurrent` (or edit `job.yaml`).
 Results are written locally under `examples/harbor-workspace/jobs/` or
 `examples/harbor-workspace/trials/`, even when using Modal. Paths shown below are
 relative to the workspace root.
 If you pass `-m gemini-2.5-flash`, the wrapper normalizes it to
 `gemini/gemini-2.5-flash` automatically.
 
-When you use Modal (`--env modal` or `--modal`), the agent runs inside a
-remote Modal sandbox. Your machine just builds the task bundle, uploads it, and
-streams logs/results back. Scaling is limited by Modal quotas and budget, plus network
-latency.
+### Local runs (job + trial)
+Full jobs (ground-template):
+- Oracle:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
+```
 
-### Run Harbor on Modal (native)
+- Gemini CLI:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash
+```
+
+- Claude Code:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a claude-code
+```
+
+To use `ground-template-easy`, swap the template name in the path.
+
+Single-task trials:
+Pick a task id from:
+```bash
+ls out/harbor/supercon-mini-v2/ground-template/tasks
+```
+- Oracle:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> -a oracle
+```
+- Gemini CLI:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
+  -a gemini-cli -m gemini/gemini-2.5-flash
+```
+- Claude Code:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
+  -a claude-code
+```
+
+### Agent examples (native Harbor)
+Use `--agent-kwarg key=value` (repeatable) to pass agent-specific options. The available
+kwargs are defined on each agent's `__init__` in Harbor.
+
+- Terminus 2 (multi-turn, capped):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a terminus-2 -m openai/gpt-4o-mini \
+  --agent-kwarg max_turns=1
+```
+
+- Terminus 2 via OpenRouter (Qwen Coder 3+):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a terminus-2 -m openrouter/qwen/qwen3-coder-32b \
+  --agent-kwarg max_turns=1
+```
+Requires `OPENROUTER_API_KEY` in `.env`. Swap the model slug to any OpenRouter
+Qwen Coder 3+ listing you want to use.
+
+- OpenHands (disable tool calls):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a openhands -m openai/gpt-4o-mini \
+  --agent-kwarg disable_tool_calls=true
+```
+
+- SWE-agent (installed agent wrapper):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
+  -a swe-agent -m openai/gpt-4o-mini
+```
+
+Other built-ins include: `oracle`, `nop`, `claude-code`, `cline-cli`, `aider`,
+`codex`, `cursor-cli`, `gemini-cli`, `goose`, `mini-swe-agent`, `opencode`, `qwen-coder`.
+
+### Modal backend (native)
 Harbor supports Modal as an environment backend. Ensure `MODAL_TOKEN_ID` and
 `MODAL_TOKEN_SECRET` are in `.env` (or run `modal token set`).
 Example: `modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET"`.
@@ -116,7 +196,7 @@ Single-task trial on Modal:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
   -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
-  -a gemini-cli -m gemini/gemini-2.5-flash \
+  -a gemini-cli -m gemini-2.5-flash \
   --modal
 ```
 If Modal hits resource limits, lower resources with:
@@ -127,12 +207,12 @@ Quick single-task test (Modal + overrides):
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py trials start \
   -p out/harbor/supercon-mini-v2/ground-template/tasks/pr05001178 \
-  -a gemini-cli -m gemini/gemini-2.5-flash \
+  -a gemini-cli -m gemini-2.5-flash \
   --modal --override-storage-mb 1024 --override-memory-mb 1024
 ```
 Concurrency for jobs is controlled with `--n-concurrent` (example above).
 
-### Run Harbor from HF tasks
+### Run Harbor from an HF task registry
 Jobs from an HF task registry:
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
@@ -154,61 +234,6 @@ If you used a custom dataset name/version in the registry, pass
 `--hf-tasks-dataset NAME` and `--hf-tasks-version VERSION`.
 If needed, you can also set `--hf-registry-url` explicitly (e.g.,
 `https://huggingface.co/datasets/<repo>/raw/main/registry.json`).
-
-### Export traces to HF (built-in Harbor)
-```bash
-uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-2.5-flash \
-  --modal --n-concurrent 4 \
-  --export-traces --export-push --export-repo your-org/your-traces-dataset
-```
-
-### Full jobs (ground-template)
-- Oracle:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
-```
-
-- Gemini CLI:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-2.5-flash
-```
-
-- Claude Code:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
-  -a claude-code
-```
-
-To use `ground-template-easy`, swap the template name in the path.
-
-### Single-task trials
-Pick a task id from:
-```bash
-ls out/harbor/supercon-mini-v2/ground-template/tasks
-```
-- Oracle:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> -a oracle
-```
-- Gemini CLI:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
-  -a gemini-cli -m gemini/gemini-2.5-flash
-```
-- Claude Code:
-```bash
-uv run python src/harbor-task-gen/run_harbor.py trials start \
-  -p out/harbor/supercon-mini-v2/ground-template/tasks/<task-id> \
-  -a claude-code
-```
 
 ## Where Results Go
 - Jobs: `examples/harbor-workspace/jobs/<timestamp>/result.json`

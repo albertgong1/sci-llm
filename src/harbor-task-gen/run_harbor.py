@@ -393,6 +393,7 @@ def main() -> int:
     argv = _apply_modal_defaults(argv, modal_requested)
     argv = _rewrite_env_flag(argv)
     argv = _apply_hf_args(argv, hf_args, workspace=workspace)
+    argv = _validate_local_trial_path(argv, workspace=workspace)
     modal_active = _detect_environment_type(argv) == "modal"
 
     run_roots = _run_roots_from_args(argv, workspace=workspace)
@@ -625,6 +626,75 @@ def _rewrite_env_flag(argv: list[str]) -> list[str]:
             rewritten.append(arg.replace("--env=", "--environment-type=", 1))
             continue
         rewritten.append(arg)
+    return rewritten
+
+
+def _slugify_task_id(value: str) -> str:
+    """Normalize task IDs to match prepare_harbor_tasks naming."""
+    return (
+        value.lower()
+        .replace(" ", "-")
+        .replace("/", "-")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
+def _resolve_task_path(raw: str, *, workspace: Path) -> Path:
+    """Return a resolved local task path, trying slugified fallbacks."""
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = (workspace / candidate).resolve()
+    if candidate.exists():
+        return candidate
+
+    slug = _slugify_task_id(candidate.name)
+    if slug != candidate.name:
+        slug_candidate = candidate.with_name(slug)
+        if slug_candidate.exists():
+            return slug_candidate
+
+    parent = candidate.parent
+    if parent.exists():
+        for child in parent.iterdir():
+            if child.name.lower() == candidate.name.lower():
+                return child.resolve()
+
+    return candidate
+
+
+def _validate_local_trial_path(argv: list[str], *, workspace: Path) -> list[str]:
+    """Ensure local trial tasks exist and include tests/ before running Harbor."""
+    if "trials" not in argv:
+        return argv
+    if "--task-git-url" in argv:
+        return argv
+
+    rewritten = argv[:]
+    for idx, arg in enumerate(rewritten):
+        if arg not in {"-p", "--path"}:
+            continue
+        if idx + 1 >= len(rewritten):
+            continue
+        resolved = _resolve_task_path(rewritten[idx + 1], workspace=workspace)
+        if not resolved.exists():
+            raise SystemExit(
+                "Task path not found: "
+                f"{resolved}\n"
+                "Run `prepare_harbor_tasks.py` first, e.g.:\n"
+                "  uv run python src/harbor-task-gen/prepare_harbor_tasks.py "
+                "--refno PR05001178 --write-job-config --force\n"
+                "Note: task IDs are slugified to lowercase (pr05001178)."
+            )
+        tests_dir = resolved / "tests"
+        if not tests_dir.exists():
+            raise SystemExit(
+                "Task is missing tests/: "
+                f"{tests_dir}\n"
+                "Rebuild tasks with `prepare_harbor_tasks.py --force` "
+                "to regenerate verifier assets."
+            )
+        rewritten[idx + 1] = str(resolved)
     return rewritten
 
 
