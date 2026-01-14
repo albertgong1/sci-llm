@@ -19,6 +19,7 @@ import pandas as pd
 
 # pbench imports
 import pbench
+from pbench_eval.metrics import compute_material_property_precision
 from pbench_eval.utils import scorer_pymatgen, score_value
 import logging
 
@@ -83,79 +84,105 @@ missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
     logger.warning(f"{missing_rubric} rows have no matching rubric")
 
-# Group by predicted material and calculate precision scores
-grouped = df.groupby("material_or_system_pred")
-logger.info(f"Processing {len(grouped)} unique predicted materials...")
+if False:
+    # Group by predicted material and calculate precision scores
+    grouped = df.groupby(["material_or_system_pred", "property_name_pred"])
+    logger.info(f"Processing {len(grouped)} unique predicted materials...")
+    results = []
 
-results = []
+    for (material_pred, property_pred), group in grouped:
+        # Check which rows have matching materials using scorer_pymatgen
+        matching_rows = []
 
-for material_pred, group in grouped:
-    # Check which rows have matching materials using scorer_pymatgen
-    matching_rows = []
+        for idx, row in group.iterrows():
+            # Check if materials match using pymatgen
+            if pd.notna(material_pred) and pd.notna(row["material_or_system_gt"]):
+                if scorer_pymatgen(
+                    str(material_pred), str(row["material_or_system_gt"])
+                ):
+                    matching_rows.append(row)
 
-    for idx, row in group.iterrows():
-        # Check if materials match using pymatgen
-        if pd.notna(material_pred) and pd.notna(row["material_or_system_gt"]):
-            if scorer_pymatgen(str(material_pred), str(row["material_or_system_gt"])):
-                matching_rows.append(row)
+        num_matches = len(matching_rows)
 
-    num_matches = len(matching_rows)
+        if num_matches == 0:
+            # No matches, score is 0
+            precision_score = 0.0
+        else:
+            # At least one match, calculate scores and take max
+            scores = []
 
-    if num_matches == 0:
-        # No matches, score is 0
-        precision_score = 0.0
-    else:
-        # At least one match, calculate scores and take max
-        scores = []
+            for row in matching_rows:
+                # Skip if values are missing
+                if (
+                    pd.isna(row["value_string_pred"])
+                    or pd.isna(row["value_string_gt"])
+                    or pd.isna(row["rubric"])
+                ):
+                    continue
 
-        for row in matching_rows:
-            # Skip if values are missing
-            if (
-                pd.isna(row["value_string_pred"])
-                or pd.isna(row["value_string_gt"])
-                or pd.isna(row["rubric"])
-            ):
-                continue
+                # Calculate score
+                score = score_value(
+                    pred_value=str(row["value_string_pred"]),
+                    answer_value=str(row["value_string_gt"]),
+                    rubric=str(row["rubric"]),
+                    mapping=None,
+                )
+                scores.append(score)
 
-            # Calculate score
-            score = score_value(
-                pred_value=str(row["value_string_pred"]),
-                answer_value=str(row["value_string_gt"]),
-                rubric=str(row["rubric"]),
-                mapping=None,
-            )
-            scores.append(score)
+            # Take maximum score
+            precision_score = max(scores) if scores else 0.0
 
-        # Take maximum score
-        precision_score = max(scores) if scores else 0.0
+        results.append(
+            {
+                "material_or_system_pred": material_pred,
+                "property_name_pred": property_pred,
+                "value_string_pred": ", ".join(
+                    list(
+                        set(
+                            [
+                                str(row["value_string_pred"])
+                                for _, row in group.iterrows()
+                            ]
+                        )
+                    )
+                ),
+                "num_property_matches": len(group),
+                "num_property_material_matches": num_matches,
+                "precision_score": precision_score,
+                "matches": ", ".join(
+                    [
+                        f"{row['property_name_gt']}: {row['value_string_gt']}"
+                        for row in matching_rows
+                    ]
+                ),
+            }
+        )
+    df_results = pd.DataFrame(results)
+else:
+    df_results = compute_material_property_precision(df)
 
-    results.append(
-        {
-            "material_or_system_pred": material_pred,
-            "num_total_rows": len(group),
-            "num_material_matches": num_matches,
-            "precision_score": precision_score,
-        }
-    )
+# # Print results
+# logger.info("=" * 60)
+# logger.info("PRECISION SCORES")
+# logger.info("=" * 60)
 
-df_results = pd.DataFrame(results)
-
-# Print results
-logger.info("=" * 60)
-logger.info("PRECISION SCORES")
-logger.info("=" * 60)
-
-for _, row in df_results.iterrows():
-    print(f"\nMaterial: {row['material_or_system_pred']}")
-    print(f"  Total rows: {row['num_total_rows']}")
-    print(f"  Material matches: {row['num_material_matches']}")
-    print(f"  Precision score: {row['precision_score']:.3f}")
+# for _, row in df_results.iterrows():
+#     print(f"\nMaterial: {row['material_or_system_pred']}")
+#     print(f"  Property: {row['property_name_pred']}")
+#     print(f"  Total rows: {row['num_property_matches']}")
+#     print(f"  Property matches: {row['num_property_material_matches']}")
+#     print(f"  Precision score: {row['precision_score']:.3f}")
 
 # Summary statistics
 logger.info("=" * 60)
 logger.info("SUMMARY")
 logger.info("=" * 60)
-print(f"Total materials: {len(df_results)}")
-print(f"Materials with matches: {(df_results['num_material_matches'] > 0).sum()}")
+print(f"Total (material, property) pairs: {len(df_results)}")
+print(f"Pairs with matches: {(df_results['num_property_material_matches'] > 0).sum()}")
 print(f"Average precision score: {df_results['precision_score'].mean():.3f}")
 print(f"Median precision score: {df_results['precision_score'].median():.3f}")
+
+# save results to csv
+score_dir = args.output_dir / "scores"
+score_dir.mkdir(parents=True, exist_ok=True)
+df_results.to_csv(score_dir / "score_precision.csv", index=False)

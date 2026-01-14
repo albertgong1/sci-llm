@@ -19,6 +19,7 @@ import pandas as pd
 
 # pbench imports
 import pbench
+from pbench_eval.metrics import compute_material_property_recall
 from pbench_eval.utils import scorer_pymatgen, score_value
 import logging
 
@@ -83,85 +84,94 @@ missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
     logger.warning(f"{missing_rubric} rows have no matching rubric")
 
-# Group by ground truth material AND property name to calculate recall scores
-grouped = df.groupby(["material_or_system_gt", "property_name_gt"])
-logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
+if False:
+    # Group by ground truth material AND property name to calculate recall scores
+    grouped = df.groupby(["material_or_system_gt", "property_name_gt"])
+    logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
 
-results = []
+    results = []
 
-for (material_gt, property_gt), group in grouped:
-    # if material_gt != "Hf1Rh0.7Pd0.3Si1":
-    #     continue
-    # import pdb; pdb.set_trace()
-    # Check which rows have matching materials using scorer_pymatgen
-    matching_rows = []
+    for (material_gt, property_gt), group in grouped:
+        # if material_gt != "Hf1Rh0.7Pd0.3Si1":
+        #     continue
+        # import pdb; pdb.set_trace()
+        # Check which rows have matching materials using scorer_pymatgen
+        matching_rows = []
 
-    for idx, row in group.iterrows():
-        # Check if materials match using pymatgen
-        if pd.notna(material_gt) and pd.notna(row["material_or_system_pred"]):
-            if scorer_pymatgen(str(material_gt), str(row["material_or_system_pred"])):
-                matching_rows.append(row)
+        for idx, row in group.iterrows():
+            # Check if materials match using pymatgen
+            if pd.notna(material_gt) and pd.notna(row["material_or_system_pred"]):
+                if scorer_pymatgen(
+                    str(material_gt), str(row["material_or_system_pred"])
+                ):
+                    matching_rows.append(row)
 
-    num_matches = len(matching_rows)
+        num_matches = len(matching_rows)
 
-    if num_matches == 0:
-        # No matches, score is 0
-        recall_score = 0.0
-    else:
-        # At least one match, calculate scores and take max
-        scores = []
+        if num_matches == 0:
+            # No matches, score is 0
+            recall_score = 0.0
+        else:
+            # At least one match, calculate scores and take max
+            scores = []
 
-        for row in matching_rows:
-            # Skip if values are missing
-            if (
-                pd.isna(row["value_string_pred"])
-                or pd.isna(row["value_string_gt"])
-                or pd.isna(row["rubric"])
-            ):
-                continue
+            for row in matching_rows:
+                # Skip if values are missing
+                if (
+                    pd.isna(row["value_string_pred"])
+                    or pd.isna(row["value_string_gt"])
+                    or pd.isna(row["rubric"])
+                ):
+                    continue
 
-            # Calculate score
-            score = score_value(
-                pred_value=str(row["value_string_pred"]),
-                answer_value=str(row["value_string_gt"]),
-                rubric=str(row["rubric"]),
-                mapping=None,
-            )
-            scores.append(score)
-
-        # Take maximum score
-        recall_score = max(scores) if scores else 0.0
-
-    results.append(
-        {
-            "material_or_system_gt": material_gt,
-            "property_name_gt": property_gt,
-            "value_string_gt": ", ".join(
-                list(set([str(row["value_string_gt"]) for _, row in group.iterrows()]))
-            ),
-            "num_property_matches": len(group),
-            "num_property_material_matches": num_matches,
-            "material_or_system_pred": ", ".join(
-                list(
-                    set(
-                        [
-                            str(row["material_or_system_pred"])
-                            for _, row in group.iterrows()
-                        ]
-                    )
+                # Calculate score
+                score = score_value(
+                    pred_value=str(row["value_string_pred"]),
+                    answer_value=str(row["value_string_gt"]),
+                    rubric=str(row["rubric"]),
+                    mapping=None,
                 )
-            ),
-            "recall_score": recall_score,
-            "matches": ", ".join(
-                [
-                    f"{row['property_name_pred']}: {row['value_string_pred']}"
-                    for row in matching_rows
-                ]
-            ),
-        }
-    )
+                scores.append(score)
 
-df_results = pd.DataFrame(results)
+            # Take maximum score
+            recall_score = max(scores) if scores else 0.0
+
+        results.append(
+            {
+                "material_or_system_gt": material_gt,
+                "property_name_gt": property_gt,
+                "value_string_gt": ", ".join(
+                    list(
+                        set(
+                            [str(row["value_string_gt"]) for _, row in group.iterrows()]
+                        )
+                    )
+                ),
+                "num_property_matches": len(group),
+                "num_property_material_matches": num_matches,
+                "material_or_system_pred": ", ".join(
+                    list(
+                        set(
+                            [
+                                str(row["material_or_system_pred"])
+                                for _, row in group.iterrows()
+                            ]
+                        )
+                    )
+                ),
+                "recall_score": recall_score,
+                "matches": ", ".join(
+                    [
+                        f"{row['property_name_pred']}: {row['value_string_pred']}"
+                        for row in matching_rows
+                    ]
+                ),
+            }
+        )
+
+    df_results = pd.DataFrame(results)
+else:
+    df_results = compute_material_property_recall(df)
 
 # Print results
 # logger.info("=" * 60)
