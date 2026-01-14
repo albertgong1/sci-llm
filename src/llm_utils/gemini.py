@@ -2,6 +2,7 @@
 
 import os
 from typing import Any
+import json
 
 from google import genai
 from google.genai import types as genai_types
@@ -86,15 +87,17 @@ class GeminiChat(LLMChat):
         self,
         messages: list[dict[str, Any]],
         inf_gen_config: InferenceGenerationConfig,
+        use_async: bool = False,
     ) -> Any:
         """Call the Gemini API.
 
         Args:
             messages: Messages in Gemini's format.
             inf_gen_config: Inference generation configuration.
+            use_async: Whether to return an async coroutine.
 
         Returns:
-            Raw API response.
+            Raw API response or async coroutine.
 
         """
         gen_kwargs: dict[str, Any] = {
@@ -110,6 +113,14 @@ class GeminiChat(LLMChat):
         if inf_gen_config.stop_sequences:
             gen_kwargs["stop_sequences"] = inf_gen_config.stop_sequences
 
+        # See https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#generationconfig for all available response mime types
+        if inf_gen_config.output_format == "json":
+            gen_kwargs["response_mime_type"] = "application/json"
+        elif inf_gen_config.output_format == "text":
+            gen_kwargs["response_mime_type"] = "text/plain"
+        else:
+            raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
+
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
         if messages and messages[0]["role"] == "system":
@@ -117,7 +128,11 @@ class GeminiChat(LLMChat):
             messages = messages[1:]
 
         # Gemini's chat expects history (all but last message) and current message
-        response = self.client.models.generate_content(
+        if use_async:
+            client = self.client.aio
+        else:
+            client = self.client
+        response = client.models.generate_content(
             model=self.model_name,
             contents=messages,
             config=genai_types.GenerateContentConfig(**gen_kwargs),
@@ -125,18 +140,28 @@ class GeminiChat(LLMChat):
 
         return response
 
-    def _parse_api_output(self, response: Any) -> LLMChatResponse:
+    def _parse_api_output(
+        self, response: Any, inf_gen_config: InferenceGenerationConfig
+    ) -> LLMChatResponse:
         """Parse Gemini's response.
 
         Args:
             response: Raw Gemini API response.
+            inf_gen_config: Inference generation configuration.
 
         Returns:
             Parsed LLM chat response.
 
         """
         try:
-            pred = response.text
+            if inf_gen_config.output_format == "json":
+                pred = json.loads(response.text)
+            elif inf_gen_config.output_format == "text":
+                pred = response.text
+            else:
+                raise ValueError(
+                    f"Invalid output format: {inf_gen_config.output_format}"
+                )
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
                 "completion_tokens": response.usage_metadata.candidates_token_count,

@@ -14,7 +14,7 @@ import llm_utils
 SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
 
 DOMAIN2HF_DATASET_NAME: dict[str, str] = {
-    "supercon": "kilian-group/supercon-mini",
+    "supercon": "kilian-group/supercon-mini-v2",
 }
 
 
@@ -85,9 +85,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
 
     # Logging args
-    parser.add_argument(
-        "--log_level", type=int, default=logging.INFO, help="Logging level"
-    )
+    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
     return parser
 
 
