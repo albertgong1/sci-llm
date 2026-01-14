@@ -36,7 +36,7 @@ except ImportError:
     sys.path.append(str(repo_root / "src"))
     import pbench
 
-from pbench_eval.utils import score_value
+from pbench_eval.utils import score_value, ASSETS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -335,9 +335,9 @@ def main() -> None:
             if args.rubric_csv_filename:
                 rubric_path = Path(args.rubric_csv_filename)
             elif args.domain == "precedent-search":
-                rubric_path = pbench.ASSETS_DIR / "hard" / "rubric.csv"
+                rubric_path = ASSETS_DIR / "hard" / "rubric.csv"
             else:
-                rubric_path = pbench.ASSETS_DIR / args.domain / "rubric.csv"
+                rubric_path = ASSETS_DIR / args.domain / "rubric.csv"
             
             scores_dir = args.output_dir / args.domain / "scores"
             scores_dir.mkdir(parents=True, exist_ok=True)

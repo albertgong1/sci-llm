@@ -85,9 +85,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
 
     # Logging args
-    parser.add_argument(
-        "--log_level", type=int, default=logging.INFO, help="Logging level"
-    )
+    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
     return parser
 
 

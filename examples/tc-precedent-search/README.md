@@ -59,18 +59,20 @@ Execute the agents on the generated tasks using Harbor.
 **Command (Run one task):**
 ```bash
 # From the root
-python src/harbor-task-gen/run_harbor.py trials start \
-  -p examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
-  -a gemini-cli -m gemini/gemini-3-pro-preview
+python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace trials start \
+  -p out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
+  -a gemini-cli -m gemini/gemini-3-pro-preview \
+  --env modal
 ```
 - `<task_name>` is just the name of the task directories in `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`.
 
 **Command (Run all tasks):**
 ```bash
 # From the root
-python src/harbor-task-gen/run_harbor.py trials start \
-  -j examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/job.yaml \
-  -a gemini-cli -m gemini/gemini-3-pro-preview
+python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace jobs start \
+  -c out/harbor/precedent-search/tc-precedent-search/job.yaml \
+  -a gemini-cli -m gemini/gemini-3-pro-preview \
+  --env modal
 ```
 
 **Inputs:**
@@ -78,7 +80,16 @@ python src/harbor-task-gen/run_harbor.py trials start \
 - `job.yaml` (for batch execution).
 
 **Outputs:**
-- `examples/harbor-workspace/trials/`: A directory containing execution logs and `predictions.json` for each run.
+- `examples/harbor-workspace/out/harbor/precedent-search/trials/`: A directory containing execution logs and `predictions.json` for each run.
+
+**Note:**
+- If you want to check which modal tasks failed, you can find them with
+  ```bash
+  find examples/harbor-workspace/jobs/<TIMESTAMP_DIR> -name "exception.txt"
+  ```
+  where `<TIMESTAMP_DIR>` is the actual job folder (e.g., `2026-01-08__19-56-26`).
+- However, to make sure errors don't happen, we set the number of attempts to 3 in the `job.yaml` config.
+
 
 ### 4. Collect Results
 Consolidate the results from the `trials/` directory into a clean format for analysis.
@@ -88,9 +99,7 @@ Consolidate the results from the `trials/` directory into a clean format for ana
 # From the root
 python examples/harbor-workspace/collect_harbor_results.py
 ```
-*(Note: This script typically looks in `trials/` and aggregates results based on the task metadata.)*
-
-Optional: pass `--output-dir` to override the default output location.
+*(Note: This script looks in `examples/harbor-workspace/out/harbor/precedent-search/trials/` and aggregates results based on the task metadata.) You can also pass the `--trials-dir` flag to point to a specific trials directory.*
 
 **Outputs:**
 - `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: Consolidated prediction files.

@@ -9,14 +9,9 @@ import pandas as pd
 from argparse import ArgumentParser
 from datasets import load_dataset
 
-# llm imports
-from google import genai
-from google.genai import types
-
 # pbench imports
 import pbench
-
-BATCH_SIZE = 100
+from pbench_eval.match import generate_embeddings
 
 parser = ArgumentParser(description="Generate embeddings from property names.")
 parser = pbench.add_base_args(parser)
@@ -33,8 +28,6 @@ gt_df = ds.to_pandas()
 embeddings_dir = args.output_dir / "gt_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
 
-client = genai.Client()
-
 for i, row in gt_df.iterrows():
     refno = row["refno"]
     logger.info(f"Processing refno {refno}...")
@@ -42,17 +35,8 @@ for i, row in gt_df.iterrows():
     properties = row["properties"]
     # get unique property names
     unique_property_names = list(set([prop["property_name"] for prop in properties]))
-    # generate embeddings in batches
-    embeddings = []
-    for i in range(0, len(unique_property_names), BATCH_SIZE):
-        batch = unique_property_names[i : i + BATCH_SIZE]
-        result = client.models.embed_content(
-            model="gemini-embedding-001",
-            contents=batch,
-            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
-        )
-        embeddings.extend([emb.values for emb in result.embeddings])
-
+    # generate embeddings
+    embeddings = generate_embeddings(unique_property_names)
     # save embeddings to parquet
     df = pd.DataFrame(
         {

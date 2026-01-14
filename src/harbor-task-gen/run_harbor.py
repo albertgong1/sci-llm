@@ -43,6 +43,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import quote, urlparse, urlunparse
 
+import asyncio
+
 from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 
 
@@ -204,6 +206,100 @@ def _extract_modal_args(argv: list[str]) -> tuple[list[str], bool]:
     return cleaned, modal_requested
 
 
+def _patch_modal_download_logs(timeout_sec: int) -> None:
+    """Guard Modal log downloads so stalled gRPC calls can't freeze the job."""
+    try:
+        from grpclib.exceptions import StreamTerminatedError
+        from harbor.environments.modal import ModalEnvironment
+        from harbor.trial.trial import Trial
+    except Exception:
+        return
+
+    try:
+        from modal.exception import ClientClosed
+    except Exception:
+        ClientClosed = None  # type: ignore[assignment]
+
+    original = Trial._maybe_download_logs
+    if getattr(original, "_harbor_task_gen_patched", False):
+        return
+
+    async def patched(self: Any, source_dir: str, target_dir: Path) -> None:
+        if not isinstance(self._environment, ModalEnvironment):
+            return await original(self, source_dir, target_dir)
+
+        if self._environment.is_mounted or self._are_agent_logs_downloaded:
+            return
+
+        try:
+            await asyncio.wait_for(
+                self._environment.download_dir(
+                    source_dir=source_dir, target_dir=target_dir
+                ),
+                timeout=timeout_sec,
+            )
+        except asyncio.TimeoutError:
+            self._logger.warning(
+                "Modal download_dir timed out after %ss; skipping log download.",
+                timeout_sec,
+            )
+        except StreamTerminatedError as exc:
+            self._logger.warning(
+                "Modal download_dir failed (StreamTerminatedError): %s", exc
+            )
+        except AttributeError as exc:
+            self._logger.warning("Modal download_dir failed (AttributeError): %s", exc)
+        except Exception as exc:
+            if ClientClosed is not None and isinstance(exc, ClientClosed):
+                self._logger.warning("Modal download_dir failed (ClientClosed).")
+            else:
+                self._logger.warning("Modal download_dir failed: %s", exc)
+        finally:
+            self._are_agent_logs_downloaded = True
+
+    patched._harbor_task_gen_patched = True  # type: ignore[attr-defined]
+    Trial._maybe_download_logs = patched  # type: ignore[assignment]
+
+
+def _extract_agent_setup_timeout(
+    argv: list[str],
+) -> tuple[list[str], int | None]:
+    """Strip --agent-setup-timeout-sec from argv."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--agent-setup-timeout-sec", type=int, default=None)
+    args, remaining = parser.parse_known_args(argv)
+    return remaining, args.agent_setup_timeout_sec
+
+
+def _patch_agent_setup_timeout(timeout_sec: int) -> None:
+    """Override Harbor's default agent setup timeout (seconds)."""
+    try:
+        from harbor.trial.trial import Trial
+    except Exception:
+        return
+
+    Trial._AGENT_SETUP_TIMEOUT_SEC = timeout_sec
+
+
+def _run_harbor_cli_in_process(argv: list[str], *, workspace: Path) -> int:
+    """Invoke Harbor's Typer app in-process so runtime patches take effect."""
+    from harbor.cli.main import app
+
+    old_argv = sys.argv[:]
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(workspace)
+        sys.argv = ["harbor", *argv]
+        try:
+            app()
+            return 0
+        except SystemExit as exc:
+            return int(exc.code or 0)
+    finally:
+        sys.argv = old_argv
+        os.chdir(old_cwd)
+
+
 def main() -> int:
     """Run Harbor or helper utilities with env prep + a small failure summary."""
     argv = sys.argv[1:]
@@ -264,6 +360,7 @@ def main() -> int:
     argv, post_run = _extract_post_run_args(argv, workspace=workspace)
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
+    argv, agent_setup_override = _extract_agent_setup_timeout(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -296,6 +393,7 @@ def main() -> int:
     argv = _apply_modal_defaults(argv, modal_requested)
     argv = _rewrite_env_flag(argv)
     argv = _apply_hf_args(argv, hf_args, workspace=workspace)
+    modal_active = _detect_environment_type(argv) == "modal"
 
     run_roots = _run_roots_from_args(argv, workspace=workspace)
     pre_run_mtime = _latest_run_mtime(run_roots) if post_run.enabled else None
@@ -309,12 +407,33 @@ def main() -> int:
             if existing_pythonpath
             else src_path
         )
-    command = [sys.executable, "-m", "harbor.cli.main", *argv]
-    result = subprocess.run(command, check=False, cwd=workspace, env=env)
-    if result.returncode != 0:
-        _summarize_failure(argv, workspace=workspace)
+    if modal_active:
+        timeout_raw = env.get("HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300").strip()
+        if timeout_raw and timeout_raw != "0":
+            try:
+                timeout_sec = int(timeout_raw)
+            except ValueError:
+                timeout_sec = 300
+            _patch_modal_download_logs(timeout_sec)
+        setup_timeout_raw = (
+            str(agent_setup_override)
+            if agent_setup_override is not None
+            else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
+        ).strip()
+        if setup_timeout_raw and setup_timeout_raw != "0":
+            try:
+                setup_timeout_sec = int(setup_timeout_raw)
+            except ValueError:
+                setup_timeout_sec = 900
+            _patch_agent_setup_timeout(setup_timeout_sec)
+        exit_code = _run_harbor_cli_in_process(argv, workspace=workspace)
+    else:
+        command = [sys.executable, "-m", "harbor.cli.main", *argv]
+        result = subprocess.run(command, check=False, cwd=workspace, env=env)
+        exit_code = int(result.returncode)
 
-    exit_code = int(result.returncode)
+    if exit_code != 0:
+        _summarize_failure(argv, workspace=workspace)
     if post_run.enabled:
         exit_code = _run_post_actions(
             argv=argv,
