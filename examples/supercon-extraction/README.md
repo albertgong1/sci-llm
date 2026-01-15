@@ -99,14 +99,29 @@ uv run python score_precision.py -od OUTPUT_DIR
 
 ## Constructing the Dataset from SuperCon original
 
-1. Download files [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing) containing 15 PDFs and untar to `data`.
+1. Download the following from Google Drive (email ag2435@cornell.edu for access) and place in `DATA_DIR/Paper_DB`.
+
+* Link: [Google Drive Folder](https://drive.google.com/drive/folders/1Kk6kZAzgLMNlmlsKPJcvqCoW5_IVuQKb?usp=sharing). Contains 1339 PDFs.
+
+* Additionally, download the CSV of SuperCon refno to arXiv PDF name mapping by going to the following [Google Sheet](https://docs.google.com/spreadsheets/d/14MW-16wK7h4gOPJsexllRY_Zzx3WNEa4_pQ87oQrg14/edit?gid=933802094#gid=933802094) -> navigate to the Sheet named "Arxiv" -> click "File" -> "Download" -> "Comma Separated values (.csv)" and place at `DATA_DIR/SuperCon Property Extraction Dataset - Arxiv.csv`.
+
+Rename the PDFs from arXiv IDs to paper_ids (refnos) based on the CSV mapping:
+
+```bash
+uv run python rename_arxiv_pdfs.py --data-dir DATA_DIR
+```
+
+<details>
+    <summary>Download instructions for Lite version</summary>
+
+Link: [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLcRK5lP8/view?usp=sharing). Contains 15 PDFs.
 
 ```bash
 # Assumes Paper_DB.tar is in the current directory
-mkdir -p data && tar -xvf Paper_DB.tar -C data
+mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 ```
 
-2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `data/SuperCon.csv`.
+2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `DATA_DIR/SuperCon.csv`.
 
 3. Generate mappings from properties to their corresponding units:
 
@@ -115,15 +130,29 @@ mkdir -p data && tar -xvf Paper_DB.tar -C data
 uv run python generate_property_unit_mappings.py
 ```
 
-3. Generate a CSV version of the SuperCon property extraction dataset for the PDFs present in `data/Paper_DB`:
+3. Generate a CSV version of the SuperCon property extraction dataset for the PDFs present in `DATA_DIR/Paper_DB` and save to `OUTPUT_DIR`:
+
+> \[!NOTE\]
+> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
 
 ```bash
-uv run python create_huggingface_dataset.py \
-    --output_dir OUTPUT_DIR \
-    --filter_pdf
+uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
+    --tag_name v0.0.0 --repo_name kilian-group/supercon-extraction --split SPLIT
 ```
 
-4. Generate Harbor tasks:
+4. Create Harbor template for SuperCon:
 
 ```bash
+# Copy the Harbor workspace template
+cp -r ../harbor-workspace/ground-template .
+# Add placeholder variable to the start of the prompt
+{ echo '{paper_at_command}'; echo; cat prompts/unsupervised_extraction_prompt.md; } > ground-template/instruction.md.template
+```
+
+5. Instantiate the Harbor template using the papers from `DATA_DIR/Paper_DB`:
+
+```bash
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
+    --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . --domain supercon \
+    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
 ```
