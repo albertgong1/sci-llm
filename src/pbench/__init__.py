@@ -6,13 +6,6 @@ from pathlib import Path
 
 import llm_utils
 
-# NOTE: Assets are in the root directory of the project, change the path
-# if the project structure changes.
-# ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-# DATA_DIR = Path(__file__).parent.parent.parent / "data"
-
-SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search", "biosurfactants"]
-
 
 def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add base arguments to the argument parser."""
