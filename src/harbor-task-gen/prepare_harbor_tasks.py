@@ -1,4 +1,4 @@
-r"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
+r"""Compile Harbor tasks for property extraction from a folder of PDFs.
 
 This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
 each with:
@@ -7,27 +7,26 @@ each with:
   - `tests/`: verifier that scores predictions using rubric tolerances
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
 
-The source of truth for the benchmark is the Hugging Face dataset
-`kilian-group/supercon-mini-v2`, grouped by `refno` (one Harbor task per paper).
+The ground truth source is specified via --gt-hf-repo, --gt-hf-split, and optionally
+--gt-hf-revision (defaults to main).
 
 Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
 and write a `registry.json` so Harbor can pull tasks directly from the Hub.
 
 By default this script writes tasks under
-`examples/harbor-workspace/out/harbor/supercon-mini-v2/<task>/<template>/` so the
+`examples/harbor-workspace/out/harbor/<dataset>/<template>/` so the
 repository stays clean until you build.
 
 Example (from repo root):
-    # Default template is `ground-template`.
-    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force
-    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force \
+      --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \
+      -c out/harbor/supercon-extraction/ground-template/job.yaml -a oracle
 
     # To use the guided template:
-    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
-      --task tc --template ground-template-easy --force
-    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template-easy/job.yaml -a oracle
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+      --task tc --template ground-template-easy --force \
+      --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full
 """
 
 from __future__ import annotations
@@ -47,8 +46,6 @@ from typing import Any, Iterable, Mapping, cast
 from datasets import load_dataset
 from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
-
-from pbench import DOMAIN2HF_DATASET_CONFIG
 
 
 def repo_root() -> Path:
@@ -409,10 +406,22 @@ def main() -> None:
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
     parser.add_argument(
-        "--domain",
+        "--gt-hf-repo",
         type=str,
-        default="supercon",
-        help="Domain for the dataset (default: supercon).",
+        required=True,
+        help="Hugging Face repo name for ground truth dataset (e.g., kilian-group/supercon-extraction).",
+    )
+    parser.add_argument(
+        "--gt-hf-split",
+        type=str,
+        required=True,
+        help="Split of the ground truth HF dataset (e.g., full, test).",
+    )
+    parser.add_argument(
+        "--gt-hf-revision",
+        type=str,
+        default="main",
+        help="Revision/version of the ground truth HF dataset (e.g., v0.0.0, main). Defaults to main.",
     )
     parser.add_argument(
         "--workspace",
@@ -547,17 +556,10 @@ def main() -> None:
         raise SystemExit(f"--workspace must be a directory: {resolved_workspace}")
     resolved_workspace.mkdir(parents=True, exist_ok=True)
 
-    # Load dataset configuration
-    domain = args.domain
-    if domain not in DOMAIN2HF_DATASET_CONFIG:
-        raise ValueError(
-            f"Unknown domain: {domain}. Available: {list(DOMAIN2HF_DATASET_CONFIG.keys())}"
-        )
-
-    dataset_config = DOMAIN2HF_DATASET_CONFIG[domain]
-    dataset_name = dataset_config["name"]
-    dataset_revision = dataset_config["revision"]
-    dataset_split = dataset_config["split"]
+    # Load dataset configuration from CLI args
+    dataset_name = args.gt_hf_repo
+    dataset_split = args.gt_hf_split
+    dataset_revision = args.gt_hf_revision
 
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
@@ -597,7 +599,7 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = resolved_workspace / "rubric.csv"
+    rubric_path = resolved_workspace / "scoring" / "rubric.csv"
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
@@ -802,13 +804,17 @@ def upload_tasks_to_hf(
         except Exception as exc:
             raise SystemExit(f"Repo not found or not accessible: {repo_id}") from exc
 
-    api.upload_folder(
+    # NOTE: upload_large_folder does not support path_in_repo or commit_message.
+    # If path_in_repo is needed, local folder structure must match the desired repo path.
+    if path_in_repo and path_in_repo not in ("", ".", "/"):
+        print(
+            f"Warning: upload_large_folder ignores path_in_repo='{path_in_repo}'. "
+            "Files will be uploaded to repo root."
+        )
+    api.upload_large_folder(
         repo_id=str(repo_id),
         repo_type=str(repo_type),
         folder_path=str(resolved_root),
-        path_in_repo=path_in_repo or None,
-        commit_message=f"Upload Harbor tasks from {resolved_root.name}",
-        token=hf_token,
     )
 
     registry = _build_registry(
