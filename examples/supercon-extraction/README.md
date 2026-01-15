@@ -1,23 +1,63 @@
 # SuperCon Property Extraction
 
 > \[!NOTE\]
-> We only need to construct the dataset following [Construct the Dataset from Scratch](#constructing-the-dataset-from-scratch) once.
-> For now, we will use the orignal SuperCon dataset as the ground-truth.
+> Currently, we are using the original SuperCon dataset as the ground-truth, so please follow the instructions under [Constructing the Dataset from SuperCon original](#constructing-the-dataset-from-supercon-original) to construct the dataset.
 
 TODO:
 - [ ] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
 - [ ] Push GT property name embeddings to HF.
 
+## Setup Instructions
+
+1. Follow the setup instructions at [README.md](../../README.md#getting-started).
+
+2. Additional setup instructions:
+
+<details>
+    <summary>Instructions for running Harbor locally</summary>
+
+* Install Docker Desktop following [these](https://docs.docker.com/desktop/setup/install/mac-install/) instructions.
+
+</details>
+
+<details>
+    <summary>Instructions for running Harbor on Modal</summary>
+
+* Create a Modal API key at https://modal.com/settings/kilian-group/tokens (email ag2435@cornell.edu to be added to the group) and follow the onscreen instructions to activate it.
+
+</details>
+
 ## Experiments
 
-1. Run the tasks using Harbor/Modal:
+1. Run the tasks using Harbor + Modal:
 
 ```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config --force
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out-0114-harbor/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
+  --seed 1
 ```
 
-2. Compute accuracy:
+<details>
+    <summary> Instructions for runnning Harbor locally</summary>
+
+* Launch Docker Desktop.
+* Run the following command:
 
 ```bash
+uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  -c out-0114-harbor/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --seed 1 --jobs-dir JOBS_DIR
+```
+
+</details>
+
+2. Compute accuracy across tasks:
+
+```bash
+uv run python format_accuracy.py -jd JOBS_DIR
 ```
 
 ## Experiments using simple LLM API (for debugging only)
@@ -153,6 +193,7 @@ cp -r ../harbor-workspace/ground-template .
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
-    --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . --domain supercon \
+    --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . \
+    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
 ```
