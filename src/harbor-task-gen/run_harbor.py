@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import quote, urlparse, urlunparse
+import random
 
 import asyncio
 
@@ -206,6 +207,149 @@ def _extract_modal_args(argv: list[str]) -> tuple[list[str], bool]:
     return cleaned, modal_requested
 
 
+_DEFAULT_BATCH_SIZE = 10
+
+
+def _extract_batch_args(
+    argv: list[str],
+) -> tuple[list[str], int, int | None, int | None]:
+    """Strip --batch-size, --batch-number, and --seed from argv and return them separately."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--batch-size", type=int, default=_DEFAULT_BATCH_SIZE)
+    parser.add_argument("--batch-number", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
+    args, remaining = parser.parse_known_args(argv)
+    return remaining, args.batch_size, args.batch_number, args.seed
+
+
+def _get_config_path_from_argv(argv: list[str], workspace: Path) -> Path | None:
+    """Extract job config path from -c / --config flag."""
+    config_path: Path | None = None
+    for idx, arg in enumerate(argv):
+        if arg in {"-c", "--config"} and idx + 1 < len(argv):
+            config_path = Path(argv[idx + 1])
+            break
+        if arg.startswith("--config="):
+            config_path = Path(arg.split("=", 1)[1])
+            break
+
+    if config_path is None:
+        return None
+
+    if not config_path.is_absolute():
+        config_path = workspace / config_path
+
+    return config_path if config_path.exists() else None
+
+
+def _get_tasks_path_from_config(config_path: Path, workspace: Path) -> Path | None:
+    """Extract tasks path from job config YAML (datasets[0].path)."""
+    try:
+        import yaml
+
+        config_data = yaml.safe_load(config_path.read_text())
+        datasets = config_data.get("datasets", [])
+        if datasets and isinstance(datasets, list) and len(datasets) > 0:
+            first_dataset = datasets[0]
+            if isinstance(first_dataset, dict) and "path" in first_dataset:
+                tasks_path = Path(first_dataset["path"])
+                if not tasks_path.is_absolute():
+                    tasks_path = workspace / tasks_path
+                return tasks_path
+    except Exception:
+        raise SystemExit(f"Failed to load config from {config_path}")
+
+    return None
+
+
+def _get_task_dirs(tasks_path: Path) -> list[Path]:
+    """Return task directories under tasks_path (directories with task.md)."""
+    if not tasks_path.exists() or not tasks_path.is_dir():
+        return []
+    task_dirs = []
+    for child in sorted(tasks_path.iterdir()):
+        if child.is_dir() and (child / "task.toml").exists():
+            task_dirs.append(child)
+    return task_dirs
+
+
+def _get_agent_model_from_argv(argv: list[str]) -> tuple[str | None, str | None]:
+    """Extract agent name and model name from command line arguments."""
+    agent_name: str | None = None
+    model_name: str | None = None
+
+    for idx, arg in enumerate(argv):
+        # Agent: -a or --agent
+        if arg in {"-a", "--agent"} and idx + 1 < len(argv):
+            agent_name = argv[idx + 1]
+        elif arg.startswith("--agent="):
+            agent_name = arg.split("=", 1)[1]
+
+        # Model: -m or --model or --model-name
+        if arg in {"-m", "--model", "--model-name"} and idx + 1 < len(argv):
+            model_name = argv[idx + 1]
+        elif arg.startswith("--model="):
+            model_name = arg.split("=", 1)[1]
+        elif arg.startswith("--model-name="):
+            model_name = arg.split("=", 1)[1]
+
+    return agent_name, model_name
+
+
+def _create_batch_config(
+    original_config: Path,
+    batch_tasks_path: Path,
+    output_path: Path,
+    batch_number: int,
+    agent_name: str | None,
+    model_name: str | None,
+    seed: int | None,
+) -> None:
+    """Create a modified job config with updated datasets path and job name for a batch."""
+    import yaml
+
+    config_data = yaml.safe_load(original_config.read_text())
+    if "datasets" in config_data and config_data["datasets"]:
+        config_data["datasets"][0]["path"] = str(batch_tasks_path)
+
+    # Set job name: bn{batch_number}-{agent_name}-{model_name}
+    agent_part = agent_name or "agent"
+    # Clean model name: remove provider prefix and special chars
+    if model_name:
+        model_part = model_name.split("/")[-1].replace(":", "-")
+    else:
+        model_part = "model"
+    seed_part = f"-s{seed}" if seed is not None else ""
+    config_data["job_name"] = f"bn{batch_number}-{agent_part}-{model_part}{seed_part}"
+
+    output_path.write_text(yaml.dump(config_data, default_flow_style=False))
+
+
+def _replace_config_in_argv(argv: list[str], new_config: str) -> list[str]:
+    """Replace the -c/--config value in argv with a new config path."""
+    result: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in {"-c", "--config"}:
+            result.append(arg)
+            result.append(new_config)
+            skip_next = True
+            continue
+        if arg.startswith("--config="):
+            result.append(f"--config={new_config}")
+            continue
+        result.append(arg)
+    return result
+
+
+def _argv_has_any(argv: list[str], needles: set[str]) -> bool:
+    """Return True if any of the needles are present in argv."""
+    return any(arg in needles for arg in argv)
+
+
 def _patch_modal_download_logs(timeout_sec: int) -> None:
     """Guard Modal log downloads so stalled gRPC calls can't freeze the job."""
     try:
@@ -361,6 +505,7 @@ def main() -> int:
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
     argv, agent_setup_override = _extract_agent_setup_timeout(argv)
+    argv, batch_size, batch_number, seed = _extract_batch_args(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -407,33 +552,116 @@ def main() -> int:
             if existing_pythonpath
             else src_path
         )
-    if modal_active:
-        timeout_raw = env.get("HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300").strip()
-        if timeout_raw and timeout_raw != "0":
-            try:
-                timeout_sec = int(timeout_raw)
-            except ValueError:
-                timeout_sec = 300
-            _patch_modal_download_logs(timeout_sec)
-        setup_timeout_raw = (
-            str(agent_setup_override)
-            if agent_setup_override is not None
-            else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
-        ).strip()
-        if setup_timeout_raw and setup_timeout_raw != "0":
-            try:
-                setup_timeout_sec = int(setup_timeout_raw)
-            except ValueError:
-                setup_timeout_sec = 900
-            _patch_agent_setup_timeout(setup_timeout_sec)
-        exit_code = _run_harbor_cli_in_process(argv, workspace=workspace)
-    else:
-        command = [sys.executable, "-m", "harbor.cli.main", *argv]
-        result = subprocess.run(command, check=False, cwd=workspace, env=env)
-        exit_code = int(result.returncode)
 
-    if exit_code != 0:
-        _summarize_failure(argv, workspace=workspace)
+    # Batching setup (always enabled for jobs commands with config)
+    if config_path := _get_config_path_from_argv(argv, workspace):
+        tasks_path = _get_tasks_path_from_config(config_path, workspace)
+    else:
+        raise SystemExit(
+            "No config path found in argv. Please use the -c/--config flag to specify a config file."
+        )
+    all_tasks = _get_task_dirs(tasks_path)
+    # Shuffle tasks if seed is provided
+    if seed is not None:
+        print(f"Shuffling tasks with seed {seed}...", file=sys.stderr)
+        random.seed(seed)
+        random.shuffle(all_tasks)
+    all_batches = [
+        all_tasks[i : i + batch_size] for i in range(0, len(all_tasks), batch_size)
+    ]
+    if batch_number is not None:
+        if batch_number < 1 or batch_number > len(all_batches):
+            raise SystemExit(
+                f"--batch-number {batch_number} out of range (1-{len(all_batches)})."
+            )
+        print(
+            f"Running batch {batch_number}/{len(all_batches)} "
+            f"({len(all_batches[batch_number - 1])} tasks).",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"Batching {len(all_tasks)} tasks into {len(all_batches)} batches of {batch_size}.",
+            file=sys.stderr,
+        )
+
+    def _run_single_harbor(argv_for_run: list[str]) -> int:
+        """Run a single Harbor invocation."""
+        if modal_active:
+            timeout_raw = env.get(
+                "HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300"
+            ).strip()
+            if timeout_raw and timeout_raw != "0":
+                try:
+                    timeout_sec = int(timeout_raw)
+                except ValueError:
+                    timeout_sec = 300
+                _patch_modal_download_logs(timeout_sec)
+            setup_timeout_raw = (
+                str(agent_setup_override)
+                if agent_setup_override is not None
+                else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
+            ).strip()
+            if setup_timeout_raw and setup_timeout_raw != "0":
+                try:
+                    setup_timeout_sec = int(setup_timeout_raw)
+                except ValueError:
+                    setup_timeout_sec = 900
+                _patch_agent_setup_timeout(setup_timeout_sec)
+            return _run_harbor_cli_in_process(argv_for_run, workspace=workspace)
+        else:
+            command = [sys.executable, "-m", "harbor.cli.main", *argv_for_run]
+            result = subprocess.run(command, check=False, cwd=workspace, env=env)
+            return int(result.returncode)
+
+    # Run batches sequentially
+    exit_code = 0
+    agent_name, model_name = _get_agent_model_from_argv(argv)
+    batch_indices = [batch_number - 1] if batch_number else range(len(all_batches))
+    batch_tmp_dir = workspace / ".batch_tmp"
+
+    for idx in batch_indices:
+        batch = all_batches[idx]
+        batch_num = idx + 1
+        print(
+            f"\n=== Batch {batch_num}/{len(all_batches)} ({len(batch)} tasks) ===",
+            file=sys.stderr,
+        )
+
+        # Copy tasks to temp directory (symlinks cause SymlinkRecursionError)
+        batch_dir = batch_tmp_dir / f"tasks_batch_{batch_num}"
+        if batch_dir.exists():
+            shutil.rmtree(batch_dir)
+        batch_dir.mkdir(parents=True, exist_ok=True)
+        for task_dir in batch:
+            shutil.copytree(task_dir, batch_dir / task_dir.name)
+
+        # Create batch config and run
+        batch_config = batch_tmp_dir / f"job_batch_{batch_num}.yaml"
+        _create_batch_config(
+            config_path,
+            batch_dir,
+            batch_config,
+            batch_num,
+            agent_name,
+            model_name,
+            seed,
+        )
+        batch_argv = _replace_config_in_argv(argv, str(batch_config))
+        batch_exit = _run_single_harbor(batch_argv)
+        if batch_exit != 0:
+            _summarize_failure(batch_argv, workspace=workspace)
+            exit_code = batch_exit
+
+        # Clean up
+        shutil.rmtree(batch_dir, ignore_errors=True)
+        batch_config.unlink(missing_ok=True)
+
+    # Clean up batch tmp directory if it exists
+    batch_tmp = workspace / ".batch_tmp"
+    if batch_tmp.exists():
+        shutil.rmtree(batch_tmp, ignore_errors=True)
+
     if post_run.enabled:
         exit_code = _run_post_actions(
             argv=argv,
@@ -799,10 +1027,6 @@ def _apply_hf_args(
         return argv
 
     return argv
-
-
-def _argv_has_any(argv: list[str], needles: set[str]) -> bool:
-    return any(arg in needles for arg in argv)
 
 
 def _hf_repo_url(repo_id: str, repo_type: str) -> str:
