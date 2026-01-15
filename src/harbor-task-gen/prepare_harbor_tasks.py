@@ -795,7 +795,7 @@ def upload_tasks_to_hf(
         api.create_repo(
             repo_id=str(repo_id),
             repo_type=str(repo_type),
-            private=True if private is None else private,
+            private=False if private is None else private,
             exist_ok=True,
         )
     else:
