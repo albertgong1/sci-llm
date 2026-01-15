@@ -107,7 +107,7 @@ Link: [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLc
 mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 ```
 
-<details>
+</details>
 
 2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `DATA_DIR/SuperCon.csv`.
 
