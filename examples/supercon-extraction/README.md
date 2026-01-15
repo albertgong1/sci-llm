@@ -31,7 +31,10 @@ TODO:
 
 ## Experiments
 
-1. Please run the following command to launch the Harbor tasks:
+1. Please run the following command to execute the Harbor tasks in batches (default batch size: 10):
+
+> \[!IMPORTANT\]
+> Adding the `--seed 1` flag will randomly shuffle the tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
