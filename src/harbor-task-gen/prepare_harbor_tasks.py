@@ -6,12 +6,13 @@ each with:
   - `instruction.md`: a single prompt/instruction file shared across tasks via a template
   - `tests/`: verifier that scores predictions using rubric tolerances
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
+  - `registry.json`: a local task registry for Harbor to discover and load tasks
 
 The ground truth source is specified via --gt-hf-repo, --gt-hf-split, and optionally
 --gt-hf-revision (defaults to main).
 
 Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
-and write a `registry.json` so Harbor can pull tasks directly from the Hub.
+so Harbor can pull tasks directly from the Hub.
 
 By default this script writes tasks under
 `examples/harbor-workspace/out/harbor/<dataset>/<template>/` so the
@@ -21,7 +22,7 @@ Example (from repo root):
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force \
       --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0
     uv run python src/harbor-task-gen/run_harbor.py jobs start \
-      -c out/harbor/supercon-extraction/ground-template/job.yaml -a oracle
+      --registry out/harbor/supercon-extraction/tc/ground-template/registry.json -a oracle
 
     # To use the guided template:
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
@@ -234,34 +235,37 @@ def flatten_dataset(
     return grouped
 
 
-def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> None:
-    """Write a Harbor job YAML pointing at the generated tasks."""
-    if tasks_dir.is_absolute():
-        try:
-            tasks_rel = tasks_dir.relative_to(workspace)
-        except ValueError:
-            tasks_rel = tasks_dir
-    else:
-        tasks_rel = tasks_dir
-    job_yaml = f"""\
-jobs_dir: jobs
-n_attempts: 1
-timeout_multiplier: 1.0
-orchestrator:
-  type: local
-  n_concurrent_trials: 2
-  quiet: false
-environment:
-  type: docker
-  force_build: true
-  delete: true
-agents:
-  - name: oracle
-datasets:
-  - path: {tasks_rel.as_posix()}
-"""
-    job_path.parent.mkdir(parents=True, exist_ok=True)
-    job_path.write_text(job_yaml)
+def write_local_registry(
+    task_dirs: list[Path],
+    registry_path: Path,
+    *,
+    dataset_name: str,
+    dataset_version: str = "local",
+    description: str = "Locally generated Harbor tasks.",
+) -> None:
+    """Write a local registry.json for the generated tasks.
+
+    This registry can be used by Harbor to discover and load tasks from the local
+    filesystem without requiring HuggingFace upload.
+    """
+    tasks = []
+    for task_dir in task_dirs:
+        tasks.append(
+            {
+                "name": task_dir.name,
+                "path": task_dir.as_posix(),
+            }
+        )
+    registry = [
+        {
+            "name": dataset_name,
+            "version": dataset_version,
+            "description": description,
+            "tasks": tasks,
+        }
+    ]
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(json.dumps(registry, indent=2))
 
 
 def build_task(
@@ -474,11 +478,6 @@ def main() -> None:
         help="Overwrite the output task directory if it already exists.",
     )
     parser.add_argument(
-        "--write-job-config",
-        action="store_true",
-        help="Also emit a Harbor job config pointing at the generated tasks.",
-    )
-    parser.add_argument(
         "--upload-hf",
         action="store_true",
         help="Upload the generated tasks to a Hugging Face repo (writes registry.json).",
@@ -657,14 +656,23 @@ def main() -> None:
             task_rel = task_dir
         print(f"Wrote task {task_id} -> {task_rel}")
 
-    if args.write_job_config:
-        job_path = task_root / "job.yaml"
-        write_job_config(tasks_dir, job_path, workspace=resolved_workspace)
+    # Write local registry.json
+    generated_task_dirs = _collect_task_dirs(tasks_dir)
+    if generated_task_dirs:
+        registry_path = task_root / "registry.json"
+        dataset_short_name = dataset_name.split("/")[-1]
+        write_local_registry(
+            generated_task_dirs,
+            registry_path,
+            dataset_name=dataset_short_name,
+            dataset_version=dataset_revision,
+            description=f"Harbor tasks for {dataset_name} ({task_label}).",
+        )
         try:
-            job_rel = job_path.relative_to(resolved_workspace)
+            registry_rel = registry_path.relative_to(resolved_workspace)
         except ValueError:
-            job_rel = job_path
-        print(f"Wrote job config -> {job_rel}")
+            registry_rel = registry_path
+        print(f"Wrote registry -> {registry_rel}")
 
     if args.upload_hf:
         _upload_tasks_after_build(
