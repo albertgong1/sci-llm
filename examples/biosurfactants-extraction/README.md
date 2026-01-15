@@ -8,16 +8,26 @@
 
 ## Experiments
 
-1. Generate predictions using Harbor + Modal:
+1. Please run the following command to execute the Harbor tasks in batches (default batch size: 10):
 
-> \[!TIP\]
-> To run on Modal, add `--modal` to the command. Note: this allows you to run more concurrent tasks (e.g., 10) than the default of 4.
+> \[!IMPORTANT\]
+> Adding the `--seed 1` flag will randomly shuffle the tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  -c out-0114-harbor/ground-template/job.yaml \
+  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
-  --workspace .
+  --workspace . --seed 1 --jobs-dir JOBS_DIR
+```
+
+<details>
+    <summary>Instructions for running Harbor on Modal</summary>
+
+```bash
+uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
+  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
+  --seed 1 --jobs-dir JOBS_DIR
 ```
 
 ## Reproducing the Dataset Construction
@@ -93,8 +103,8 @@ uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter
 1. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/biosurfactants-extraction-harbor-tasks.
 
 ```bash
-uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
-    --gt-hf-repo kilian-group/biosurfactants-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
-    --force --upload-hf --hf-repo-id kilian-group/biosurfactants-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
+    --gt-hf-repo kilian-group/biosurfactants-extraction --gt-hf-split lite --gt-hf-revision v0.0.0 \
+    --force --upload-hf --hf-repo-id kilian-group/biosurfactants-extraction-harbor-tasks
 ```

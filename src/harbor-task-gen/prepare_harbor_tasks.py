@@ -675,9 +675,10 @@ def main() -> None:
         print(f"Wrote registry -> {registry_rel}")
 
     if args.upload_hf:
+        # import pdb; pdb.set_trace()
         _upload_tasks_after_build(
             args=args,
-            tasks_root=tasks_dir,
+            tasks_root=task_root,
         )
 
 
@@ -771,7 +772,6 @@ def upload_tasks_to_hf(
     tasks_root: Path,
     repo_id: str,
     repo_type: str = "dataset",
-    path_in_repo: str = "tasks",
     registry_path: str = "registry.json",
     dataset_name: str | None = None,
     dataset_version: str = "head",
@@ -784,16 +784,9 @@ def upload_tasks_to_hf(
 
     Returns a small summary dict for logging.
     """
-    resolved_root = _resolve_tasks_root(tasks_root).resolve()
-    if not resolved_root.exists():
-        raise FileNotFoundError(f"Tasks root not found: {resolved_root}")
-
-    task_dirs = _collect_task_dirs(resolved_root)
-    if not task_dirs:
-        raise SystemExit(f"No valid Harbor task folders found under {resolved_root}.")
+    task_dirs = _collect_task_dirs(tasks_root / "tasks")
 
     dataset_name = dataset_name or repo_id
-    path_in_repo = str(path_in_repo).strip("/")
     registry_path = str(registry_path).strip("/")
 
     hf_token = token or _infer_hf_token()
@@ -814,22 +807,17 @@ def upload_tasks_to_hf(
 
     # NOTE: upload_large_folder does not support path_in_repo or commit_message.
     # If path_in_repo is needed, local folder structure must match the desired repo path.
-    if path_in_repo and path_in_repo not in ("", ".", "/"):
-        print(
-            f"Warning: upload_large_folder ignores path_in_repo='{path_in_repo}'. "
-            "Files will be uploaded to repo root."
-        )
     api.upload_large_folder(
         repo_id=str(repo_id),
         repo_type=str(repo_type),
-        folder_path=str(resolved_root),
+        folder_path=str(tasks_root),
     )
 
     registry = _build_registry(
         task_dirs=task_dirs,
         repo_id=str(repo_id),
         repo_type=str(repo_type),
-        path_in_repo=path_in_repo or ".",
+        path_in_repo="tasks",
         dataset_name=dataset_name,
         dataset_version=str(dataset_version),
         description=str(description),
@@ -848,7 +836,7 @@ def upload_tasks_to_hf(
         "task_count": str(len(task_dirs)),
         "registry_url": _hf_resolve_url(str(repo_id), str(repo_type), registry_path),
         "dataset_name": f"{dataset_name}@{dataset_version}",
-        "path_in_repo": path_in_repo or "/",
+        "path_in_repo": "/",
     }
 
 
@@ -881,7 +869,6 @@ def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> 
         tasks_root=tasks_root,
         repo_id=str(repo_id),
         repo_type=str(args.hf_repo_type),
-        path_in_repo=str(args.hf_path_in_repo),
         registry_path=str(args.hf_registry_path),
         dataset_name=args.hf_dataset_name or str(repo_id),
         dataset_version=str(args.hf_dataset_version),
