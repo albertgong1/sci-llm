@@ -48,6 +48,8 @@ from datasets import load_dataset
 from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
 
+from pbench import DOMAIN2HF_DATASET_CONFIG
+
 
 def repo_root() -> Path:
     """Return the repository root directory."""
@@ -407,6 +409,12 @@ def main() -> None:
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
     parser.add_argument(
+        "--domain",
+        type=str,
+        default="supercon",
+        help="Domain for the dataset (default: supercon).",
+    )
+    parser.add_argument(
         "--workspace",
         type=Path,
         default=None,
@@ -539,10 +547,24 @@ def main() -> None:
         raise SystemExit(f"--workspace must be a directory: {resolved_workspace}")
     resolved_workspace.mkdir(parents=True, exist_ok=True)
 
+    # Load dataset configuration
+    domain = args.domain
+    if domain not in DOMAIN2HF_DATASET_CONFIG:
+        raise ValueError(
+            f"Unknown domain: {domain}. Available: {list(DOMAIN2HF_DATASET_CONFIG.keys())}"
+        )
+
+    dataset_config = DOMAIN2HF_DATASET_CONFIG[domain]
+    dataset_name = dataset_config["name"]
+    dataset_revision = dataset_config["revision"]
+    dataset_split = dataset_config["split"]
+
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
     if args.output_dir is None:
-        args.output_dir = resolved_workspace / "out" / "harbor" / "supercon-mini-v2"
+        # Use the dataset name (last part) for output directory
+        dataset_short_name = dataset_name.split("/")[-1]
+        args.output_dir = resolved_workspace / "out" / "harbor" / dataset_short_name
     if not args.pdf_dir.is_absolute():
         args.pdf_dir = resolved_workspace / args.pdf_dir
     if not args.output_dir.is_absolute():
@@ -579,9 +601,11 @@ def main() -> None:
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
-    dataset = load_dataset(
-        "kilian-group/supercon-mini-v2", split="test", revision="v2.0.1"
+    # Load dataset from configuration
+    print(
+        f"Loading dataset: {dataset_name} (revision: {dataset_revision}, split: {dataset_split})"
     )
+    dataset = load_dataset(dataset_name, split=dataset_split, revision=dataset_revision)
     property_filter = resolve_property_filter(args.task)
     grouped = flatten_dataset(
         cast(Iterable[dict[str, Any]], dataset),

@@ -24,6 +24,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "pymatgen",
+    "pyyaml",
     "tqdm",
     "google-genai",
     "openai",
@@ -44,8 +45,15 @@ validator = [
 
 [project.urls]
 
+[project.scripts]
+pbench-extract = "pbench.mass_extract_properties_from_llm:main"
+pbench-filter = "pbench.filter_candidates:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+pbench = ["*.yaml"]

@@ -2454,6 +2454,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pymatgen" },
     { name = "pymupdf" },
+    { name = "pyyaml" },
     { name = "scikit-learn" },
     { name = "tqdm" },
 ]
@@ -2481,6 +2482,7 @@ requires-dist = [
     { name = "pydantic" },
     { name = "pymatgen" },
     { name = "pymupdf" },
+    { name = "pyyaml" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "tqdm" },
 ]

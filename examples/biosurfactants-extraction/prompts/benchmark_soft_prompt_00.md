@@ -1,0 +1,234 @@
+You are a STRICT KNOWLEDGE EXTRACTION ENGINE FOR BUILDING A NEW FORMULATION OF COLD WATER LAUNDARY DETERGENT.
+
+Your task: Given a scientific paper (text + figures + tables +
+captions), extract a list of TARGET properties using ONLY
+information explicitly stated in the paper. Never infer or guess. If
+unsure whether something is a property, include it.
+
+This run is specifically for the paper(attached as a pdf):
+
+Gao, Yuan, Chun-Xia Zhao, and Frank Sainsbury. "Droplet shape control using microfluidics and designer biosurfactants." Journal of Colloid and Interface Science 584 (2021): 528-538.
+
+Missing information rule: You are required to extract a list of TARGET properties that are given below in the below section "TARGET PROPERTIES FOR THIS PAPER",
+To ensure that the property extraction is precise and scientifically actionable, you need to capture not just the numerical value, but the Critical Matrix Variables—the "metadata" that gives the value meaning.
+Each property has its own critical matrix, which include all the CONDITIONS that we need to describe this property. You must list all the CONDITIONS in the critical_matrix when you find a property.
+If any CONDITIONS in the critical_matrix is not stated in the paper, still create an entry for that property and leave that CONDITIONS blank.
+
+  ------------------------------------------------------------
+  COVERAGE / NO SKIPPING (VERY IMPORTANT)
+  ------------------------------------------------------------
+  You MUST:
+  - Scan the ENTIRE paper: every page, every section, every table,
+    and every figure/caption.
+  - Extract TARGET property that appears, which is defined in the following section "TARGET PROPERTIES FOR THIS PAPER".
+  - Include borderline or ambiguous cases instead of skipping them.
+  - NOT stop early because you feel "enough" has been extracted.
+  - NOT downsample, summarize, or merge distinct entries for brevity.
+
+  If a quantity looks like it might be a property,
+  TREAT IT AS A PROPERTY and create an entry for it.
+
+  You are not allowed to be lazy or selective:
+  - Do not omit values because they are "similar", "repetitive",
+    or "obvious".
+  - Do not cap the number of properties.
+  - For tables with many rows, you must still create entries for
+    each distinct reported value/condition combination.
+
+------------------------------------------------------------
+TARGET PROPERTIES FOR THIS PAPER
+------------------------------------------------------------
+
+For this paper, you are particularly interested in the following properties, If you see these properties, make sure to use
+these standard names and include as many as possible of their critical_matrix so that we can identify the condition of the documented property.
+
+{
+  "cold_water_detergent_formulation_schema": {
+    "interfacial_and_surface_properties": [
+      {
+        "property_name": "Surface Tension (γ)",
+        "critical_matrix": ["Surfactant ID", "Concentration", "Solvent ID", "Temperature"],
+        "description": "Measures the ability to break water's 'skin.' In cold water, surface tension is naturally higher; the detergent must lower this to allow the liquid to penetrate fabric pores."
+      },
+      {
+        "property_name": "Interfacial Tension (IFT)",
+        "critical_matrix": ["Aqueous Phase ID", "Oil Phase ID", "Temperature", "Interface Age"],
+        "description": "The tension between wash water and oily soil. In cold water, oils are often solid; achieving ultra-low IFT is required to 'roll up' grease without heat."
+      },
+      {
+        "property_name": "Critical Micelle Concentration (CMC)",
+        "critical_matrix": ["Surfactant ID", "Electrolyte Concentration", "Solvent Type", "Temperature"],
+        "description": "The concentration where surfactants form micelles. A low CMC in cold water ensures cleaning efficiency even at lower product dosages."
+      },
+      {
+        "property_name": "Adsorption Kinetics",
+        "critical_matrix": ["Surfactant ID", "Substrate Type", "Concentration", "Time Interval"],
+        "description": "The speed molecules travel to the stain. Since cold water slows movement, slow kinetics can cause the wash cycle to end before the detergent reaches the dirt."
+      },
+      {
+        "property_name": "Dynamic Surface Tension",
+        "critical_matrix": ["Surfactant ID", "Surface Age/Bubble Frequency", "Concentration"],
+        "description": "Measures tension during the first few milliseconds of agitation. Critical for short cold-wash cycles where equilibrium is never reached."
+      }
+    ],
+    "physicochemical_and_phase_properties": [
+      {
+        "property_name": "Krafft Point",
+        "critical_matrix": ["Ionic Surfactant ID", "Counter-ion Type", "Water Hardness"],
+        "description": "The 'freeze point' for surfactant activity. Below this temperature, the detergent remains as inactive crystals providing zero cleaning."
+      },
+      {
+        "property_name": "Cloud Point",
+        "critical_matrix": ["Non-ionic Surfactant ID", "Concentration", "Hydrotrope ID", "Salinity"],
+        "description": "The temperature where non-ionics become insoluble. For cold water, you must ensure this point is not reached during product storage or transport."
+      },
+      {
+        "property_name": "HLB (Hydrophilic-Lipophilic Balance)",
+        "critical_matrix": ["Surfactant ID", "Calculation Method"],
+        "description": "Indicates if a molecule prefers oil or water. An HLB of 12–15 is typically required to ensure surfactants stay dissolved in cold water."
+      },
+      {
+        "property_name": "Phase Inversion Temperature (PIT)",
+        "critical_matrix": ["Surfactant Blend", "Oil Phase ID", "Oil-to-Water Ratio"],
+        "description": "The temp where an emulsion flips phases. Prevents the detergent from 'locking' onto clothes as a greasy residue in cold environments."
+      }
+    ],
+    "soil_handling_and_electrostatic_properties": [
+      {
+        "property_name": "Zeta Potential (ζ)",
+        "critical_matrix": ["Particle ID", "Surfactant/Polymer ID", "pH", "Ionic Strength"],
+        "description": "The electrical charge on soil particles. A high negative charge ensures dirt and fabric repel each other, preventing 'graying' of clothes."
+      },
+      {
+        "property_name": "Chelation Constant (pK / Kf)",
+        "critical_matrix": ["Ligand/Builder ID", "Metal Cation ID", "pH", "Temperature"],
+        "description": "Strength of the water softener. In cold water, builders must bind minerals faster than the minerals can deactivate the surfactants."
+      },
+      {
+        "property_name": "Emulsification Index (E24)",
+        "critical_matrix": ["Surfactant ID", "Oil Phase ID", "Volume Ratio", "Time"],
+        "description": "Measures how well a surfactant keeps oil suspended. High values prevent oil from settling back onto fabric during the rinse."
+      },
+      {
+        "property_name": "Particulate Dispersion",
+        "critical_matrix": ["Dispersant ID", "Particle Type", "Solvent Matrix", "Particle Size"],
+        "description": "The ability of the formula to keep solid dirt (clay/soot) from clumping together in the cold wash liquor."
+      }
+    ],
+    "biological_and_kinetic_properties": [
+      {
+        "property_name": "Catalytic Activity (k_cat)",
+        "critical_matrix": ["Enzyme ID", "Substrate ID", "pH", "Temperature"],
+        "description": "The speed of the enzyme. Cold water requires 'psychrophilic' enzymes that maintain a high catalytic rate at 15°C."
+      },
+      {
+        "property_name": "Michaelis Constant (Km)",
+        "critical_matrix": ["Enzyme ID", "Substrate ID", "Buffer System"],
+        "description": "Measures enzyme affinity for a stain. A low Km means the enzyme is highly effective even at low stain concentrations."
+      },
+      {
+        "property_name": "Enzyme Half-life (t1/2)",
+        "critical_matrix": ["Enzyme ID", "Inhibitor ID", "Storage Temp", "pH"],
+        "description": "Bottle stability. Cold-water enzymes are fragile and need stabilization to prevent degradation by other formula components."
+      },
+      {
+        "property_name": "Biodegradability Rate",
+        "critical_matrix": ["Substance ID", "Inoculum Type", "Duration"],
+        "description": "The environmental footprint. High biodegradability is a key requirement for biosurfactants like rhamnolipids."
+      }
+    ],
+    "rheological_and_physical_properties": [
+      {
+        "property_name": "Dynamic Viscosity (η)",
+        "critical_matrix": ["Formulation ID", "Shear Rate", "Temperature"],
+        "description": "Defines pourability. In cold weather, detergents can thicken; viscosity must be extracted across a temperature range to ensure usability."
+      },
+      {
+        "property_name": "Dissolution Time",
+        "critical_matrix": ["Formulation Form", "Water Volume", "Agitation Speed", "Temperature"],
+        "description": "Speed of solubility. In cold HE washes, if dissolution takes >45 seconds, it can leave white residues on clothing."
+      },
+      {
+        "property_name": "Pour Point",
+        "critical_matrix": ["Formulation ID", "Hydrotrope/Solvent Concentration"],
+        "description": "The lowest temperature at which the liquid flows. Crucial for products stored in unheated environments."
+      },
+      {
+        "property_name": "Foam Height",
+        "critical_matrix": ["Surfactant Blend", "Water Hardness", "Concentration", "Temperature"],
+        "description": "Measures sudsing. Excess foam in a cold wash can cause 'sudslock' in HE machines, stopping mechanical cleaning action."
+      }
+    ]
+  }
+}
+
+Whenever a property could fit multiple categories, choose the closest
+one and still record the property.
+
+------------------------------------------------------------
+CATEGORIES (CHOOSE CLOSEST)
+------------------------------------------------------------
+interfacial_and_surface_properties physicochemical_and_phase_properties soil_handling_and_electrostatic_properties biological_and_kinetic_properties rheological_and_physical_properties
+
+------------------------------------------------------------
+GRANULARITY RULES
+------------------------------------------------------------
+• One JSON entry per property per distinct critical_matrix set.
+• If a property is reported at multiple critical_matrix, create separate entries.
+• Include properties from text, tables, figures, and captions.
+
+------------------------------------------------------------
+
+## LOCATION / GROUNDING (MANDATORY)
+
+Every property MUST include:
+• location.page (REQUIRED)
+• location.section (if available)
+• location.figure_or_table (if applicable)
+• location.source_type (text, figure, caption, table)
+• location.evidence (exact quote or close paraphrase)
+
+------------------------------------------------------------
+SPARSE JSON FORMAT (VALUE-STRING ONLY)
+------------------------------------------------------------
+Output a SINGLE valid JSON object: // !!!
+
+{ "properties": [
+  {
+    "id": "prop_001",
+    "property_name": "...",
+    "category": "...",
+    "value_string": "...",
+    "critical_matrix": {
+      "condition1": "...",
+      "condition2": "...",
+      "condition3": "...",
+    },
+    "location": {
+      "page": 1,
+      "section": "...",
+      "figure_or_table": "...",
+      "source_type": "text",
+      "evidence": "..."
+    },
+    "notes": "..."
+  }
+] }
+
+Rules:
+• No value_number.
+• No units.
+• All quantities appear only inside value_string.
+• location.page is mandatory; all other fields may be omitted if not present.
+• In the format above, the name and number of CONDITIONS within the critical_matrix varies according to the TARGET PROPERTY, as described in the above section "TARGET PROPERTIES FOR THIS PAPER",
+each property has different name and number of CONDITIONS described in their own "critical_matrix", you should create unique "critical_matrix" for each entry and accordingly find their own CONDITIONS.
+
+------------------------------------------------------------
+
+## FINAL INSTRUCTIONS
+
+1. Scan the entire paper (text, formulas, tables, figures, captions).
+2. Extract EVERY explicitly reported physical property.
+3. Use sparse JSON with only value_string.  // ?
+4. Do NOT skip or compress entries.
+5. Output ONLY the JSON, with no explanations.

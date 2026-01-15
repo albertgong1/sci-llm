@@ -190,13 +190,18 @@ async def main(args: argparse.Namespace) -> None:
     #
     # Load ground truth properties
     #
-    if False:
-        hf_dataset_name = pbench.DOMAIN2HF_DATASET_NAME["supercon"]
+    if True:
+        dataset_config = pbench.DOMAIN2HF_DATASET_CONFIG["supercon"]
+        hf_dataset_name = dataset_config["name"]
+        revision = dataset_config["revision"]
+        split = args.split or dataset_config["split"]
         logger.info(
-            f"Loading dataset from HuggingFace: {hf_dataset_name} (split={args.split})"
+            f"Loading dataset from HuggingFace: {hf_dataset_name} "
+            f"(revision={revision}, split={split})"
         )
-        dataset = load_dataset(hf_dataset_name, split=args.split, revision="v2.0.1")
+        dataset = load_dataset(hf_dataset_name, split=split, revision=revision)
     else:
+        # NOTE (Albert): for debugging using local version of the dataset
         dataset = load_from_disk("out-0111/dataset")
     df_gt: pd.DataFrame = dataset.to_pandas()
     # make the refno column the index
