@@ -118,7 +118,7 @@ mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 uv run python generate_property_unit_mappings.py
 ```
 
-3. Generate a CSV version of the SuperCon property extraction dataset for the PDFs present in `DATA_DIR/Paper_DB` and save to `OUTPUT_DIR`:
+3. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction.
 
 > \[!NOTE\]
 > Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
@@ -137,12 +137,12 @@ cp -r ../harbor-workspace/ground-template .
 { echo '{paper_at_command}'; echo; cat prompts/unsupervised_extraction_prompt.md; } > ground-template/instruction.md.template
 ```
 
-5. Instantiate the Harbor template using the papers from `DATA_DIR/Paper_DB`:
+5. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
-    --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . \
-    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0 \
+    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
 ```
 
