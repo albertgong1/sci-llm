@@ -242,6 +242,31 @@ if __name__ == "__main__":
     )
     parser = pbench.add_base_args(parser)
 
+    # Domain args
+    parser.add_argument(
+        "--domain",
+        type=str,
+        default="supercon",
+        help="Material science domain",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="kilian-group/supercon-mini-v2",
+        help="Path to Ground Truth CSV or Hugging Face dataset name",
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default=None,
+        help="HuggingFace dataset configuration name, depending on the domain (e.g., 'tc', 'gap')",
+    )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        help="Split of the dataset to use",
+    )
     # Batch processing arguments
     parser.add_argument(
         "--batch_size",
