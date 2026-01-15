@@ -1,6 +1,6 @@
 # Biosurfactants Dataset
 
-1. Please follow the setup instructions at [README.md](../../README.md#setup-instructions).
+1. Please follow the setup instructions at [README.md](../../README.md#getting-started).
 
 2. If constructing the dataset, please follow the instructions under "Dataset Construction".
 
@@ -22,7 +22,21 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 
 ## Reproducing the Dataset Construction
 
-1. Download [Paper_DB.zip](https://drive.google.com/file/d/1XqosBMhqzUIx3U5Cfd0kO9co2KaKUErI/view?usp=share_link) and unzip to `data/Paper_DB`.
+1. Download PDFs and place them in `DATA_DIR/Paper_DB`.
+
+Link: [Google Drive Folder](https://drive.google.com/drive/folders/1xjR5tQSpiKuLiuJyc3Khzmkjl0ie4htK?usp=share_link). Contains 52 PDFs.
+
+<details>
+    <summary>Download instructions for Lite version</summary>
+
+Link: [Paper_DB.zip](https://drive.google.com/file/d/1XqosBMhqzUIx3U5Cfd0kO9co2KaKUErI/view?usp=share_link). Contains 5 PDFs.
+
+```bash
+# Assumes Paper_DB.zip is in the current directory
+unzip Paper_DB.zip -d DATA_DIR
+```
+
+</details>
 
 2. Obtain candidate properties:
 
@@ -40,13 +54,13 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 
 - Extract properties from PDFs using an LLM:
 ```bash
-uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
+uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -dd DATA_DIR -od OUTPUT_DIR -pp prompts/benchmark_soft_prompt_00.md
 ```
 
 - Filter the irrelevant extracted properties so that we have a smaller set of properties to validate:
 
 ```bash
-uv run pbench-filter -od OUTPUT_DIR
+uv run pbench-filter -dd DATA_DIR -od OUTPUT_DIR
 ```
 
 TODO:
@@ -64,27 +78,23 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
-4. Create HuggingFace dataset:
+4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/biosurfactants-extraction.
+
+> \[!NOTE\]
+> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
 
 ```bash
-uv run python create_huggingface_dataset.py --output_dir out-0113-for-jiashuo --repo_name kilian-group/biosurfactants-mini --tag_name v0.0.0
+uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
+    --repo_name kilian-group/biosurfactants-extraction --tag_name v0.0.0 --split SPLIT
 ```
 
 ## Constructing Harbor tasks
 
-1. Create Harbor template:
-
-```bash
-# Copy the Harbor workspace template
-cp -r ../harbor-workspace/ground-template .
-# Add placeholder variable to the start of the prompt
-{ echo '{paper_at_command}'; echo; cat prompts/benchmark_soft_prompt_00.md; } > ground-template/instruction.md.template
-```
-
-2. Instantiate the Harbor tasks using the template for all papers:
+1. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/biosurfactants-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
-    --pdf-dir data/Paper_DB --output-dir out-0114-harbor --workspace . --domain biosurfactants \
-    --force
+    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --gt-hf-repo kilian-group/biosurfactants-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
+    --force --upload-hf --hf-repo-id kilian-group/biosurfactants-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
 ```
