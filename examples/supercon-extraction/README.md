@@ -27,29 +27,27 @@ TODO:
 
 </details>
 
+3. Optional: If running Harbor locally, launch Docker Desktop.
+
 ## Experiments
 
-1. Run the tasks using Harbor + Modal:
-
-```bash
-uv run python src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config --force
-uv run python src/harbor-task-gen/run_harbor.py jobs start \
-  -c out-0114-harbor/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
-  --seed 1
-```
-
-<details>
-    <summary> Instructions for runnning Harbor locally</summary>
-
-* Launch Docker Desktop.
-* Run the following command:
+1. Please run the following command to launch the Harbor tasks:
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
   -c out-0114-harbor/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --seed 1 --jobs-dir JOBS_DIR
+```
+
+<details>
+    <summary>Instructions for running Harbor on Modal</summary>
+
+```bash
+uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  -c out-0114-harbor/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
+  --seed 1 --jobs-dir JOBS_DIR
 ```
 
 </details>
@@ -60,7 +58,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 uv run python format_accuracy.py -jd JOBS_DIR
 ```
 
-## Experiments using simple LLM API (for debugging only)
+<!-- ## Experiments using simple LLM API (for debugging only)
 
 1. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task.
 This uses the existing huggingface repo https://huggingface.co/datasets/kilian-group/supercon-mini.
@@ -83,59 +81,7 @@ Outputs are stored at `out/supercon/preds/*.json`.
     --domain supercon \
     --task tc \
     -od out/
-```
-
-## Constructing the Dataset from Scratch
-
-1. Mass-extract properties on supercon papers with an LLM:
-
-```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
-```
-
-Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
-Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-
-2. Run the validator app with the following:
-
-```bash
-./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
-```
-
-It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
-There are more instructions in `docs/VALIDATOR_GUIDE.md`.
-
-### Validating the dataset construction (SuperCon only)
-
-1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
-
-```bash
-uv run python generate_pred_embeddings.py -od OUTPUT_DIR
-uv run python generate_gt_embeddings.py -od OUTPUT_DIR
-```
-
-2. Query LLM to determine best match between generated and ground-truth property name:
-
-```bash
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
-```
-
-3. Compute recall:
-
-```bash
-uv run python score_recall.py -od OUTPUT_DIR
-```
-
-4. Compute precision:
-
-```bash
-uv run python score_precision.py -od OUTPUT_DIR
-```
-
-5. Compute inter-annotator agreement:
-
-```bash
-```
+``` -->
 
 ## Constructing the Dataset from SuperCon original
 
@@ -196,4 +142,57 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-conf
     --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . \
     --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
+```
+
+
+## Constructing the Dataset from Scratch
+
+1. Mass-extract properties on supercon papers with an LLM:
+
+```bash
+./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
+```
+
+Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
+Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
+
+2. Run the validator app with the following:
+
+```bash
+./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
+```
+
+It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
+There are more instructions in `docs/VALIDATOR_GUIDE.md`.
+
+### Validating the dataset construction (SuperCon only)
+
+1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
+
+```bash
+uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+uv run python generate_gt_embeddings.py -od OUTPUT_DIR
+```
+
+2. Query LLM to determine best match between generated and ground-truth property name:
+
+```bash
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
+```
+
+3. Compute recall:
+
+```bash
+uv run python score_recall.py -od OUTPUT_DIR
+```
+
+4. Compute precision:
+
+```bash
+uv run python score_precision.py -od OUTPUT_DIR
+```
+
+5. Compute inter-annotator agreement:
+
+```bash
 ```

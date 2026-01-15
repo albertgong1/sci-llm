@@ -13,6 +13,9 @@ from datasets import load_dataset
 import pbench
 from pbench_eval.match import generate_embeddings
 
+# local imports
+from utils import HF_DATASET_NAME, HF_DATASET_REVISION, HF_DATASET_SPLIT
+
 parser = ArgumentParser(description="Generate embeddings from property names.")
 parser = pbench.add_base_args(parser)
 args = parser.parse_args()
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 #
 # Load ground truth dataset
 #
-ds = load_dataset(args.dataset, split=args.split, revision="v2.0.1")
+ds = load_dataset(HF_DATASET_NAME, split=HF_DATASET_SPLIT, revision=HF_DATASET_REVISION)
 gt_df = ds.to_pandas()
 
 embeddings_dir = args.output_dir / "gt_embeddings"

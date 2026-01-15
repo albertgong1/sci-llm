@@ -40,6 +40,9 @@ from llm_utils import (
 import pbench
 from pbench_eval.match import generate_property_name_matches
 
+# local imports
+from utils import HF_DATASET_NAME, HF_DATASET_REVISION, HF_DATASET_SPLIT
+
 logger = logging.getLogger(__name__)
 
 
@@ -191,15 +194,13 @@ async def main(args: argparse.Namespace) -> None:
     # Load ground truth properties
     #
     if True:
-        dataset_config = pbench.DOMAIN2HF_DATASET_CONFIG["supercon"]
-        hf_dataset_name = dataset_config["name"]
-        revision = dataset_config["revision"]
-        split = args.split or dataset_config["split"]
         logger.info(
-            f"Loading dataset from HuggingFace: {hf_dataset_name} "
-            f"(revision={revision}, split={split})"
+            f"Loading dataset from HuggingFace: {HF_DATASET_NAME} "
+            f"(revision={HF_DATASET_REVISION}, split={HF_DATASET_SPLIT})"
         )
-        dataset = load_dataset(hf_dataset_name, split=split, revision=revision)
+        dataset = load_dataset(
+            HF_DATASET_NAME, split=HF_DATASET_SPLIT, revision=HF_DATASET_REVISION
+        )
     else:
         # NOTE (Albert): for debugging using local version of the dataset
         dataset = load_from_disk("out-0111/dataset")
