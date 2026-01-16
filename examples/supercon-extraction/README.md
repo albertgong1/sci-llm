@@ -29,7 +29,7 @@ TODO:
 
 3. Optional: If running Harbor locally, launch Docker Desktop.
 
-## Experiments
+## Reproducing Experiments
 
 > \[!IMPORTANT\]
 > To obtain results incrementally, batching functionality is available. Simply specificy the `--batch-size` in the commands below. To obtain an unbiased estimate of the average accuracy across all tasks, please shuffle the tasks using the `--seed 1` flag.
