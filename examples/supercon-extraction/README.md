@@ -38,6 +38,15 @@ TODO:
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks \
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --jobs-dir JOBS_DIR
+```
+
+or if running tasks stored locally:
+
+```bash
+uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
   --registry-path out-0115-harbor/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --seed 1 --jobs-dir JOBS_DIR

@@ -206,6 +206,99 @@ def _extract_modal_args(argv: list[str]) -> tuple[list[str], bool]:
     return cleaned, modal_requested
 
 
+_DEFAULT_BATCH_SIZE = 10
+
+
+def _extract_batch_args(argv: list[str]) -> tuple[list[str], int, int | None]:
+    """Strip --batch-size and --batch-number from argv and return them separately."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--batch-size", type=int, default=_DEFAULT_BATCH_SIZE)
+    parser.add_argument("--batch-number", type=int, default=None)
+    args, remaining = parser.parse_known_args(argv)
+    return remaining, args.batch_size, args.batch_number
+
+
+def _get_registry_path_from_argv(argv: list[str]) -> Path | None:
+    """Extract --registry-path value from argv."""
+    for idx, arg in enumerate(argv):
+        if arg == "--registry-path" and idx + 1 < len(argv):
+            return Path(argv[idx + 1])
+        if arg.startswith("--registry-path="):
+            return Path(arg.split("=", 1)[1])
+    return None
+
+
+def _replace_registry_path_in_argv(argv: list[str], new_path: str) -> list[str]:
+    """Replace --registry-path value in argv with a new path."""
+    result: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--registry-path":
+            result.append(arg)
+            result.append(new_path)
+            skip_next = True
+            continue
+        if arg.startswith("--registry-path="):
+            result.append(f"--registry-path={new_path}")
+            continue
+        result.append(arg)
+    return result
+
+
+def _compute_total_batches(registry_data: list[dict[str, Any]], batch_size: int) -> int:
+    """Compute total number of batches for a registry."""
+    all_tasks = _collect_all_tasks(registry_data)
+    total_tasks = len(all_tasks)
+    return (total_tasks + batch_size - 1) // batch_size  # ceil division
+
+
+def _apply_batching_to_argv(
+    argv: list[str],
+    batch_size: int,
+    batch_number: int,
+    workspace: Path,
+) -> tuple[list[str], int]:
+    """Apply batching to registry path in argv.
+
+    Returns:
+        Tuple of (modified_argv, total_batches)
+
+    """
+    registry_path = _get_registry_path_from_argv(argv)
+    if registry_path is None:
+        raise SystemExit(
+            "Batching requires --registry-path. Use --hf-tasks-repo or provide --registry-path directly."
+        )
+
+    if not registry_path.is_absolute():
+        registry_path = (workspace / registry_path).resolve()
+
+    if not registry_path.exists():
+        raise SystemExit(f"Registry file not found: {registry_path}")
+
+    registry_data = json.loads(registry_path.read_text())
+    if not isinstance(registry_data, list):
+        raise SystemExit(f"Invalid registry format in {registry_path}")
+
+    # Generate batch registry filename
+    cache_dir = workspace / "out" / "harbor" / "registry-cache"
+    base_name = registry_path.stem.replace("__registry", "")
+    batch_registry_path = cache_dir / f"{base_name}__batch{batch_number}__registry.json"
+
+    _, total_batches = _create_batch_registry(
+        registry_data=registry_data,
+        batch_size=batch_size,
+        batch_number=batch_number,
+        output_path=batch_registry_path,
+    )
+
+    new_argv = _replace_registry_path_in_argv(argv, str(batch_registry_path))
+    return new_argv, total_batches
+
+
 def _patch_modal_download_logs(timeout_sec: int) -> None:
     """Guard Modal log downloads so stalled gRPC calls can't freeze the job."""
     try:
@@ -305,7 +398,8 @@ def main() -> int:
     argv = sys.argv[1:]
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] <harbor args...>", file=sys.stderr
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] <harbor args...>",
+            file=sys.stderr,
         )
         print(
             "Example: run_harbor.py trials start -p <task> -a gemini-cli -m ...",
@@ -313,6 +407,10 @@ def main() -> int:
         )
         print(
             "Default workspace: examples/harbor-workspace (override with --workspace).",
+            file=sys.stderr,
+        )
+        print(
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted).",
             file=sys.stderr,
         )
         print(
@@ -324,7 +422,8 @@ def main() -> int:
     argv, workspace, workspace_explicit = _extract_workspace_arg(argv)
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] <harbor args...>", file=sys.stderr
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] <harbor args...>",
+            file=sys.stderr,
         )
         print(
             "Example: run_harbor.py trials start -p <task> -a gemini-cli -m ...",
@@ -332,6 +431,10 @@ def main() -> int:
         )
         print(
             "Default workspace: examples/harbor-workspace (override with --workspace).",
+            file=sys.stderr,
+        )
+        print(
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted).",
             file=sys.stderr,
         )
         print(
@@ -361,6 +464,7 @@ def main() -> int:
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
     argv, agent_setup_override = _extract_agent_setup_timeout(argv)
+    argv, batch_size, batch_number = _extract_batch_args(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -407,33 +511,80 @@ def main() -> int:
             if existing_pythonpath
             else src_path
         )
-    if modal_active:
-        timeout_raw = env.get("HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300").strip()
-        if timeout_raw and timeout_raw != "0":
-            try:
-                timeout_sec = int(timeout_raw)
-            except ValueError:
-                timeout_sec = 300
-            _patch_modal_download_logs(timeout_sec)
-        setup_timeout_raw = (
-            str(agent_setup_override)
-            if agent_setup_override is not None
-            else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
-        ).strip()
-        if setup_timeout_raw and setup_timeout_raw != "0":
-            try:
-                setup_timeout_sec = int(setup_timeout_raw)
-            except ValueError:
-                setup_timeout_sec = 900
-            _patch_agent_setup_timeout(setup_timeout_sec)
-        exit_code = _run_harbor_cli_in_process(argv, workspace=workspace)
-    else:
-        command = [sys.executable, "-m", "harbor.cli.main", *argv]
-        result = subprocess.run(command, check=False, cwd=workspace, env=env)
-        exit_code = int(result.returncode)
 
-    if exit_code != 0:
-        _summarize_failure(argv, workspace=workspace)
+    def _run_single_harbor(argv_for_run: list[str]) -> int:
+        """Run a single Harbor invocation."""
+        if modal_active:
+            timeout_raw = env.get(
+                "HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300"
+            ).strip()
+            if timeout_raw and timeout_raw != "0":
+                try:
+                    timeout_sec = int(timeout_raw)
+                except ValueError:
+                    timeout_sec = 300
+                _patch_modal_download_logs(timeout_sec)
+            setup_timeout_raw = (
+                str(agent_setup_override)
+                if agent_setup_override is not None
+                else env.get("HARBOR_AGENT_SETUP_TIMEOUT_SEC", "900")
+            ).strip()
+            if setup_timeout_raw and setup_timeout_raw != "0":
+                try:
+                    setup_timeout_sec = int(setup_timeout_raw)
+                except ValueError:
+                    setup_timeout_sec = 900
+                _patch_agent_setup_timeout(setup_timeout_sec)
+            return _run_harbor_cli_in_process(argv_for_run, workspace=workspace)
+        else:
+            command = [sys.executable, "-m", "harbor.cli.main", *argv_for_run]
+            result = subprocess.run(command, check=False, cwd=workspace, env=env)
+            return int(result.returncode)
+
+    # Check if batching is requested (only for jobs commands with registry)
+    batching_enabled = (
+        _argv_has_any(argv, {"jobs", "run"})
+        and _get_registry_path_from_argv(argv) is not None
+    )
+
+    if batching_enabled:
+        # Determine total batches by reading the registry
+        registry_path = _get_registry_path_from_argv(argv)
+        if registry_path and not registry_path.is_absolute():
+            registry_path = (workspace / registry_path).resolve()
+        if registry_path and registry_path.exists():
+            registry_data = json.loads(registry_path.read_text())
+            total_batches = _compute_total_batches(registry_data, batch_size)
+        else:
+            total_batches = 1
+
+        # Determine which batches to run
+        if batch_number is not None:
+            batch_indices = [batch_number]
+        else:
+            batch_indices = list(range(1, total_batches + 1))
+
+        print(
+            f"Batching {total_batches} batch(es) of up to {batch_size} tasks each.",
+            file=sys.stderr,
+        )
+
+        exit_code = 0
+        for bn in batch_indices:
+            print(
+                f"\n=== Running batch {bn}/{total_batches} ===",
+                file=sys.stderr,
+            )
+            batch_argv, _ = _apply_batching_to_argv(argv, batch_size, bn, workspace)
+            batch_exit = _run_single_harbor(batch_argv)
+            if batch_exit != 0:
+                _summarize_failure(batch_argv, workspace=workspace)
+                exit_code = batch_exit
+    else:
+        exit_code = _run_single_harbor(argv)
+        if exit_code != 0:
+            _summarize_failure(argv, workspace=workspace)
+
     if post_run.enabled:
         exit_code = _run_post_actions(
             argv=argv,
@@ -904,6 +1055,77 @@ def _rewrite_registry_git_urls(registry_data: Any, *, token: str) -> Any:
                 continue
             task["git_url"] = _embed_hf_token_in_git_url(git_url, token=token)
     return registry_data
+
+
+def _collect_all_tasks(registry_data: list[dict[str, Any]]) -> list[tuple[int, dict]]:
+    """Collect all tasks from registry with their dataset index."""
+    all_tasks: list[tuple[int, dict]] = []
+    for dataset_idx, dataset in enumerate(registry_data):
+        tasks = dataset.get("tasks") if isinstance(dataset, dict) else None
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if isinstance(task, dict):
+                all_tasks.append((dataset_idx, task))
+    return all_tasks
+
+
+def _create_batch_registry(
+    registry_data: list[dict[str, Any]],
+    batch_size: int,
+    batch_number: int,
+    output_path: Path,
+) -> tuple[Path, int]:
+    """Create a registry with only the tasks in the specified batch.
+
+    Args:
+        registry_data: Full registry data (list of dataset dicts)
+        batch_size: Number of tasks per batch
+        batch_number: 1-indexed batch number
+        output_path: Path to write the batch registry
+
+    Returns:
+        Tuple of (output_path, total_batches)
+
+    """
+    all_tasks = _collect_all_tasks(registry_data)
+    total_tasks = len(all_tasks)
+    total_batches = (total_tasks + batch_size - 1) // batch_size  # ceil division
+
+    if batch_number < 1 or batch_number > total_batches:
+        raise SystemExit(
+            f"--batch-number {batch_number} out of range (1-{total_batches} for {total_tasks} tasks)."
+        )
+
+    # Get tasks for this batch
+    start_idx = (batch_number - 1) * batch_size
+    end_idx = min(start_idx + batch_size, total_tasks)
+    batch_tasks = all_tasks[start_idx:end_idx]
+
+    # Build new registry with only batch tasks, preserving dataset structure
+    # Group tasks by their original dataset index
+    tasks_by_dataset: dict[int, list[dict]] = {}
+    for dataset_idx, task in batch_tasks:
+        if dataset_idx not in tasks_by_dataset:
+            tasks_by_dataset[dataset_idx] = []
+        tasks_by_dataset[dataset_idx].append(task)
+
+    # Create new registry with only datasets that have tasks in this batch
+    batch_registry: list[dict[str, Any]] = []
+    for dataset_idx, tasks in sorted(tasks_by_dataset.items()):
+        original_dataset = registry_data[dataset_idx]
+        batch_dataset = {
+            "name": original_dataset.get("name", ""),
+            "version": original_dataset.get("version", ""),
+            "description": original_dataset.get("description", ""),
+            "tasks": tasks,
+        }
+        batch_registry.append(batch_dataset)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(batch_registry, indent=2))
+
+    return output_path, total_batches
 
 
 def _embed_hf_token_in_git_url(git_url: str, *, token: str) -> str:
