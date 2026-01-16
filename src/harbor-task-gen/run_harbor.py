@@ -34,6 +34,7 @@ import io
 import json
 import os
 import platform
+import random
 import shutil
 import subprocess
 import sys
@@ -206,16 +207,16 @@ def _extract_modal_args(argv: list[str]) -> tuple[list[str], bool]:
     return cleaned, modal_requested
 
 
-_DEFAULT_BATCH_SIZE = 10
-
-
-def _extract_batch_args(argv: list[str]) -> tuple[list[str], int, int | None]:
-    """Strip --batch-size and --batch-number from argv and return them separately."""
+def _extract_batch_args(
+    argv: list[str],
+) -> tuple[list[str], int, int | None, int | None]:
+    """Strip --batch-size, --batch-number, and --seed from argv and return them separately."""
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--batch-size", type=int, default=_DEFAULT_BATCH_SIZE)
+    parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--batch-number", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     args, remaining = parser.parse_known_args(argv)
-    return remaining, args.batch_size, args.batch_number
+    return remaining, args.batch_size, args.batch_number, args.seed
 
 
 def _get_registry_path_from_argv(argv: list[str]) -> Path | None:
@@ -255,13 +256,54 @@ def _compute_total_batches(registry_data: list[dict[str, Any]], batch_size: int)
     return (total_tasks + batch_size - 1) // batch_size  # ceil division
 
 
+def _shuffle_registry_tasks(
+    registry_data: list[dict[str, Any]], seed: int
+) -> list[dict[str, Any]]:
+    """Return a new registry with tasks shuffled using the given seed.
+
+    The shuffle is deterministic: same seed always produces same order.
+    """
+    all_tasks = _collect_all_tasks(registry_data)
+
+    # Shuffle with deterministic seed
+    rng = random.Random(seed)
+    rng.shuffle(all_tasks)
+
+    # Rebuild registry structure with shuffled task order
+    # We flatten all tasks into a single dataset to preserve shuffle order
+    if not all_tasks:
+        return registry_data
+
+    # Use metadata from first dataset
+    first_dataset = registry_data[0] if registry_data else {}
+    shuffled_registry: list[dict[str, Any]] = [
+        {
+            "name": first_dataset.get("name", ""),
+            "version": first_dataset.get("version", ""),
+            "description": first_dataset.get("description", ""),
+            "tasks": [task for _, task in all_tasks],
+        }
+    ]
+    return shuffled_registry
+
+
 def _apply_batching_to_argv(
     argv: list[str],
     batch_size: int,
     batch_number: int,
     workspace: Path,
+    seed: int | None = None,
+    shuffled_registry_data: list[dict[str, Any]] | None = None,
 ) -> tuple[list[str], int]:
     """Apply batching to registry path in argv.
+
+    Args:
+        argv: Command line arguments
+        batch_size: Number of tasks per batch
+        batch_number: 1-indexed batch number
+        workspace: Workspace directory
+        seed: Random seed (used in filename for cache identification)
+        shuffled_registry_data: Pre-shuffled registry data (if None, reads from file)
 
     Returns:
         Tuple of (modified_argv, total_batches)
@@ -276,17 +318,22 @@ def _apply_batching_to_argv(
     if not registry_path.is_absolute():
         registry_path = (workspace / registry_path).resolve()
 
-    if not registry_path.exists():
-        raise SystemExit(f"Registry file not found: {registry_path}")
+    if shuffled_registry_data is not None:
+        registry_data = shuffled_registry_data
+    else:
+        if not registry_path.exists():
+            raise SystemExit(f"Registry file not found: {registry_path}")
+        registry_data = json.loads(registry_path.read_text())
+        if not isinstance(registry_data, list):
+            raise SystemExit(f"Invalid registry format in {registry_path}")
 
-    registry_data = json.loads(registry_path.read_text())
-    if not isinstance(registry_data, list):
-        raise SystemExit(f"Invalid registry format in {registry_path}")
-
-    # Generate batch registry filename
+    # Generate batch registry filename (include seed in name if shuffled)
     cache_dir = workspace / "out" / "harbor" / "registry-cache"
     base_name = registry_path.stem.replace("__registry", "")
-    batch_registry_path = cache_dir / f"{base_name}__batch{batch_number}__registry.json"
+    seed_suffix = f"__seed{seed}" if seed is not None else ""
+    batch_registry_path = (
+        cache_dir / f"{base_name}{seed_suffix}__batch{batch_number}__registry.json"
+    )
 
     _, total_batches = _create_batch_registry(
         registry_data=registry_data,
@@ -398,7 +445,7 @@ def main() -> int:
     argv = sys.argv[1:]
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] <harbor args...>",
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] <harbor args...>",
             file=sys.stderr,
         )
         print(
@@ -410,7 +457,7 @@ def main() -> int:
             file=sys.stderr,
         )
         print(
-            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted).",
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks).",
             file=sys.stderr,
         )
         print(
@@ -422,7 +469,7 @@ def main() -> int:
     argv, workspace, workspace_explicit = _extract_workspace_arg(argv)
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] <harbor args...>",
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] <harbor args...>",
             file=sys.stderr,
         )
         print(
@@ -434,7 +481,7 @@ def main() -> int:
             file=sys.stderr,
         )
         print(
-            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted).",
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks).",
             file=sys.stderr,
         )
         print(
@@ -464,7 +511,7 @@ def main() -> int:
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
     argv, agent_setup_override = _extract_agent_setup_timeout(argv)
-    argv, batch_size, batch_number = _extract_batch_args(argv)
+    argv, batch_size, batch_number, seed = _extract_batch_args(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -541,19 +588,21 @@ def main() -> int:
             result = subprocess.run(command, check=False, cwd=workspace, env=env)
             return int(result.returncode)
 
-    # Check if batching is requested (only for jobs commands with registry)
-    batching_enabled = (
-        _argv_has_any(argv, {"jobs", "run"})
-        and _get_registry_path_from_argv(argv) is not None
-    )
-
-    if batching_enabled:
+    if batch_size is not None:
         # Determine total batches by reading the registry
         registry_path = _get_registry_path_from_argv(argv)
         if registry_path and not registry_path.is_absolute():
             registry_path = (workspace / registry_path).resolve()
+
+        registry_data: list[dict[str, Any]] | None = None
         if registry_path and registry_path.exists():
             registry_data = json.loads(registry_path.read_text())
+
+            # Shuffle tasks once if seed is provided (before any batching)
+            if seed is not None:
+                print(f"Shuffling tasks with seed {seed}...", file=sys.stderr)
+                registry_data = _shuffle_registry_tasks(registry_data, seed)
+
             total_batches = _compute_total_batches(registry_data, batch_size)
         else:
             total_batches = 1
@@ -575,7 +624,14 @@ def main() -> int:
                 f"\n=== Running batch {bn}/{total_batches} ===",
                 file=sys.stderr,
             )
-            batch_argv, _ = _apply_batching_to_argv(argv, batch_size, bn, workspace)
+            batch_argv, _ = _apply_batching_to_argv(
+                argv,
+                batch_size,
+                bn,
+                workspace,
+                seed=seed,
+                shuffled_registry_data=registry_data,
+            )
             batch_exit = _run_single_harbor(batch_argv)
             if batch_exit != 0:
                 _summarize_failure(batch_argv, workspace=workspace)

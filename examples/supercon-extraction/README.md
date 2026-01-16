@@ -31,35 +31,29 @@ TODO:
 
 ## Experiments
 
-1. Please run the following command to execute the Harbor tasks in batches (default batch size: 10):
+1. Please run the following command to execute the Harbor tasks in batches of size 10:
 
 > \[!IMPORTANT\]
 > Adding the `--seed 1` flag will randomly shuffle the tasks.
+
+> \[!TIP\]
+> To run on Modal, simply add the `--modal` flag.
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
   --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
-  --workspace . --jobs-dir JOBS_DIR
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
 
-or if running tasks stored locally:
+<details>
+    <summary>Instructions for running local tasks</summary>
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
   --registry-path out-0115-harbor/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
-  --workspace . --seed 1 --jobs-dir JOBS_DIR
-```
-
-<details>
-    <summary>Instructions for running Harbor on Modal</summary>
-
-```bash
-uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  -c out-0114-harbor/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
-  --seed 1 --jobs-dir JOBS_DIR
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
 
 </details>
