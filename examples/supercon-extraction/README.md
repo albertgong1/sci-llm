@@ -38,7 +38,7 @@ TODO:
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  -c out-0114-harbor/ground-template/job.yaml \
+  --registry-path out-0115-harbor/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --seed 1 --jobs-dir JOBS_DIR
 ```
