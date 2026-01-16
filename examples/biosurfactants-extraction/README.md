@@ -30,6 +30,8 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
   --seed 1 --jobs-dir JOBS_DIR
 ```
 
+</details>
+
 ## Reproducing the Dataset Construction
 
 1. Download PDFs and place them in `DATA_DIR/Paper_DB`.
