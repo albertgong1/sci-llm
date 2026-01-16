@@ -31,13 +31,13 @@ TODO:
 
 ## Experiments
 
-1. Please run the following command to execute the Harbor tasks in batches of size 10:
-
 > \[!IMPORTANT\]
-> Adding the `--seed 1` flag will randomly shuffle the tasks.
+> To obtain results incrementally, batching functionality is available. Simply specificy the `--batch-size` in the commands below. To obtain an unbiased estimate of the average accuracy across all tasks, please shuffle the tasks using the `--seed 1` flag.
 
 > \[!TIP\]
-> To run on Modal, simply add the `--modal` flag.
+> To run on Modal, simply add the `--modal` flag to any of the commands below.
+
+1. Please run the following command to execute the Harbor tasks in batches of size 10:
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
