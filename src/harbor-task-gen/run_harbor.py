@@ -287,6 +287,29 @@ def _shuffle_registry_tasks(
     return shuffled_registry
 
 
+def _get_agent_model_from_argv(argv: list[str]) -> tuple[str | None, str | None]:
+    """Extract agent name and model name from command line arguments."""
+    agent_name: str | None = None
+    model_name: str | None = None
+
+    for idx, arg in enumerate(argv):
+        # Agent: -a or --agent
+        if arg in {"-a", "--agent"} and idx + 1 < len(argv):
+            agent_name = argv[idx + 1]
+        elif arg.startswith("--agent="):
+            agent_name = arg.split("=", 1)[1]
+
+        # Model: -m or --model or --model-name
+        if arg in {"-m", "--model", "--model-name"} and idx + 1 < len(argv):
+            model_name = argv[idx + 1]
+        elif arg.startswith("--model="):
+            model_name = arg.split("=", 1)[1]
+        elif arg.startswith("--model-name="):
+            model_name = arg.split("=", 1)[1]
+
+    return agent_name, model_name
+
+
 def _apply_batching_to_argv(
     argv: list[str],
     batch_size: int,
@@ -343,6 +366,21 @@ def _apply_batching_to_argv(
     )
 
     new_argv = _replace_registry_path_in_argv(argv, str(batch_registry_path))
+
+    # Set job name: bn{batch_number}-{agent_name}-{model_name}{seed_suffix}
+    agent_name, model_name = _get_agent_model_from_argv(argv)
+    agent_part = agent_name or "agent"
+    # Clean model name: remove provider prefix and special chars
+    if model_name:
+        model_part = model_name.split("/")[-1].replace(":", "-")
+    else:
+        model_part = "model"
+    seed_part = f"-s{seed}" if seed is not None else ""
+    job_name = f"bn{batch_number}-{agent_part}-{model_part}{seed_part}"
+
+    # Add --job-name argument for the job name (always use the auto-generated name)
+    new_argv = [*new_argv, "--job-name", job_name]
+
     return new_argv, total_batches
 
 
