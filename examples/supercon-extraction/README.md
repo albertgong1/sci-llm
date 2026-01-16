@@ -51,7 +51,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  --registry-path out-0115-harbor/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
+  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
