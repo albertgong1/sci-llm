@@ -153,27 +153,47 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-conf
 ```
 
 
-## Constructing the Dataset from Scratch
+## Constructing the Post-2021 version of the SuperCon Dataset from Scratch
 
-1. Mass-extract properties on supercon papers with an LLM:
+1. Download PDFs and place them in `DATA_DIR/Paper_DB`.
+- [ ] TODO (Anmol): Manually download the 19 PDFs listed in https://docs.google.com/spreadsheets/d/1vrHiEV15S39tHtsq-_T6-1Ei0yeSpLTMI7b1t5USagY/edit?usp=sharing
+- [ ] TODO (Anmol): Upload PDFs to Google Drive and add download link here.
 
-```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
-```
+2. Obtain candidate properties:
 
-Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
-Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-
-2. Run the validator app with the following:
+- Extract properties from PDFs using an LLM:
 
 ```bash
-./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
+uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -dd DATA_DIR -od OUTPUT_DIR -pp prompts/unsupervised_extraction_prompt.md
 ```
 
-It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
-There are more instructions in `docs/VALIDATOR_GUIDE.md`.
+- Add `data_type` column to the CSV. The resulting CSV will be saved to `OUTPUT_DIR/candidates`.
 
-### Validating the dataset construction (SuperCon only)
+```bash
+uv run pbench-filter -dd DATA_DIR -od OUTPUT_DIR
+```
+
+3. Launch the validator app and accept/reject the candidates:
+
+> \[!NOTE\]
+> This step requires manual effort and is not fully reproducibile.
+
+```bash
+uv sync --group validator
+uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
+```
+
+4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
+
+> \[!NOTE\]
+> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+
+```bash
+uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
+    --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
+```
+
+<!-- ### Validating the dataset construction (SuperCon only)
 
 1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
@@ -203,4 +223,4 @@ uv run python score_precision.py -od OUTPUT_DIR
 5. Compute inter-annotator agreement:
 
 ```bash
-```
+``` -->
