@@ -151,7 +151,9 @@ def compute_recall_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
     return df_results
 
 
-def compute_precision_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
+def compute_precision_per_material_property(
+    df: pd.DataFrame, conversion_df: pd.DataFrame
+) -> pd.DataFrame:
     """Score precision for a dataframe of predicted-ground truth pairs.
 
     Args:
@@ -160,6 +162,7 @@ def compute_precision_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
             - value_string_pred: Predicted value string.
             - value_string_gt: Ground truth value string.
             - rubric: Rubric for the property.
+        conversion_df: DataFrame with unit conversion factors.
 
     Returns:
         DataFrame with precision score for each predicted material.
@@ -205,7 +208,7 @@ def compute_precision_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
                     pred_value=str(row["value_string_pred"]),
                     answer_value=str(row["value_string_gt"]),
                     rubric=str(row["rubric"]),
-                    mapping=None,
+                    conversion_df=conversion_df,
                 )
                 scores.append(score)
 

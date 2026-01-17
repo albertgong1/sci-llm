@@ -79,6 +79,11 @@ df = df_matches.merge(
     how="left",
 )
 
+# Load conversion factors
+conversion_factors_path = Path("scoring") / "si_conversion_factors.csv"
+logger.info(f"Loading conversion factors from {conversion_factors_path}")
+conversion_df = pd.read_csv(conversion_factors_path, index_col=0)
+
 # Check for missing rubrics
 missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
@@ -159,7 +164,9 @@ if False:
         )
     df_results = pd.DataFrame(results)
 else:
-    df_results = compute_precision_per_material_property(df)
+    df_results = compute_precision_per_material_property(
+        df, conversion_df=conversion_df
+    )
 
 # # Print results
 # logger.info("=" * 60)
