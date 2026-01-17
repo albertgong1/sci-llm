@@ -209,14 +209,15 @@ def _extract_modal_args(argv: list[str]) -> tuple[list[str], bool]:
 
 def _extract_batch_args(
     argv: list[str],
-) -> tuple[list[str], int, int | None, int | None]:
-    """Strip --batch-size, --batch-number, and --seed from argv and return them separately."""
+) -> tuple[list[str], int, int | None, int | None, bool]:
+    """Strip --batch-size, --batch-number, --seed, and --force from argv and return them separately."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--batch-number", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--force", action="store_true")
     args, remaining = parser.parse_known_args(argv)
-    return remaining, args.batch_size, args.batch_number, args.seed
+    return remaining, args.batch_size, args.batch_number, args.seed, args.force
 
 
 def _get_registry_path_from_argv(argv: list[str]) -> Path | None:
@@ -308,6 +309,43 @@ def _get_agent_model_from_argv(argv: list[str]) -> tuple[str | None, str | None]
             model_name = arg.split("=", 1)[1]
 
     return agent_name, model_name
+
+
+def _get_batch_job_name(argv: list[str], batch_number: int, seed: int | None) -> str:
+    """Generate the job name that would be used for a batch.
+
+    This mirrors the logic in _apply_batching_to_argv to determine
+    if a batch has already been processed.
+    """
+    agent_name, model_name = _get_agent_model_from_argv(argv)
+    agent_part = agent_name or "agent"
+    # Clean model name: remove provider prefix and special chars
+    if model_name:
+        model_part = model_name.split("/")[-1].replace(":", "-")
+    else:
+        model_part = "model"
+    seed_part = f"-s{seed}" if seed is not None else ""
+    return f"bn{batch_number}-{agent_part}-{model_part}{seed_part}"
+
+
+def _batch_already_processed(
+    workspace: Path, argv: list[str], batch_number: int, seed: int | None
+) -> bool:
+    """Check if a batch has already been processed by looking for the job directory."""
+    job_name = _get_batch_job_name(argv, batch_number, seed)
+
+    # Determine where jobs are stored based on command type
+    run_roots = _run_roots_from_args(argv, workspace=workspace)
+
+    # Check if a job directory with this name exists in any of the run roots
+    for root in run_roots:
+        if not root.exists():
+            continue
+        job_dir = root / job_name
+        if job_dir.exists():
+            return True
+
+    return False
 
 
 def _apply_batching_to_argv(
@@ -483,7 +521,7 @@ def main() -> int:
     argv = sys.argv[1:]
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] <harbor args...>",
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] [--force] <harbor args...>",
             file=sys.stderr,
         )
         print(
@@ -495,7 +533,7 @@ def main() -> int:
             file=sys.stderr,
         )
         print(
-            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks).",
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks), --force (reprocess batches).",
             file=sys.stderr,
         )
         print(
@@ -507,7 +545,7 @@ def main() -> int:
     argv, workspace, workspace_explicit = _extract_workspace_arg(argv)
     if not argv:
         print(
-            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] <harbor args...>",
+            "Usage: run_harbor.py [--workspace PATH] [--batch-size N] [--batch-number N] [--seed N] [--force] <harbor args...>",
             file=sys.stderr,
         )
         print(
@@ -519,7 +557,7 @@ def main() -> int:
             file=sys.stderr,
         )
         print(
-            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks).",
+            "Batching: --batch-size (default: 10), --batch-number (1-indexed, run all if omitted), --seed (shuffle tasks), --force (reprocess batches).",
             file=sys.stderr,
         )
         print(
@@ -549,7 +587,7 @@ def main() -> int:
     argv, hf_args = _extract_hf_args(argv)
     argv, modal_requested = _extract_modal_args(argv)
     argv, agent_setup_override = _extract_agent_setup_timeout(argv)
-    argv, batch_size, batch_number, seed = _extract_batch_args(argv)
+    argv, batch_size, batch_number, seed, force = _extract_batch_args(argv)
 
     dotenv = _parse_dotenv(_repo_root() / ".env")
     for key, value in dotenv.items():
@@ -658,6 +696,15 @@ def main() -> int:
 
         exit_code = 0
         for bn in batch_indices:
+            # Check if batch has already been processed (unless --force is set)
+            if not force and _batch_already_processed(workspace, argv, bn, seed):
+                job_name = _get_batch_job_name(argv, bn, seed)
+                print(
+                    f"\n=== Skipping batch {bn}/{total_batches} (already processed: {job_name}) ===",
+                    file=sys.stderr,
+                )
+                continue
+
             print(
                 f"\n=== Running batch {bn}/{total_batches} ===",
                 file=sys.stderr,
@@ -756,12 +803,37 @@ def _should_force_delete(argv: list[str]) -> bool:
     return "jobs" in argv or "trials" in argv
 
 
+def _get_jobs_dir_from_argv(argv: list[str]) -> str | None:
+    """Extract --jobs-dir value from argv if provided."""
+    for idx, arg in enumerate(argv):
+        if arg == "--jobs-dir" and idx + 1 < len(argv):
+            return argv[idx + 1]
+        if arg.startswith("--jobs-dir="):
+            return arg.split("=", 1)[1]
+    return None
+
+
 def _run_roots_from_args(argv: list[str], *, workspace: Path) -> list[Path]:
     """Infer which Harbor output roots (jobs/trials) a command will use."""
     if "trials" in argv and "jobs" not in argv:
         return [workspace / "trials"]
+
+    # Check for custom jobs directory
+    jobs_dir_arg = _get_jobs_dir_from_argv(argv)
     if "jobs" in argv or "run" in argv:
+        if jobs_dir_arg:
+            jobs_dir = Path(jobs_dir_arg)
+            if not jobs_dir.is_absolute():
+                jobs_dir = workspace / jobs_dir
+            return [jobs_dir]
         return [workspace / "jobs"]
+
+    # Default case
+    if jobs_dir_arg:
+        jobs_dir = Path(jobs_dir_arg)
+        if not jobs_dir.is_absolute():
+            jobs_dir = workspace / jobs_dir
+        return [jobs_dir, workspace / "trials"]
     return [workspace / "jobs", workspace / "trials"]
 
 
