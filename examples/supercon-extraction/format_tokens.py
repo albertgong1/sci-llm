@@ -33,6 +33,8 @@ import numpy as np
 from tabulate import tabulate
 from collections import defaultdict
 
+from tqdm import tqdm
+
 # %%
 parser = ArgumentParser(
     description="Format token usage results from Harbor job directories."
@@ -53,7 +55,7 @@ if not jobs_dir.exists():
 # Collect results from all batches and trials
 all_results: list[dict] = []
 
-for batch_dir in sorted(jobs_dir.iterdir()):
+for batch_dir in tqdm(sorted(jobs_dir.iterdir()), desc="Batches"):
     if not batch_dir.is_dir():
         continue
 
