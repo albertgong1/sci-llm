@@ -370,12 +370,12 @@ async def extract_properties(args: argparse.Namespace) -> None:
     model_name_safe = args.model_name.replace("/", "--")
 
     # Process each PDF
-    for i, pdf_path in enumerate(tqdm(pdf_files, desc="Processing PDFs")):
-        # Skip if file_no is specified and this isn't it
-        if args.file_no is not None and i + 1 != args.file_no:
-            continue
-
+    for pdf_path in tqdm(pdf_files, desc="Processing PDFs"):
         refno = pdf_path.stem
+
+        # Skip if refno is specified and this isn't it
+        if args.refno is not None and refno != args.refno:
+            continue
 
         # Construct output path
         output_filename = (
@@ -418,12 +418,18 @@ def main() -> None:
         default=Path("prompts/unsupervised_extraction_prompt.md"),
         help="Path to the unsupervised extraction prompt (default: prompts/unsupervised_extraction_prompt.md)",
     )
+    # parser.add_argument(
+    #     "--file_no",
+    #     "-fn",
+    #     type=int,
+    #     default=None,
+    #     help="Specific file number to process (1-indexed). If None, process all files",
+    # )
     parser.add_argument(
-        "--file_no",
-        "-fn",
-        type=int,
+        "--refno",
+        type=str,
         default=None,
-        help="Specific file number to process (1-indexed). If None, process all files",
+        help="Refno to process. If None, process all refnos",
     )
     parser.add_argument(
         "--exclude_list",
