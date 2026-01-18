@@ -364,7 +364,6 @@ def score_value(
                 )
             answer_num, answer_unit = answer_nums[0]
             for pred_num, pred_unit in parse_numeric_candidates(pred_value):
-                # TODO: implement unit conversion/checking
                 if scorer_si(
                     pred_num,
                     pred_unit,
