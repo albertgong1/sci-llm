@@ -47,7 +47,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 ```
 
 <details>
-    <summary>Instructions for running local tasks</summary>
+    <summary>Instructions for running Harbor tasks saved locally</summary>
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
