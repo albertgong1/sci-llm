@@ -33,6 +33,8 @@ parser = pbench.add_base_args(parser)
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 
+model_name = args.model_name
+
 # Load all CSV files from output_dir/gt_matches
 gt_matches_dir = args.output_dir / "gt_matches"
 
@@ -55,7 +57,10 @@ for csv_file in csv_files:
     dfs.append(df)
 
 df_matches = pd.concat(dfs, ignore_index=True)
-logger.info(f"Loaded {len(df_matches)} total rows")
+df_matches = df_matches[df_matches["model"] == model_name]
+logger.info(
+    f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
+)
 
 # Filter for rows where is_match is True
 original_count = len(df_matches)
