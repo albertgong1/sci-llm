@@ -227,7 +227,7 @@ async def generate_property_name_matches(
         # NOTE: this may yield more than k matches since some rows share property name, but not context
         top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
         df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
-        logger.info(f"Found {len(df2_top_k)} matches for {x['property_name']}")
+        logger.debug(f"Found {len(df2_top_k)} matches for {x['property_name']}")
         # Construct async tasks, reusing the same task for rows with the same property name and context
         for idx, y in df2_top_k.iterrows():
             # NOTE: rename the variables to avoid conflicts when substituting them into the prompt template
