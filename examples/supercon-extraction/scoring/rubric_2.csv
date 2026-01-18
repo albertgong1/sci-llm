@@ -1,0 +1,764 @@
+db_label,property_name,unique property_unit,data_type,category,rubric,prompt,claude,SI,description
+name,common formula of materials,#N/A,String,Chemical,pymatgen,#N/A,,,common formula of materials
+t2,transition temperature (mid point),K,Float,Electronic,0.1% SI,What is the SI unit for transition temperature (mid point)? Equivalent units are: K,The SI unit for transition temperature (mid point) is the kelvin (K).,K,transition temperature (mid point)
+tc,Tc (of this sample) recommended,"K, k",Float,Electronic,0.1% SI,"What is the SI unit for Tc (of this sample) recommended? Equivalent units are: K, k","The SI unit for temperature (Tc) is Kelvin (K).
+
+Between the two options you provided (K and k), ""K"" is the correct SI unit symbol for Kelvin. The symbol should be capitalized as ""K"" rather than lowercase ""k"".",K,Tc (of this sample) recommended
+str3,common name of structure,#N/A,String,Structural,exact_match,#N/A,,,*common name of structure
+tcn,lowest temperature for measurement (not superconducting),K,Float,Environmental,0.1% SI,What is the SI unit for lowest temperature for measurement (not superconducting)? Equivalent units are: K,"The SI unit for temperature measurement is indeed the Kelvin (K). It is the base unit for thermodynamic temperature in the International System of Units (SI).
+
+For the lowest temperature measurement (excluding specialized techniques like those used in superconductivity research), the Kelvin scale is appropriate since it starts at absolute zero (0 K), which represents the theoretical temperature at which all thermal motion ceases. There is no lower temperature than absolute zero.
+
+The Kelvin scale has the same magnitude of degrees as the Celsius scale (a 1 K change equals a 1°C change), but it starts at absolute zero rather than the freezing point of water.",K,lowest temperature for measurement (not superconducting)
+lata,lattice constant a,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant a? Equivalent units are: A, nm","The SI unit for the lattice constant (a) is the meter (m).
+
+However, since atomic lattice dimensions are extremely small, the meter is impractically large for expressing these values. That's why these equivalent units are commonly used in crystallography and materials science:
+
+- Ångström (Å): equal to 10^-10 m
+- Nanometer (nm): equal to 10^-9 m (or 10 Å)
+
+For example, the lattice constant of silicon is typically expressed as a = 5.43 Å or a = 0.543 nm, rather than a = 5.43 × 10^-10 m.",m,lattice constant a
+gamma,coefficient of electronic specific heat,"mj/mol.K2, erg/cc.K2, mJ/mol.K2, mJ/gat.K2, J/K2.Mol-C, mJ/gmol.K2, J/mol.K2, mj/f.u.K2, mJ/mol.K2., mj/K2.m-Re, mj/mol. K2, mJ/K2fu, uJ/K2.g, mJ/Ymol.K2, mJ/Mol.K2, erg/cm3.K2, mJ/K2mol, mJ/molK2, mJ/Pr mol, mJ/K2mole, J/K2gat, my/md,K2, mJ/Kmol, mJ/Ni.K2, mJ/m-Co.K2, mJmol-1K-2, mJ/g.K2, mJ/f.u.K2, mj/mole.K2, uJ/g.K2, mj/cm3.K2, MJ/MOLE.K2",Float,Electronic,0.1% SI,"What is the SI unit for coefficient of electronic specific heat? Equivalent units are: mj/mol.K2, erg/cc.K2, mJ/mol.K2, mJ/gat.K2, J/K2.Mol-C, mJ/gmol.K2, J/mol.K2, mj/f.u.K2, mJ/mol.K2., mj/K2.m-Re, mj/mol. K2, mJ/K2fu, uJ/K2.g, mJ/Ymol.K2, mJ/Mol.K2, erg/cm3.K2, mJ/K2mol, mJ/molK2, mJ/Pr mol, mJ/K2mole, J/K2gat, my/md,K2, mJ/Kmol, mJ/Ni.K2, mJ/m-Co.K2, mJmol-1K-2, mJ/g.K2, mJ/f.u.K2, mj/mole.K2, uJ/g.K2, mj/cm3.K2, MJ/MOLE.K2","The SI unit for the coefficient of electronic specific heat is J/(mol·K²).
+
+Looking at your list of equivalent units, they represent the same physical quantity but in different notations or with different prefixes:
+
+- J/mol·K² is the proper SI unit
+- mJ/mol·K² is the same but using millijoules (1 mJ = 10⁻³ J)
+- erg/cc·K² and erg/cm³·K² use the CGS unit system (1 erg = 10⁻⁷ J)
+- Units with ""f.u."" refer to ""formula unit"" rather than mole
+- Units with ""gat"" refer to ""gram atom""
+
+The various other forms in your list represent the same quantity with different notations, spellings, or prefixes, but J/(mol·K²) is the standard SI unit.",J/mol.K^2,coefficient of electronic specific heat
+debyet,Debye temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Debye temperature? Equivalent units are: K,"The SI unit for Debye temperature is Kelvin (K).
+
+The Debye temperature is a physical parameter that characterizes the maximum vibrational frequency in a crystalline solid. It's defined in terms of temperature and is directly expressed in Kelvin in the SI system. This temperature value helps determine various thermodynamic properties of solids, particularly the temperature above which all vibrational modes in a crystal are excited.",K,Debye temperature
+hc1zero,Hc1 at 0 K for poly crystal,"Oe, mT, T, A, gauss, micro-T",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for poly crystal? Equivalent units are: Oe, mT, T, A, gauss, micro-T","The SI unit for critical magnetic field (Hc1) at 0 K for a polycrystal would be tesla (T).
+
+Among the units you mentioned:
+- Tesla (T) is the SI unit for magnetic field strength or magnetic flux density
+- Oersted (Oe) is a CGS unit for magnetic field strength
+- Millitesla (mT) is just a tesla with a metric prefix
+- Gauss is a CGS unit for magnetic flux density (1 T = 10,000 gauss)
+- Microtesla (micro-T) is again tesla with a metric prefix
+- Ampere (A) is not a unit for magnetic field but for electric current
+
+In scientific literature, when describing the lower critical field (Hc1) of a superconductor, the value is typically expressed in tesla (T) when using SI units.",T,Hc1 at 0 K for poly crystal
+carrier,carrier density at 300 K,"E+19 /cm3, n/cm3, E+21/cc, E+22 /cm3, E+20 /cm3, E+19/cc, E+22/cm3, n/m3, E+21 /cm3, /eV.cm3, E+21/cm3, cm-2, hole/Cu, /cm3, E+18/cm3, /CuO2, cm(-3), n/f.u, n/m^3, cm3C-1",Double,Electronic,0.1% SI,"What is the SI unit for carrier density at 300 K? Equivalent units are: E+19 /cm3, n/cm3, E+21/cc, E+22 /cm3, E+20 /cm3, E+19/cc, E+22/cm3, n/m3, E+21 /cm3, /eV.cm3, E+21/cm3, cm-2, hole/Cu, /cm3, E+18/cm3, /CuO2, cm(-3), n/f.u, n/m^3, cm3C-1","The SI unit for carrier density is number per cubic meter (n/m³).
+
+Looking at your list of equivalent units, most are variations of concentration units (particles per volume), but with different prefixes, notations, or non-SI volume units:
+
+- n/m³ is the proper SI unit (n represents number of carriers)
+- Units like /cm³, /cc, cm⁻³, E+19/cm³, etc. are the same measurement but using cubic centimeters instead of cubic meters
+- Some specialized notations like hole/Cu and /CuO₂ are field-specific ways to express carrier density in certain materials
+
+The temperature (300 K) doesn't change the unit itself, though carrier density values often depend on temperature in semiconductors.",m^-3,carrier density at 300K
+rawmat,raw materials,#N/A,String,Chemical,pymatgen,#N/A,,,raw materials
+shape,shape,#N/A,Integer,Structural,exact_match,#N/A,,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+hc2zero,Hc2 at 0 K for poly crystal,"Oe, kG, kOe, T, E+3 A/m, mT, KOe, KG, micro-T, gauss",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for poly crystal? Equivalent units are: Oe, kG, kOe, T, E+3 A/m, mT, KOe, KG, micro-T, gauss","The SI unit for the critical magnetic field (Hc2) at 0 K for a polycrystal would be tesla (T) or, equivalently, amperes per meter (A/m).
+
+In the SI system:
+- The primary unit is tesla (T) or amperes per meter (A/m), where 1 T = 10^6 A/m
+
+The other units you listed are related as follows:
+- 1 T = 10^4 gauss (G) = 10^4 G = 10 kG (kilogauss)
+- 1 T = 10^6 μT (microtesla)
+- 1 T = 10^3 mT (millitesla)
+- 1 T = 10^4/(4π) Oe (oersted) ≈ 795.8 Oe
+- 1 T = 10/(4π) kOe (kilooersted) ≈ 0.7958 kOe
+
+So while magnetic field can be expressed in various units, the proper SI unit for Hc2 would be tesla (T).",T,Hc2 at 0 K for poly crystal
+dhc2dt,-slope in Hc2 vs T at Tc for poly crystal,"Oe/K, G/K, kOe/K, T/K, mT/K, kG/K, kG/T, kG, K/kOe",Float,#N/A,#N/A,"What is the SI unit for -slope in Hc2 vs T at Tc for poly crystal? Equivalent units are: Oe/K, G/K, kOe/K, T/K, mT/K, kG/K, kG/T, kG, K/kOe","# SI Unit for -Slope in Hc2 vs T at Tc for Polycrystalline Superconductors
+
+The SI unit for the negative slope of the upper critical field (Hc2) versus temperature (T) at the critical temperature (Tc) for a polycrystalline superconductor is **T/K** (tesla per kelvin).
+
+Among the units you've listed:
+- T/K is the proper SI unit
+- Other magnetic field per temperature units (Oe/K, G/K, kOe/K, mT/K, kG/K) are equivalent but in different unit systems or scales
+- kG/T and kG are not dimensionally correct for this slope (which must be magnetic field divided by temperature)
+- K/kOe is the inverse of the required unit (would represent dT/dHc2 instead of dHc2/dT)
+
+The conversion relationships between these units are:
+- 1 T/K = 10,000 G/K = 10 kG/K
+- 1 T/K = 10,000 Oe/K = 10 kOe/K
+- 1 T/K = 1,000 mT/K
+
+The tesla (T) is the SI unit for magnetic field, and the kelvin (K) is the SI unit for temperature.",T/K,
+curiet,Curie temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Curie temperature? Equivalent units are: K,"The SI unit for Curie temperature is the kelvin (K).
+
+Curie temperature (also called the Curie point) is the temperature above which a ferromagnetic material loses its permanent magnetic properties and becomes paramagnetic. This is a temperature measurement, so it's expressed in kelvin, which is the SI base unit for thermodynamic temperature.
+
+While you may sometimes see Curie temperatures reported in degrees Celsius (°C) in scientific literature, the kelvin (K) is the proper SI unit.",K,Curie temperature
+neelt,Neel temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Neel temperature? Equivalent units are: K,"The SI unit for Néel temperature is the kelvin (K).
+
+The Néel temperature is a critical temperature above which an antiferromagnetic material becomes paramagnetic - losing its ordered magnetic structure. Like other temperature measurements in physics (such as Curie temperature, melting point, etc.), it is properly expressed in kelvins in the SI system.",K,Neel temperature
+latc,lattice constant c,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant c? Equivalent units are: A, nm","The SI unit for lattice constant c is the meter (m).
+
+However, since atomic lattice constants are typically very small, they are commonly expressed in non-SI units that are more convenient for atomic scale measurements:
+
+- Ångström (Å), where 1 Å = 10⁻¹⁰ m
+- Nanometer (nm), where 1 nm = 10⁻⁹ m = 10 Å
+
+In crystallography literature, you'll frequently see lattice constants reported in either Ångströms or nanometers rather than meters, as these units provide more practical numerical values for crystal structures.",m,lattice constant c
+gapene,"normarized energy gap at 0 K , 2delta(0)/kTc","meV, kTc, K, cm(-1), cm-1, MeV, MEV, k<B>T",Float,Electronic,0.1% SI,"What is the SI unit for normarized energy gap at 0 K , 2delta(0)/kTc? Equivalent units are: meV, kTc, K, cm(-1), cm-1, MeV, MEV, k<B>T","The normalized energy gap at 0 K, represented as 2Δ(0)/kTc, is actually a dimensionless quantity. This is because:
+
+- 2Δ(0) is an energy (the superconducting gap at zero temperature)
+- kTc is also an energy (Boltzmann constant multiplied by the critical temperature)
+- When you divide one energy by another energy, the units cancel out
+
+Since 2Δ(0)/kTc is dimensionless, it doesn't have an SI unit. The value is typically expressed as a pure number without units.
+
+None of the units you mentioned (meV, kTc, K, cm⁻¹, MeV, kₐT) would be appropriate for this normalized ratio, as they all represent either energies or temperatures, not dimensionless quantities.",,"normarized energy gap at 0 K , 2delta(0)/kTc"
+dtcdp,slope at P = 0 in Tc vs P plot,"K/GPa, K/kbar, K/KBAR, K/Gpa, T/GPa, K/GP, K/kBar, k/kbar, K/Kbar, mK/MPa, K/GPA, GPa",Float,,0.1% SI,"What is the SI unit for slope at P = 0 in Tc vs P plot? Equivalent units are: K/GPa, K/kbar, K/KBAR, K/Gpa, T/GPa, K/GP, K/kBar, k/kbar, K/Kbar, mK/MPa, K/GPA, GPa","The SI unit for slope at P = 0 in a Tc vs P plot (where Tc is temperature in Kelvin and P is pressure) would be K/Pa (kelvin per pascal).
+
+From your list of equivalent units, the closest to pure SI units would be mK/MPa (millikelvin per megapascal).
+
+However, in practice, K/GPa (kelvin per gigapascal) is commonly used in scientific literature because the slope values are often more convenient to express with this scaling. This is an acceptable derived SI unit.
+
+Some of your listed units are equivalent but with different capitalizations (like K/GPa, K/Gpa, K/GPA), while others use non-SI pressure units like kbar (K/kbar, K/KBAR, K/kBar, k/kbar, K/Kbar).",K/Pa,slope at P=0 in Tc vs P plot
+phc2t,Hc2 at given temperature for single crystal H//ab-plane,"kOe, T, Oe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for single crystal H//ab-plane? Equivalent units are: kOe, T, Oe","For the critical magnetic field (Hc2) of a superconductor at a given temperature for a single crystal with the magnetic field applied parallel to the ab-plane, the SI unit is **tesla (T)**.
+
+The equivalent units are:
+- Tesla (T) - SI unit
+- Oersted (Oe) - CGS unit
+- kiloOersted (kOe) - CGS unit, where 1 kOe = 1000 Oe
+
+The conversion between these units is:
+- 1 T = 10,000 Oe = 10 kOe
+
+In scientific literature on superconductors, you'll often see Hc2 values reported in any of these units, though tesla is the standard SI unit for magnetic field strength.",T,Hc2 at given temperature for single crystal H//ab-plane
+nhc2t,Hc2 at given temperature for single crystal H//c-axis,"kOe, T, Oe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for single crystal H//c-axis? Equivalent units are: kOe, T, Oe","The SI unit for the critical magnetic field (Hc2) at a given temperature for a single crystal with the magnetic field applied parallel to the c-axis (H//c-axis) is **tesla (T)**.
+
+The equivalent units you mentioned can be converted as follows:
+
+- 1 tesla (T) = 10 kilooersted (kOe)
+- 1 tesla (T) = 10,000 oersted (Oe)
+
+So if you have a value of Hc2 in any of these units, you can convert:
+- From kOe to T: multiply by 0.1
+- From Oe to T: multiply by 0.0001
+- From T to kOe: multiply by 10
+- From T to Oe: multiply by 10,000
+
+In scientific literature on superconductivity, you might see Hc2 values reported in any of these units, but tesla is the proper SI unit for magnetic field strength.",T,Hc2 at given temperature for single crystal H//c-axis
+spaceg,space group,#N/A,String,Structural,space_group,#N/A,,,space group
+latb,lattice constant b,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant b? Equivalent units are: A, nm","The SI unit for the lattice constant b is the meter (m).
+
+However, since atomic lattice dimensions are typically very small, the meter is not a practical unit for everyday use in crystallography. That's why equivalent units like:
+
+- Ångström (Å), where 1 Å = 10^-10 m
+- Nanometer (nm), where 1 nm = 10^-9 m
+
+are much more commonly used when discussing lattice constants. In particular, the Ångström is traditionally very common in crystallography, though nanometers are also widely used, especially in more recent literature.
+
+So while the official SI unit is the meter, lattice constants are typically reported in either Å or nm.",m,lattice constant b
+tp300,thermopower at 300 K,"uV/K, micro.V/K, mv/K, mic.V/K, mV/K, microV/K, uV/K-1, V/K, microV/P",Float,Electronic,0.1% SI,"What is the SI unit for thermopower at 300 K? Equivalent units are: uV/K, micro.V/K, mv/K, mic.V/K, mV/K, microV/K, uV/K-1, V/K, microV/P","The SI unit for thermopower (also known as Seebeck coefficient) is volts per kelvin (V/K).
+
+From your list of equivalent units, the following are valid representations of thermopower, with different prefixes:
+
+- V/K (the base SI unit)
+- mV/K (millivolts per kelvin, 10^-3 V/K)
+- μV/K, microV/K, micro.V/K, mic.V/K, uV/K (all representing microvolts per kelvin, 10^-6 V/K)
+
+Note that ""uV/K-1"" is technically incorrect notation (the K^-1 is redundant with the division).
+
+""microV/P"" is not a standard unit for thermopower, as ""P"" is not a recognized symbol for temperature in the SI system.
+
+In practice, thermopower is most commonly expressed in μV/K (microvolts per kelvin) because typical values for most materials at room temperature fall in the range of a few to hundreds of microvolts per kelvin.",V/K,thermopower at 300K
+gap,"energy gap at 0 K , delta(0)","meV, kTc, K, cm(-1), cm-1, mV, micro-eV, MeV, MEV, k<B>T",Float,Electronic,0.1% SI,"What is the SI unit for energy gap at 0 K , delta(0)? Equivalent units are: meV, kTc, K, cm(-1), cm-1, mV, micro-eV, MeV, MEV, k<B>T","The SI unit for energy gap at 0 K (denoted as delta(0) or Δ(0)) is the joule (J).
+
+Among the units you've listed:
+- meV (millielectron volt)
+- kTc (Boltzmann constant × critical temperature)
+- K (kelvin, when used with Boltzmann constant)
+- cm⁻¹ or cm-1 (wavenumber)
+- mV (millivolt, when referring to voltage across a junction)
+- μeV (micro-electron volt)
+- MeV or MEV (megaelectron volt)
+- k₍B₎T (Boltzmann constant × temperature)
+
+None of these are SI units, though they are commonly used in different contexts when discussing energy gaps in superconductivity, spectroscopy, or solid-state physics.
+
+The joule (J) is the proper SI unit for energy, including energy gaps. However, in practice, researchers often use more convenient units like electron volts (eV) or wavenumbers (cm⁻¹) depending on their field and the magnitude of the energy gap being discussed.",J,"energy gap at 0 K , delta(0)"
+cohere,coherence length at 0 K for poly crystal,"A, nm, micron, um, mm",Float,Electronic,0.1% SI,"What is the SI unit for coherence length at 0 K for poly crystal? Equivalent units are: A, nm, micron, um, mm","The SI unit for coherence length at 0 K for a polycrystalline material is the **meter (m)**.
+
+However, in practice, coherence lengths in polycrystalline materials are typically measured in:
+- Nanometers (nm)
+- Ångströms (Å)
+
+Of the equivalent units you mentioned, the most commonly used would be:
+- nm (nanometers, 10^-9 m)
+- Å (Ångströms, 10^-10 m)
+
+The choice between these units depends on the typical magnitude of the coherence length in the specific polycrystalline material being studied. For many polycrystalline materials, coherence lengths are on the order of nanometers or Ångströms, making these more practical units for reporting measurements than the base SI unit of meters.",m,coherence length at 0 K for poly crystal
+penet,penetration depth at 0 K for poly crystal,"A, nm, um, micrometer, micron.m, microm",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for poly crystal? Equivalent units are: A, nm, um, micrometer, micron.m, microm","The SI unit for penetration depth at 0 K for a polycrystal is the meter (m).
+
+However, in practical measurements and discussions of penetration depth (particularly for superconductors), smaller units are typically used because penetration depths are usually very small. The most commonly used equivalent units are:
+
+- nanometers (nm), where 1 nm = 10^-9 m
+- micrometers (μm), also called microns, where 1 μm = 10^-6 m
+- angstroms (Å), where 1 Å = 10^-10 m
+
+Of these, nanometers (nm) or angstroms (Å) are most frequently used in scientific literature when discussing penetration depths in polycrystalline superconductors, as typical values often fall in these ranges.",m,penetration depth at 0 K for poly crystal
+tcwidth,transition width for resistive transition,K,Float,Electronic,0.1% SI,What is the SI unit for transition width for resistive transition? Equivalent units are: K,"The SI unit for transition width for a resistive transition is the kelvin (K).
+
+The transition width typically refers to the temperature range over which a material transitions from its normal resistive state to a superconducting state (or vice versa). This width is measured as the difference between the temperatures at which the resistance has fallen to specific percentages of its normal state value.
+
+Since this is a temperature difference, it is expressed in kelvins (K) in the SI system, which is the base unit for thermodynamic temperature.",K,transition width for resistive transition
+t1,transition temperature (R = 0),"K, k",Float,Electronic,0.1% SI,"What is the SI unit for transition temperature (R = 0)? Equivalent units are: K, k","The SI unit for transition temperature (where electrical resistance R = 0, as in superconductivity) is the kelvin (K).
+
+K is the correct symbol for kelvin in the SI system. The lowercase ""k"" is not equivalent in this context, as it represents the prefix ""kilo-"" in the SI system (meaning 1000).",K,transition temperature (R=0)
+t3,transition temperature (R = 100%),K,Float,Electronic,0.1% SI,What is the SI unit for transition temperature (R = 100%)? Equivalent units are: K,"The SI unit for transition temperature, where the resistance becomes zero (R = 100% of the normal state resistance drops to 0%), is the Kelvin (K).
+
+The Kelvin is the base SI unit of thermodynamic temperature, defined by taking the fixed numerical value of the Boltzmann constant k to be 1.380649 × 10^-23 when expressed in the unit J⋅K^-1.
+
+For superconducting transitions, this temperature is commonly referred to as the critical temperature (Tc), below which a material exhibits zero electrical resistance and becomes superconducting.",K,transition temperature (R=100%)
+rh300,Hall coefficient at 300 K,"E-4 cm3/C, m3/C, cm3/C, e-3 cm3/C, Ohm.cm, E-8 m3/C, E-3 cm3/C, E-10 m3/C, 10-3cm3/C, E-9m3/C, mm3/C, m3C-1(20K), cm3C-1",Double,Electronic,0.1% SI,"What is the SI unit for Hall coefficient at 300 K? Equivalent units are: E-4 cm3/C, m3/C, cm3/C, e-3 cm3/C, Ohm.cm, E-8 m3/C, E-3 cm3/C, E-10 m3/C, 10-3cm3/C, E-9m3/C, mm3/C, m3C-1(20K), cm3C-1","The SI unit for Hall coefficient is m³/C (cubic meters per coulomb).
+
+Looking at the equivalent units you've listed, several are variations of this unit with different prefixes or scaling factors:
+
+- m³/C (this is the base SI unit)
+- E-8 m³/C (10⁻⁸ m³/C)
+- E-9 m³/C (10⁻⁹ m³/C)
+- E-10 m³/C (10⁻¹⁰ m³/C)
+
+The other units are either equivalent expressions or non-SI units:
+- cm³/C = 10⁻⁶ m³/C (as 1 cm³ = 10⁻⁶ m³)
+- E-3 cm³/C or 10⁻³ cm³/C = 10⁻⁹ m³/C
+- E-4 cm³/C = 10⁻¹⁰ m³/C
+- mm³/C = 10⁻⁹ m³/C (as 1 mm³ = 10⁻⁹ m³)
+- m³C⁻¹ is the same as m³/C, just different notation
+
+Note that Ohm·cm is not a direct unit for Hall coefficient, though it's related to electrical resistivity.",m^3/C,Hall coefficient at 300K
+rhn,"Hall coefficient for single, H//c-axis",#N/A,Double,Electronic,0.1% SI,#N/A,,m^3/C,"Hall coefficient for single, H//c-axis"
+dens,density (gcm-3),#N/A,Float,Chemical,0.1% SI,#N/A,,g/cm^3,Density
+tcsus,Tc from susceptibility measurement,K,Float,Electronic,0.1% SI,What is the SI unit for Tc from susceptibility measurement? Equivalent units are: K,"The SI unit for Tc (critical temperature) from susceptibility measurement is Kelvin (K).
+
+In magnetic susceptibility measurements, the critical temperature (Tc) represents the temperature at which a material transitions between different magnetic states (such as from paramagnetic to ferromagnetic or superconducting). Since Tc is a temperature, its SI unit is the Kelvin (K).
+
+No conversion is needed in this case since you already mentioned that the equivalent unit is K, which is the correct SI unit for temperature.",K,Tc from susceptibility measurement
+hc1t,Hc1 at given temperature for poly crystal,"Oe, mT, T",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at given temperature for poly crystal? Equivalent units are: Oe, mT, T","For the lower critical field (Hc1) of a polycrystalline superconductor at a given temperature, the SI unit is **tesla (T)**.
+
+Equivalent units:
+- Tesla (T) - SI unit
+- Millitesla (mT) - 1 mT = 10^-3 T
+- Oersted (Oe) - CGS unit, where 1 Oe = 10^-4 T = 0.1 mT
+
+In scientific literature on superconductors, Hc1 values are commonly reported in any of these units, though the SI unit tesla (or millitesla for smaller values) is preferred in modern publications.",T,Hc1 at given temperature for poly crystal
+hc2t,Hc2 at given temperature for poly crystal,"T, Oe, mT, kOe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for poly crystal? Equivalent units are: T, Oe, mT, kOe","# SI Unit for Hc2 (Upper Critical Field) for Polycrystals
+
+The SI unit for Hc2 (upper critical field) at a given temperature for a polycrystalline material is **tesla (T)**.
+
+## Equivalent Units:
+- **T** (tesla): The standard SI unit
+- **mT** (millitesla): 1 mT = 0.001 T
+- **Oe** (oersted): 1 Oe = 79.5775 A/m ≈ 0.0001 T (1 T = 10,000 Oe)
+- **kOe** (kilo-oersted): 1 kOe = 1,000 Oe ≈ 0.1 T (1 T = 10 kOe)
+
+In scientific literature, Hc2 values for superconductors are commonly reported in tesla (T), although older publications might use oersted (Oe) or kilo-oersted (kOe).",T,Hc2 at given temperature for poly crystal
+spjump,specific heat jump at Tc (delta-C),"mj/mol.K, J/MOLE.K, mJ/mol.K, mJ/mol.K2, dC/r*Tc, J/kg.K, mJ/cm3.K, mJ/mole.K, J/mol.K, Jmol-1K-2, mJ/molK2, mJ/K.mol, MJ/GAT.K, J/mol.K2, gamma*Tc",Float,Electronic,0.1% SI,"What is the SI unit for specific heat jump at Tc (delta-C)? Equivalent units are: mj/mol.K, J/MOLE.K, mJ/mol.K, mJ/mol.K2, dC/r*Tc, J/kg.K, mJ/cm3.K, mJ/mole.K, J/mol.K, Jmol-1K-2, mJ/molK2, mJ/K.mol, MJ/GAT.K, J/mol.K2, gamma*Tc","The SI unit for specific heat jump at a critical temperature (Tc), denoted as delta-C, is J/(mol·K) or joules per mole-kelvin.
+
+From your list of equivalent units:
+- J/MOLE.K, J/mol.K, mJ/mol.K, and mJ/mole.K are all expressing the same quantity (with mJ being millijoules)
+- J/kg·K represents mass-specific heat capacity rather than molar
+- mJ/cm³·K represents volumetric heat capacity
+- Units with K² in the denominator (J/mol·K², Jmol⁻¹K⁻², mJ/molK²) represent the temperature derivative of heat capacity
+
+The standard SI unit for molar specific heat capacity (and thus for a jump in this quantity) is J/(mol·K).",J/mol.K,specific heat jump at Tc (delta-C)
+resn,resistivity at normal-T for poly crystal,"uOhm.cm, mOhm.cm, uOhm.m, m.ohm.cm, mohm.cm, uOhmcm, uOh.cm, microohm, micro-ohm, ohm, nOhm.cm, Ohm.cm, ohm.cm, mohmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for poly crystal? Equivalent units are: uOhm.cm, mOhm.cm, uOhm.m, m.ohm.cm, mohm.cm, uOhmcm, uOh.cm, microohm, micro-ohm, ohm, nOhm.cm, Ohm.cm, ohm.cm, mohmcm, m-ohmcm, mOHM, ohmcm, mOHMcm","# SI Unit for Resistivity
+
+The SI unit for electrical resistivity is the ohm-meter (Ω·m).
+
+For polycrystalline materials at normal temperatures, resistivity is commonly expressed in this unit or in related units that differ by scale factors.
+
+From your list of equivalent units, the ones that directly relate to the SI unit are:
+- μΩ·m (microohm-meter)
+
+The other units in your list are non-SI variations, with μΩ·cm (microohm-centimeter) and mΩ·cm (milliohm-centimeter) being particularly common in materials science and engineering.
+
+To convert between these units:
+- 1 Ω·m = 100 Ω·cm
+- 1 μΩ·m = 0.1 μΩ·cm",ohm.m,resistivity at normal-T for poly crystal
+moment,magnetic moment per formula,"uB/Ce, myu-B/Eu, myu-B/mole, My-B/Nb, M/mol, emu mol-1, /ND, myu-B/f.u, myu-B/mol, uB/Ru, uB/mol, myu-B/Ce, uB, myu-B/Pu, my-B/U, my-B/Np, Myu-B/mol, My-B/Eu, my-B/Eu, my-B/f.u, my-B, My-B/f.u, myuB/mol, uB/Ho, uB/Er, uB/Tm, my-B/mol, myu-B/Er, My-B/mol, per Ru, uB/Pu, myu-B/fu, myu-B/Tm, nyu-B/Pr, Myu-B/Pr, My-B/Ce, Myu-B, uB/Pr, myu-B/R, Myu-B/f.u, myu-B/Yb, Myu-B/Fe, myu-B/Fe, per mol, per R-ion, per f.u, per Gd, myu-B, myu-B/Co, /Sm, /Gd, micro.B/Mo, myuB/Tm, myu-B/Pr, per Ho, per Eu, uB/f.u, myu-B/Y, myu-B/Gd, myu-B/Nd, uB/Cu, Bohr magne, myuB/Np, myu-B/V, nyu-B/mol, Myu-B/f.u., mB/Pr, Myu-B/Mo, uB/Ir, myu-B/U, my-B/Cr, myu-B/Cr, /GD, /CELL, /PR ION, /PR, /Pr, m/Zn",Float,Electronic,0.1% SI,"What is the SI unit for magnetic moment per formula? Equivalent units are: uB/Ce, myu-B/Eu, myu-B/mole, My-B/Nb, M/mol, emu mol-1, /ND, myu-B/f.u, myu-B/mol, uB/Ru, uB/mol, myu-B/Ce, uB, myu-B/Pu, my-B/U, my-B/Np, Myu-B/mol, My-B/Eu, my-B/Eu, my-B/f.u, my-B, My-B/f.u, myuB/mol, uB/Ho, uB/Er, uB/Tm, my-B/mol, myu-B/Er, My-B/mol, per Ru, uB/Pu, myu-B/fu, myu-B/Tm, nyu-B/Pr, Myu-B/Pr, My-B/Ce, Myu-B, uB/Pr, myu-B/R, Myu-B/f.u, myu-B/Yb, Myu-B/Fe, myu-B/Fe, per mol, per R-ion, per f.u, per Gd, myu-B, myu-B/Co, /Sm, /Gd, micro.B/Mo, myuB/Tm, myu-B/Pr, per Ho, per Eu, uB/f.u, myu-B/Y, myu-B/Gd, myu-B/Nd, uB/Cu, Bohr magne, myuB/Np, myu-B/V, nyu-B/mol, Myu-B/f.u., mB/Pr, Myu-B/Mo, uB/Ir, myu-B/U, my-B/Cr, myu-B/Cr, /GD, /CELL, /PR ION, /PR, /Pr, m/Zn","The SI unit for magnetic moment per formula is the ampere square meter (A⋅m²) per molecule or per formula unit.
+
+All the equivalent units you've listed (μB/Ce, μB/mol, emu mol⁻¹, etc.) are commonly used in scientific literature but are not SI units. They typically express magnetic moments in terms of Bohr magnetons (μB) per formula unit, per mole, or per specific atom within the structure.
+
+The Bohr magneton (μB) itself equals 9.274×10⁻²⁴ A⋅m² in SI units, so when reporting magnetic moment per formula, the proper SI expression would be A⋅m² per formula unit.",A.m^2/mol,magnetic moment per formula
+str1,"*crystal structure, symmetry",#N/A,Integer,Structural,exact_match,#N/A,,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+vols,volume fraction of Meissner effect(%),#N/A,Float,Electronic,0.1% SI,#N/A,,,"volume fraction of Meissner effect, unit=%"
+kaizero,temperature independent term in susceptibility,"emu/mol-Yb, emu/mol, emu.K/Ru, emu/mol-La, eum/mol, emu/mole, cm3/mol, emu/g, emu/m.Oe, emu/mol-Si, emu/cm3.Oe, cm3/g, emu/mol Nd, cm3/mole, emu/mol.K, emu/g.Oe, emu/mol-Cr, myu-B/kOe, emu/mol-Ce, emu/mol.G, emu/fu, emu/Oe.g, cm3.K/mol",Double,Electronic,0.1% SI,"What is the SI unit for temperature independent term in susceptibility? Equivalent units are: emu/mol-Yb, emu/mol, emu.K/Ru, emu/mol-La, eum/mol, emu/mole, cm3/mol, emu/g, emu/m.Oe, emu/mol-Si, emu/cm3.Oe, cm3/g, emu/mol Nd, cm3/mole, emu/mol.K, emu/g.Oe, emu/mol-Cr, myu-B/kOe, emu/mol-Ce, emu/mol.G, emu/fu, emu/Oe.g, cm3.K/mol","The SI unit for temperature-independent susceptibility is m³/mol (cubic meter per mole).
+
+When converting from the various units you've listed:
+
+- Units like emu/mol, cm³/mol, emu/mole, cm³/mole all represent magnetic susceptibility per mole of substance
+- Units containing Oe (oersted) in the denominator need conversion because oersted is not an SI unit
+- Units specifying particular elements (emu/mol-Yb, emu/mol-La, etc.) are just specifying the particular substance measured
+
+The conversion from emu/mol to SI units:
+1 emu/mol = 4π × 10⁻⁶ m³/mol
+
+So the standard SI unit for temperature-independent magnetic susceptibility is m³/mol (cubic meter per mole).",emu/mol,temperature independent term in susceptibility
+curiec,Curie constant,"emu.K/mol, cm3/mol, muB/f.u., emu.K/Ru, emu/mol, emu.K/Yb, emu/mol.Oe, K, emu.K/g, emu/K/mol, EMU/mol, emh.K/mol, EMU.K/G.OE, EMU.K/G, emu/mol.K, emu.K/mole, K.cm3/mol, emu,K/mol, emu.K/G.g, emu.K/cc, emuK/g, ergK/Oe2g, emu/g, emu.K/g.Oe, comment, cm3K/mol, emu.K/Ce, emu/g.K, K/mol.G, emuK/mol, EMU/K.OE, EMU/G, EMU.K/MOLE, emu.K/Oe.g, cm3.K/mol",Double,Electronic,0.1% SI,"What is the SI unit for Curie constant? Equivalent units are: emu.K/mol, cm3/mol, muB/f.u., emu.K/Ru, emu/mol, emu.K/Yb, emu/mol.Oe, K, emu.K/g, emu/K/mol, EMU/mol, emh.K/mol, EMU.K/G.OE, EMU.K/G, emu/mol.K, emu.K/mole, K.cm3/mol, emu,K/mol, emu.K/G.g, emu.K/cc, emuK/g, ergK/Oe2g, emu/g, emu.K/g.Oe, comment, cm3K/mol, emu.K/Ce, emu/g.K, K/mol.G, emuK/mol, EMU/K.OE, EMU/G, EMU.K/MOLE, emu.K/Oe.g, cm3.K/mol","The SI unit for the Curie constant is K·m³/mol (kelvin cubic meter per mole).
+
+The Curie constant describes the relationship between magnetic susceptibility and temperature in paramagnetic materials, following the Curie-Weiss law.
+
+Looking at your list of equivalent units, most are non-SI units or variations in notation. For example:
+- cm³/mol (cubic centimeter per mole) is related to the SI unit by a factor of 10⁻⁶ (since 1 cm³ = 10⁻⁶ m³)
+- emu·K/mol (electromagnetic unit · kelvin per mole) is a CGS-based unit
+
+The conversion between these units and the SI unit K·m³/mol requires appropriate conversion factors depending on the specific definition being used in a particular context.",K.m^3/mol,Curie constant
+resrt,resistivity at RT for poly crystal,"mOhm.cm, uOhm.m, m.ohm.cm, ohmcm, uOhm.cm, Ohm.cm, ohm.cm, uOhmcm, mOhm,cm, kOhm.cm, mic.ohm.cm, mic.ohm.m, mohmcm, mOhmcm, m-ohmcm, mOHM, uohmcm, mOrm.cm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at RT for poly crystal? Equivalent units are: mOhm.cm, uOhm.m, m.ohm.cm, ohmcm, uOhm.cm, Ohm.cm, ohm.cm, uOhmcm, mOhm,cm, kOhm.cm, mic.ohm.cm, mic.ohm.m, mohmcm, mOhmcm, m-ohmcm, mOHM, uohmcm, mOrm.cm","The SI unit for resistivity is the ohm-meter (Ω·m).
+
+Among the various units you've listed, the following are equivalent units for resistivity, but only some are in SI format:
+
+- μΩ·m (microohm-meter) is an SI unit, equal to 10⁻⁶ Ω·m
+- Ω·cm (ohm-centimeter) is commonly used but not an SI unit, equal to 10⁻² Ω·m
+- mΩ·cm (milliohm-centimeter) is equal to 10⁻⁵ Ω·m
+- μΩ·cm (microohm-centimeter) is equal to 10⁻⁸ Ω·m
+
+For polycrystalline materials at room temperature (RT), resistivity is properly expressed in Ω·m in the SI system.",ohm.m,resistivity at RT for poly crystal
+tblno,international table number,#N/A,Integer,Structural,exact_match,#N/A,,,international table number
+abresn,resistivity at normal-T for single crystal for J//ab-plane,"mOhm.cm, UOhm.cm, uOhm.cm, Ohm.cm, mOh..cm, ohm, mOhm,cm, m.ohm.cm, mohmmm, uohmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, microohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for single crystal for J//ab-plane? Equivalent units are: mOhm.cm, UOhm.cm, uOhm.cm, Ohm.cm, mOh..cm, ohm, mOhm,cm, m.ohm.cm, mohmmm, uohmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, microohmcm","The SI unit for resistivity is the ohm-meter (Ω⋅m).
+
+For resistivity of a single crystal with current density J parallel to the ab-plane at normal temperature, the proper SI unit would still be ohm-meter (Ω⋅m).
+
+From your list of equivalent units, these are conversions to the SI unit:
+- mOhm⋅cm (milliohm-centimeter) = 10^-5 Ω⋅m
+- μOhm⋅cm or uOhm⋅cm (microohm-centimeter) = 10^-8 Ω⋅m
+- Ohm⋅cm (ohm-centimeter) = 10^-2 Ω⋅m
+
+Many of the other notations in your list are either alternative ways of writing these units or contain typographical variations (like mOHM, mohmcm, etc.), but they should all be converted to ohm-meter (Ω⋅m) when expressing values in SI units.",ohm.m,resistivity at normal-T for single crystal for J//ab plane
+isotope,"alpha in Tc = A * M^(-alpha), isotope effect",#N/A,Float,Electronic,0.1% SI,#N/A,,,"alpha in Tc=A*M^(-alpha), isotope effect"
+isoel,isotope element,#N/A,String,Chemical,pymatgen,#N/A,,,isotope element
+method,*preparation method,#N/A,Integer,Chemical,exact_match,#N/A,,,*preparation method (see the end of this table)
+jche,"Jc at 4.2 K, H = 0 T",meV,Double,Electronic,0.1% SI,"What is the SI unit for Jc at 4.2 K, H = 0 T? Equivalent units are: meV","The SI unit for critical current density (Jc) is ampere per square meter (A/m²).
+
+However, your question mentions ""meV"" (millielectron volt) as equivalent units, which is actually a unit of energy, not current density.
+
+If you're asking about the critical current density (Jc) of a superconductor at 4.2 K (liquid helium temperature) and zero applied magnetic field (H = 0 T), the SI unit would be A/m². There is no direct conversion between A/m² and meV since they measure different physical quantities.
+
+If you're instead asking about a different parameter that is typically measured in energy units at these conditions, you might be referring to the superconducting energy gap, which would be measured in joules (J) in SI units, with meV being a commonly used equivalent.",ohm.m,"Jc at 4.2K, H=0 T"
+subst,substrate,#N/A,String,Environmental,pymatgen,#N/A,,,substrate
+ppenet,penetration depth at 0 K for single crystal for H //ab-plane,"A, nm, um, micron.m",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for single crystal for H //ab-plane? Equivalent units are: A, nm, um, micron.m","The SI unit for penetration depth at 0 K for a single crystal with H parallel to the ab-plane would be meters (m), as penetration depth is a measure of how far a magnetic field penetrates into a superconductor.
+
+However, in practice, the penetration depth for superconductors is typically very small, so the following equivalent units are commonly used:
+
+- Angstrom (Å): 1 Å = 10^-10 m
+- nanometer (nm): 1 nm = 10^-9 m
+- micrometer (μm) or micron: 1 μm = 10^-6 m
+
+Among these, nanometers (nm) are most commonly used in scientific literature for reporting penetration depths in superconductors, as typical values fall in the range of tens to hundreds of nanometers.",m,penetration depth at 0 K for single crystal for H //ab plane
+phc2zero,Hc2 at 0 K for single crystal for H //ab-plane,"T, kOe, KOe, Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for single crystal for H //ab-plane? Equivalent units are: T, kOe, KOe, Oe, mT","The SI unit for the upper critical field (Hc2) at 0 K for a single crystal with the magnetic field parallel to the ab-plane would be tesla (T).
+
+Among the options you've listed:
+- T (tesla) is the SI unit for magnetic field strength
+- Oe (oersted) is a CGS unit
+- kOe or KOe (kilo-oersted) is 1000 oersted
+- mT (millitesla) is 0.001 tesla
+
+The conversion between these units is:
+1 T = 10,000 Oe = 10 kOe = 1,000 mT
+
+So while all these units can be used to express Hc2, tesla (T) is specifically the SI unit.",T,Hc2 at 0 K for single crystal for H //ab plane
+nhc2zero,Hc2 at 0 K for single crystal for H //c-axis,"T, kOe, KOe, Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for single crystal for H //c-axis? Equivalent units are: T, kOe, KOe, Oe, mT","The SI unit for the critical field Hc2 at 0 K for a single crystal with the field applied parallel to the c-axis would be tesla (T).
+
+Among the units you've listed:
+- T (tesla) is the SI unit for magnetic field strength
+- Oe (oersted), kOe (kilo-oersted), and KOe (also kilo-oersted) are CGS units
+- mT (millitesla) is 10^-3 tesla, also an SI-derived unit
+
+While all of these can be used to express critical field values in the scientific literature, tesla (T) is the proper SI unit. The conversion relationship is 1 T = 10,000 Oe (or 10 kOe).",T,Hc2 at 0 K for single crystal for H //c-axis
+target,target material,#N/A,String,Chemical,pymatgen,#N/A,,,target material
+reshe,resistivity at 4.2 K for poly crystal,"mOhm.cm, uOhm.cm, Ohm.cm, moOhm.cm, uOhm.cn, mic.ohm.cm, m.ohm.cm, m-ohmcm, ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for poly crystal? Equivalent units are: mOhm.cm, uOhm.cm, Ohm.cm, moOhm.cm, uOhm.cn, mic.ohm.cm, m.ohm.cm, m-ohmcm, ohmcm, mohmcm","The SI unit for resistivity is ohm-meter (Ω·m).
+
+From your list of equivalent units, the closest to SI is Ohm.cm (ohm·centimeter). To convert this to the proper SI unit:
+1 Ω·cm = 0.01 Ω·m
+
+The other units in your list are variations or non-standard notations:
+- mOhm.cm (milliohm·centimeter) = 10^-3 Ω·cm = 10^-5 Ω·m
+- uOhm.cm or mic.ohm.cm (microohm·centimeter) = 10^-6 Ω·cm = 10^-8 Ω·m
+- m.ohm.cm or m-ohmcm (likely also milliohm·centimeter) = 10^-5 Ω·m
+
+Note that the resistivity value itself may vary depending on the specific polycrystalline material being measured at 4.2 K, but the SI unit remains ohm-meter regardless of temperature or material crystallinity.",ohm.m,resistivity at 4.2K for poly crystal
+isorat,exchange ratio of isotope(%),#N/A,String,Chemical,0.1% SI,#N/A,,,exchange ratio of isotope(%)
+dtc,DTC = Tc - Tc0 for isotope element,#N/A,Float,Electronic,0.1% SI,#N/A,,K,DTC=Tc-Tc0 for isotope element
+abresrt,resistivity at RT for single crystal for J//ab-plane,"mOhm.cm, mOhm, uOh.cm, uOhm.cm, Ohm.cm, nOhm.cm, m.ohm.cm, mOhm,cm, mic.ohm.cm, ohm.cm, mohmmm, mOhmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, uohmcm, Ohmcm",Float,,0.1% SI,"What is the SI unit for resistivity at RT for single crystal for J//ab-plane? Equivalent units are: mOhm.cm, mOhm, uOh.cm, uOhm.cm, Ohm.cm, nOhm.cm, m.ohm.cm, mOhm,cm, mic.ohm.cm, ohm.cm, mohmmm, mOhmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, uohmcm, Ohmcm","The SI unit for resistivity is ohm-meter (Ω·m).
+
+From your list of equivalent units, several represent resistivity but with different prefixes or formatting:
+
+- mOhm·cm (milliohm-centimeter)
+- μOhm·cm, uOhm·cm, mic.ohm.cm (microohm-centimeter)
+- Ohm·cm, ohm.cm, ohmcm (ohm-centimeter)
+- nOhm·cm (nano-ohm-centimeter)
+
+For a single crystal with current flowing in the ab-plane (J//ab-plane) at room temperature (RT), the resistivity would be measured in ohm·meter (Ω·m) in SI units.
+
+To convert between these units:
+- 1 Ω·cm = 10^-2 Ω·m
+- 1 mΩ·cm = 10^-5 Ω·m
+- 1 μΩ·cm = 10^-8 Ω·m
+- 1 nΩ·cm = 10^-11 Ω·m",,resistivity at RT for single crystal for J//ab plane
+tp300p,thermopower at 300 K for parallel to ab-plane,"uV/K, microW/mK2",Float,Electronic,0.1% SI,"What is the SI unit for thermopower at 300 K for parallel to ab-plane? Equivalent units are: uV/K, microW/mK2","The SI unit for thermopower (also called Seebeck coefficient) is volts per kelvin (V/K).
+
+When measuring thermopower at 300 K parallel to the ab-plane, the value would still be expressed in V/K (or commonly μV/K as you mentioned, where μV stands for microvolts).
+
+The unit ""microW/mK²"" (microwatts per meter-kelvin squared) that you mentioned is not directly equivalent to the thermopower unit. Thermopower is always expressed as a voltage produced per unit temperature difference (V/K).
+
+It's possible you're referring to a related thermal transport property, but the Seebeck coefficient itself is measured in V/K in the SI system.",ohm.m,thermopower at 300K for parallel to ab-plane
+dadp,pressure dependence of LATA,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Electronic,0.1% SI,"What is the SI unit for pressure dependence of LATA? Equivalent units are: k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa","The SI unit for pressure dependence of Linear Anisotropic Thermal Expansion (LATA) would be (Pa)^(-1).
+
+Looking at your equivalent units, they all represent the change in length per unit pressure. Let's analyze them:
+
+- k0/GPa: This is (10^(-3))/GPa
+- (GPa)^(-1): This is directly 1/GPa
+- E-3/GPa: This is (10^(-3))/GPa
+- A/GPa: This is (10^(-10))/GPa (if A means Ångström)
+- /GPa: This is 1/GPa
+- %/GPa: This is (10^(-2))/GPa
+- (dL/L)/GPa: This is the fractional change in length per GPa, equivalent to 1/GPa
+
+Since GPa = 10^9 Pa, the SI unit would be (Pa)^(-1), which represents the fractional change in length per pascal of pressure.",V/K,pressure dependence of LATA
+dcdp,pressure dependence of LATC,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Structural,0.1% SI,"What is the SI unit for pressure dependence of LATC? Equivalent units are: k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa","The SI unit for pressure dependence of LATC (Linear Anisotropic Thermal Coefficient) would be K⁻¹·Pa⁻¹, which represents how the thermal expansion coefficient changes per unit of pressure.
+
+From your list of equivalent units, the proper SI representation would correspond to (GPa)⁻¹ or /GPa.
+
+This can be understood dimensionally as:
+- LATC itself has units of K⁻¹ (per kelvin)
+- Pressure dependence means ""per unit pressure""
+- So pressure dependence of LATC has units of K⁻¹·Pa⁻¹
+
+The other notations in your list are equivalent expressions:
+- k₀/GPa: where k₀ is the thermal coefficient
+- E-3 /GPa: represents 10⁻³ per GPa
+- A/GPa: where A is the coefficient value
+- %/GPa: percent change per GPa
+- (dL/L)/GPa: fractional length change per GPa
+
+In SI base units, this would be expressed as m·m⁻¹·K⁻¹·Pa⁻¹, but the m·m⁻¹ part (representing strain) cancels out, leaving K⁻¹·Pa⁻¹.",1/Pa,pressure dependence of LATC
+ncohere,coherence length at 0 K for single crystal for H ���ab-plane,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for coherence length at 0 K for single crystal for H ���ab-plane? Equivalent units are: A, nm","The SI unit for coherence length (including coherence length in the ab-plane of superconductors at 0 K) is the **meter (m)**.
+
+However, for practical purposes in superconductivity research, coherence lengths are typically reported in:
+- **nanometers (nm)** (which is 10^-9 m)
+- or **Angstroms (Å)** (which is 10^-10 m)
+
+Both nm and Å are the equivalent units you mentioned, with nanometers being an SI-derived unit and Angstroms being a non-SI unit still commonly used in crystallography and superconductivity research.
+
+For type-II superconductors, the coherence length ξ in the ab-plane (ξₐᵦ) is often in the range of a few to hundreds of nanometers, depending on the specific material.",1/Pa,coherence length at 0 K for single crystal for H ⊥ab plane
+abreshe,resistivity at 4.2 K for single crystal for J//ab-plane,"uOhm.cm, mOhm.cm, microohmcm, mic.ohm.cm, m.ohm.cm, mohmcm",Float,electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for single crystal for J//ab-plane? Equivalent units are: uOhm.cm, mOhm.cm, microohmcm, mic.ohm.cm, m.ohm.cm, mohmcm","The SI unit for resistivity is ohm·meter (Ω·m).
+
+For the specific case of resistivity at 4.2 K for a single crystal with current density (J) parallel to the ab-plane, the unit would still be ohm·meter (Ω·m) in SI units.
+
+The equivalent units you listed are commonly used in materials science and condensed matter physics:
+- uOhm·cm or microohmcm or mic.ohm.cm = 10^-6 ohm·cm = 10^-8 Ω·m
+- mOhm·cm or mohmcm or m.ohm.cm = 10^-3 ohm·cm = 10^-5 Ω·m
+
+To convert between these units and the SI unit (Ω·m):
+1 Ω·m = 100 Ω·cm
+1 mΩ·cm = 10^-5 Ω·m
+1 μΩ·cm = 10^-8 Ω·m",m,resistivity at 4.2K for single crystal for J//ab plane
+creshe,resistivity at 4.2 K for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for single crystal for J//c-axis? Equivalent units are: uOhm.cm, mOhm.cm, m.ohm.cm, mohmcm","The SI unit for resistivity is ohm-meter (Ω·m), regardless of temperature or material specifics such as crystal orientation.
+
+For the specific scenario you mentioned (resistivity at 4.2 K for a single crystal with current density J parallel to the c-axis), the measurement would still be expressed in Ω·m in SI units.
+
+Regarding the equivalent units you listed:
+- μΩ·cm (micro-ohm centimeter)
+- mΩ·cm (milli-ohm centimeter)
+- m·Ω·cm or mΩ·cm (same as above)
+- mΩ·cm (same notation)
+
+To convert between these units and the SI unit:
+1 μΩ·cm = 10^-8 Ω·m
+1 mΩ·cm = 10^-5 Ω·m
+
+For example, if a measurement gives 100 μΩ·cm, this would be equivalent to 1 × 10^-6 Ω·m in SI units.",ohm.m,resistivity at 4.2K for single crystal for J//c-axis
+npenet,penetration depth at 0 K for single crystal for H���ab-plane,"micron m, A, um, micron.m, nm, micron-m, micron. M, microm",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for single crystal for H���ab-plane? Equivalent units are: micron m, A, um, micron.m, nm, micron-m, micron. M, microm","The SI unit for penetration depth at 0 K for single crystal in the H∥ab-plane would be **meters (m)**.
+
+However, in practical scientific measurements and literature discussing superconductor penetration depths, smaller units are typically used due to the microscopic scale of these measurements:
+
+- nanometers (nm) = 10^-9 m
+- micrometers (μm) = 10^-6 m
+- angstroms (Å) = 10^-10 m
+
+Among the options you've listed, the following are equivalent to micrometers:
+- μm (standard SI notation)
+- micron
+- micron m (though this is redundant notation)
+- microm
+
+The penetration depth (λ) in superconductors typically ranges from tens to hundreds of nanometers, depending on the material and temperature, so measurements are commonly reported in nm or μm rather than the base SI unit of meters.",ohm.m,penetration depth at 0 K for single crystal for H⊥ab plane
+pdhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,,0.1% SI,"What is the SI unit for -slope in Hc2 vs T at Tc for single crystal for H //ab-plane? Equivalent units are: T/K, kOe/K, Oe/K, KOe/K, K/kOe","The slope you're referring to is the rate of change of the upper critical field (Hc2) with respect to temperature (T) at the critical temperature (Tc), specifically for a single crystal with the magnetic field oriented parallel to the ab-plane.
+
+The SI unit for this slope would be **tesla per kelvin (T/K)**.
+
+Among the equivalent units you listed:
+- **T/K** is the SI unit (correct)
+- **kOe/K** (kiloeoersted per kelvin) = 0.1 T/K (conversion factor: 1 kOe = 0.1 T)
+- **Oe/K** (oersted per kelvin) = 10^-4 T/K (conversion factor: 1 Oe = 10^-4 T)
+- **KOe/K** appears to be a typo of kOe/K = 0.1 T/K
+- **K/kOe** is the inverse of the slope, measuring temperature change per field change, and equals 10 K/T
+
+The SI unit for the negative slope (-dHc2/dT at Tc) would still be T/K, just with a negative value.",m,-slope in Hc2 vs T at Tc for single crystal for H //ab plane
+ndhc2dt,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,Electronic,0.1% SI,"What is the SI unit for -slope in Hc2 vs T at Tc for single crystal for H //c-axis? Equivalent units are: T/K, kOe/K, Oe/K, KOe/K, K/kOe","The SI unit for the negative slope of H_{c2} versus T at T_c for a single crystal with H parallel to the c-axis would be tesla per kelvin (T/K).
+
+Among the options you've listed:
+- T/K is the correct SI unit
+- kOe/K (kiloOersted per kelvin) is a cgs unit equivalent to 0.1 T/K
+- Oe/K (Oersted per kelvin) is a cgs unit equivalent to 10^-4 T/K
+- KOe/K appears to be a duplicate or typo of kOe/K
+- K/kOe is the inverse unit (kelvin per kiloOersted)
+
+The proper SI unit is tesla per kelvin (T/K), as the critical field H_{c2} is measured in tesla (T) and temperature is measured in kelvin (K).",T/K,-slope in Hc2 vs T at Tc for single crystal for H //c-axis
+pcohere,coherence length at 0 K for single crystal for H //ab-plane,"A, nm",Float,Electronic,0.1% SI,"What is the SI unit for coherence length at 0 K for single crystal for H //ab-plane? Equivalent units are: A, nm","The SI unit for coherence length is the meter (m).
+
+For coherence length measurements in superconductors at 0 K for a single crystal with the magnetic field parallel to the ab-plane, researchers typically express this in:
+
+- Angstroms (Å), which is equal to 10^-10 m
+- Nanometers (nm), which is equal to 10^-9 m
+
+Between your two options (Å and nm), both are commonly used in the literature for reporting coherence lengths, but nanometers (nm) would be closer to an SI-derived unit since it uses the standard SI prefix ""nano-"".
+
+However, the true SI unit remains the meter (m), with these other units being convenient for expressing the typically small coherence lengths observed in superconductors.",T/K,coherence length at 0 K for single crystal for H //ab plane
+phc1zero,Hc1 at 0 K for single crystal for H //ab-plane,"Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for single crystal for H //ab-plane? Equivalent units are: Oe, mT","The SI unit for the lower critical field (Hc1) at 0 K for a single crystal with the magnetic field parallel to the ab-plane would be amperes per meter (A/m).
+
+In SI units, magnetic field strength is properly measured in A/m, though it's very common in the literature on superconductors to see non-SI units used, particularly:
+
+- Oersteds (Oe) in the CGS system
+- Millitesla (mT) in a mixed usage
+
+For conversion reference:
+1 Oe = 79.5775 A/m
+1 mT = 795.775 A/m
+
+When reading scientific papers on superconductors, you'll often find Hc1 values reported in Oe or mT rather than the formal SI unit of A/m, especially in older literature.",A,Hc1 at 0 K for single crystal for H //ab plane
+nhc1zero,Hc1 at 0 K for single crystal for H //c-axis,"Oe, mT, A",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for single crystal for H //c-axis? Equivalent units are: Oe, mT, A","The SI unit for the critical magnetic field (Hc1) at 0 K for a single crystal with the magnetic field parallel to the c-axis would be amperes per meter (A/m).
+
+In terms of the equivalent units you mentioned:
+- Oersted (Oe) is a CGS unit, not an SI unit
+- Millitesla (mT) is an SI unit for magnetic flux density (B), not magnetic field strength (H)
+- A (ampere) alone is not a unit for magnetic field
+
+To convert between these units:
+- 1 A/m = 0.01257 Oe
+- For the conversion to mT, you would need to use the relationship B = μ₀H, where μ₀ is the magnetic permeability of vacuum (4π × 10⁻⁷ H/m)
+
+So, the SI unit for Hc1 is amperes per meter (A/m).",T,Hc1 at 0 K for single crystal for H //c-axis
+thc300,thermal conductivity at 300 K,"W/m.K, W/K.m, mW/cm.K, W/K.M, Wm-1K-1",Float,Electronic,0.1% SI,"What is the SI unit for thermal conductivity at 300 K? Equivalent units are: W/m.K, W/K.m, mW/cm.K, W/K.M, Wm-1K-1","The SI unit for thermal conductivity at 300 K is W/(m·K), which can also be written as W/m·K or Wm⁻¹K⁻¹.
+
+Among the options you've listed, these three are equivalent and correct SI units:
+- W/m·K
+- W/(m·K)
+- Wm⁻¹K⁻¹
+
+The other options are either incorrect or not standard SI format:
+- W/K·m (incorrect order)
+- mW/cm·K (not SI base units, as it uses mW and cm)
+- W/K·M (incorrect capitalization of meter)
+
+Thermal conductivity measures how well a material conducts heat, representing the quantity of heat transferred per unit time across a unit area with a unit temperature gradient.",T,thermal conductivity at 300K
+jc77,"Jc at T = 77 K, H = 0 T",#N/A,Double,Electronic,0.1% SI,#N/A,,W/m.K,"Jc at T=77K,H=0T"
+ye300,Young's modulus at 300 K,GPa,Double,Electronic,0.1% SI,What is the SI unit for Young's modulus at 300 K? Equivalent units are: GPa,"The SI unit for Young's modulus is the pascal (Pa), which is N/m² (newtons per square meter).
+
+At 300 K or any other temperature, the unit remains the same - pascal (Pa).
+
+As you noted, Young's modulus is often expressed in gigapascals (GPa) for convenience when dealing with solid materials, since:
+1 GPa = 10⁹ Pa
+
+So while the fundamental SI unit is the pascal (Pa), expressing Young's modulus in GPa is common practice when reporting values for materials.",ohm.m,Young's modulus at 300K
+g300,shear modulus at 300 K,GPa,Float,,0.1% SI,What is the SI unit for shear modulus at 300 K? Equivalent units are: GPa,"The SI unit for shear modulus is the pascal (Pa), which is N/m² (newtons per square meter).
+
+When reporting shear modulus values at a specific temperature like 300 K, the value is typically expressed in gigapascals (GPa) as you mentioned in your ""equivalent units."" GPa is 10^9 Pa and is commonly used because the shear modulus of many solid materials, particularly metals and ceramics, is in the range of several to hundreds of GPa.
+
+So while the base SI unit is Pa, the practical unit typically used in materials science for shear modulus measurements at 300 K is GPa.",Pa,shear modulus at 300K
+po300,Poisson ratio at 300 K,#N/A,Float,#N/A,0.1% SI,#N/A,,Pa,Poisson ratio at 300K
+hv300,hardness at 300 K,"GPa, kg/mm2",Float,#N/A,0.1% SI,"What is the SI unit for hardness at 300 K? Equivalent units are: GPa, kg/mm2","The SI (International System of Units) does not define a specific base unit for hardness. Hardness is a material property that can be measured using various scales and methods, each with their own units.
+
+For the equivalent units you've mentioned:
+- GPa (gigapascals) is typically used in measurements like nanoindentation hardness
+- kg/mm² (kilograms per square millimeter) is used in certain hardness scales like Vickers or Brinell
+
+If we want to express hardness in proper SI units, we would use pascals (Pa) since hardness is essentially a measure of pressure resistance (force per unit area). So the SI-compatible unit would be Pa (or more commonly MPa or GPa for practical material hardness values).
+
+The temperature specification of 300 K doesn't change the unit itself, though it's important to note that hardness measurements are temperature-dependent, which is why testing conditions are often specified.",,hardness at 300K
+cresrt,resistivity at RT for single crystal for J//c-axis,"mOhm, uOh.cm, mOhm.cm, m.ohm.cm, uOhm.cm, mic.ohm.cm, mohmmm, ohmcm, mOHM, 10-4ohmcm, Ohmcm, mohmcm",Float,,0.1% SI,"What is the SI unit for resistivity at RT for single crystal for J//c-axis? Equivalent units are: mOhm, uOh.cm, mOhm.cm, m.ohm.cm, uOhm.cm, mic.ohm.cm, mohmmm, ohmcm, mOHM, 10-4ohmcm, Ohmcm, mohmcm","The SI unit for resistivity is the ohm-meter (Ω⋅m).
+
+For a single crystal with current density (J) parallel to the c-axis at room temperature (RT), the resistivity would still be measured in ohm-meters in SI units.
+
+From your list of equivalent units, the most direct conversions to SI would be:
+- mOhm⋅cm = 10^-5 Ω⋅m
+- μOhm⋅cm = 10^-8 Ω⋅m
+- Ohm⋅cm = 10^-2 Ω⋅m
+
+Other notations in your list represent the same units with different formatting or prefixes, for example:
+- mOhm⋅cm = m⋅ohm⋅cm = mohmcm
+- μOhm⋅cm = uOhm⋅cm = mic.ohm.cm
+
+The unit 10^-4⋅ohm⋅cm would be equivalent to 10^-6 Ω⋅m.",,resistivity at RT for single crystal for J//c-axis
+res77,resistivity at 77 K for poly crystal,"uOhm.cm, m.ohm.cm, ohm.cm, Ohm.m, mOhm.cm, mic.ohm.cm, mohmcm, mOhmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for poly crystal? Equivalent units are: uOhm.cm, m.ohm.cm, ohm.cm, Ohm.m, mOhm.cm, mic.ohm.cm, mohmcm, mOhmcm, m-ohmcm, mOHM, ohmcm, mOHMcm","The SI unit for resistivity is ohm-meter (Ω·m).
+
+Regardless of temperature (such as 77 K) or material type (like polycrystalline materials), the SI unit remains ohm-meter. From your list of equivalent units, ""Ohm.m"" is the SI unit.
+
+The other units you listed are common variations or non-SI units:
+- μΩ·cm (uOhm.cm, mic.ohm.cm): microohm-centimeter
+- mΩ·cm (m.ohm.cm, mOhm.cm, mohmcm, mOhmcm, m-ohmcm, mOHMcm): milliohm-centimeter
+- Ω·cm (ohm.cm, ohmcm): ohm-centimeter
+
+These can be converted to the SI unit (Ω·m) as follows:
+- 1 Ω·cm = 0.01 Ω·m
+- 1 mΩ·cm = 10^-5 Ω·m
+- 1 μΩ·cm = 10^-8 Ω·m",ohm.m,resistivity at 77K for poly crystal
+sv300,sound velocity at 300 K,m/s,Double,Electronic,0.1% SI,What is the SI unit for sound velocity at 300 K? Equivalent units are: m/s,"The SI unit for sound velocity is meters per second (m/s).
+
+At 300 K (which is approximately room temperature), the velocity of sound in air is around 343-346 m/s, but the unit remains m/s regardless of the temperature or medium.",ohm.m,sound velocity at 300K
+ghe,shear modulus at 4.2 K,GPa,Float,,0.1% SI,What is the SI unit for shear modulus at 4.2 K? Equivalent units are: GPa,"The SI unit for shear modulus is the pascal (Pa), regardless of the temperature. At 4.2 K (which is a common temperature for testing materials at liquid helium temperature), the unit remains the same.
+
+When expressing shear modulus in equivalent units, GPa (gigapascal) is commonly used, which equals 10^9 Pa. This is often more convenient for expressing the shear modulus of solid materials since their values typically fall in the range of several to hundreds of GPa.
+
+So, the SI unit is Pa, and GPa is an equivalent unit commonly used in practice.",m/s,shear modulus at 4.2K
+nhc1t,Hc1 at given temperature for single crystal H//c-axis,"mT, Oe",Float,#N/A,0.1% SI,"What is the SI unit for Hc1 at given temperature for single crystal H//c-axis? Equivalent units are: mT, Oe","# SI Unit for Hc1 at Given Temperature for Single Crystal H∥c-axis
+
+The SI unit for Hc1 (lower critical field) at a given temperature for a single crystal with H parallel to the c-axis is **ampere per meter (A/m)**.
+
+## Equivalent Units:
+- **mT (millitesla)**: This is a unit of magnetic flux density (B) rather than magnetic field strength (H), but they are related through B = μ₀H in vacuum.
+  - Conversion: 1 mT = 796 A/m (in vacuum)
+
+- **Oe (oersted)**: This is a CGS unit for magnetic field strength.
+  - Conversion: 1 Oe = 79.6 A/m
+
+In superconductivity literature, these units are often used interchangeably with appropriate conversion factors, but A/m is the proper SI unit for magnetic field strength H, including the lower critical field Hc1.",Pa,Hc1 at given temperature for single crystal H//c-axis
+cresn,resistivity at normal-T for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmmm, mOHM, ohmcm, 10-4ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for single crystal for J//c-axis? Equivalent units are: uOhm.cm, mOhm.cm, m.ohm.cm, mohmmm, mOHM, ohmcm, 10-4ohmcm, mohmcm","The SI unit for resistivity is ohm-meter (Ω⋅m).
+
+For resistivity of a single crystal measured with current density parallel to the c-axis at normal temperature, the standard SI unit remains ohm-meter (Ω⋅m).
+
+From your list of equivalent units, here's how they relate to the SI unit:
+- μΩ⋅cm (micro-ohm centimeter) = 10^-8 Ω⋅m
+- mΩ⋅cm (milli-ohm centimeter) = 10^-5 Ω⋅m
+- m⋅Ω⋅cm is ambiguous but likely means mΩ⋅cm
+- mΩ⋅mm (milli-ohm millimeter) = 10^-6 Ω⋅m
+- mOHM is just a unit of resistance (milli-ohm), not resistivity
+- Ω⋅cm (ohm centimeter) = 10^-2 Ω⋅m
+- 10^-4 Ω⋅cm = 10^-6 Ω⋅m
+- mΩ⋅cm (milli-ohm centimeter) = 10^-5 Ω⋅m
+
+In crystalline materials research, resistivity is often reported in μΩ⋅cm or mΩ⋅cm for convenience due to the typical magnitude of measurements, but the SI unit ohm-meter should be used for standardized scientific communication.",T,resistivity at normal-T for single crystal for J//c-axis
+yehe,Young's modulus at 4.2 K,GPa,Double,Electronic,0.1% SI,What is the SI unit for Young's modulus at 4.2 K? Equivalent units are: GPa,"The SI unit for Young's modulus is pascal (Pa), which is defined as newtons per square meter (N/m²).
+
+At any temperature, including 4.2 K (liquid helium temperature), the SI unit remains the same - pascal (Pa).
+
+Since you mentioned equivalent units as GPa (gigapascal), I should clarify that:
+1 GPa = 10⁹ Pa
+
+So while the base SI unit is the pascal, Young's modulus values are often reported in GPa for practical reasons, as many engineering materials have values in the range of several to hundreds of GPa.",ohm.m,Young's modulus at 4.2K
+pohe,Poisson ratio at 4.2 K,#N/A,Float,#N/A,0.1% SI,#N/A,,Pa,Poisson ratio at 4.2K
+dadt,temperature dependence of LATA,"(dl/dT)/l, K^(-1), A/Ma, A/GPa, A/T, E-6%",Float,#N/A,0.1% SI,"What is the SI unit for temperature dependence of LATA? Equivalent units are: (dl/dT)/l, K^(-1), A/Ma, A/GPa, A/T, E-6%","The SI unit for temperature dependence of LATA (Linear Apparent Thermal Expansion) would be K^(-1) or kelvin^(-1).
+
+This represents the fractional change in length per unit change in temperature, which can be expressed as (dl/dT)/l, where:
+- dl/dT is the rate of change of length with temperature
+- l is the original length
+
+The other units you listed are not equivalent to K^(-1) for this physical quantity:
+- A/Ma (ampere per megaampere) is a current ratio
+- A/GPa (ampere per gigapascal) relates current to pressure
+- A/T (ampere per tesla) is a unit for gyromagnetic ratio
+- E-6% (10^(-6) percent) is a dimensionless unit that could express strain but lacks the temperature dimension
+
+K^(-1) is the correct SI unit for temperature dependence of linear thermal expansion.",,temperature dependence of LATA
+dcdt,temperature dependence of LATC,"(dl/dT)/l, A/Ma, A/GPa, A/T, E-6%",Float,Electronic,0.1% SI,"What is the SI unit for temperature dependence of LATC? Equivalent units are: (dl/dT)/l, A/Ma, A/GPa, A/T, E-6%","The SI unit for temperature dependence of Linear Attenuation Temperature Coefficient (LATC) is K^-1 (per kelvin).
+
+The expression (dl/dT)/l represents fractional change in length per unit change in temperature, which is the definition of the linear thermal expansion coefficient. The fundamental dimension is [Temperature]^-1, and in SI units, this is K^-1.
+
+Looking at your equivalent units:
+- (dl/dT)/l: This is the fundamental definition, with SI unit K^-1
+- A/Ma: This appears to be ""atto per mega-atto"" which would simplify to 10^-24, a dimensionless value
+- A/GPa: Ampere per gigapascal is not dimensionally equivalent to K^-1
+- A/T: If A is ampere and T is tesla, this isn't dimensionally correct. If T means temperature, this would lack the relative nature (per original length)
+- E-6%: This represents a strain of 10^-6 percent per degree, which would convert to 10^-8 K^-1
+
+The standard SI unit remains K^-1 (per kelvin).",m/Pa,temperature dependence of LATC
+dbdp,pressure dependence of LATB,"E-3 /GPa, %/GPa, (dL/L)/GPa",Float,Electronic,0.1% SI,"What is the SI unit for pressure dependence of LATB? Equivalent units are: E-3 /GPa, %/GPa, (dL/L)/GPa","The SI unit for pressure dependence of Linear Acoustic-Tensor Birefringence (LATB) would be Pa^(-1), which represents the fractional change in length per unit pressure.
+
+Looking at the equivalent units you provided:
+- E-3/GPa = 10^(-3)/10^9 Pa = 10^(-12) Pa^(-1)
+- %/GPa = (1/100)/10^9 Pa = 10^(-11) Pa^(-1)
+- (dL/L)/GPa = fractional length change per GPa = direct dimensionless quantity per 10^9 Pa = Pa^(-1)
+
+The base SI unit would be Pa^(-1), with the other forms being equivalent expressions with different scaling factors.",m/Pa,pressure dependence of LATB
+thc300n,thermal conductivity at 300 K for heat flow//c-axis,W/m.K,Float,Structural,0.1% SI,What is the SI unit for thermal conductivity at 300 K for heat flow//c-axis? Equivalent units are: W/m.K,"The SI unit for thermal conductivity is watts per meter-kelvin (W/m·K).
+
+For thermal conductivity at 300 K for heat flow parallel to the c-axis, the unit would still be W/m·K, as this is the standard SI unit regardless of the direction of heat flow or the specific temperature. The notation ""heat flow//c-axis"" indicates the direction of heat flow (parallel to the crystallographic c-axis) but doesn't change the unit itself.",1/Pa,thermal conductivity at 300K for heat flow//c-axis
+thc300p,thermal conductivity at 300 K for heat flow//ab-plane,"W/m.K, W/K.m",Float,Electronic,0.1% SI,"What is the SI unit for thermal conductivity at 300 K for heat flow//ab-plane? Equivalent units are: W/m.K, W/K.m","The SI unit for thermal conductivity at 300 K for heat flow in the ab-plane is:
+
+W/(m·K)
+
+This can also be written equivalently as:
+- W/m·K
+- W/K·m
+
+These all represent the same physical unit: watts per meter per kelvin, which measures how well a material conducts heat.",W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+rh300p,"Hall coefficient at 300 K for single, H//ab-plane","cm3/C, m3/C",Double,Electronic,0.1% SI,"What is the SI unit for Hall coefficient at 300 K for single, H//ab-plane? Equivalent units are: cm3/C, m3/C","# SI Unit for Hall Coefficient
+
+For the Hall coefficient at 300 K for a single crystal with the magnetic field parallel to the ab-plane:
+
+The SI unit is **m³/C** (cubic meters per coulomb).
+
+Of the units you mentioned:
+- **m³/C** is the standard SI unit
+- **cm³/C** is a commonly used equivalent unit in scientific literature, but it's not the base SI unit (it's smaller by a factor of 10⁶)
+
+The Hall coefficient (R_H) represents the ratio of the induced electric field to the product of current density and magnetic field, which gives it dimensions of [voltage × thickness]/[current × magnetic field]. When these are expressed in base SI units, it works out to m³/C.",W/m.K,"Hall coefficient at 300K for single, H//ab-plane"
+svhe,sound velocity at 4.2 K,#N/A,Double,Electronic,0.1% SI,#N/A,,m^3/C,sound velocity at 4.2K
+rh300n,"Hall coefficient at 300 K for single, H//c-axis","m3/C, mic. Ohm c, cm3/C",Double,#N/A,0.1% SI,"What is the SI unit for Hall coefficient at 300 K for single, H//c-axis? Equivalent units are: m3/C, mic. Ohm c, cm3/C","The SI unit for Hall coefficient is cubic meters per coulomb (m³/C).
+
+For your specific case regarding the Hall coefficient at 300 K for a single crystal with the magnetic field parallel to the c-axis, the SI unit remains m³/C.
+
+Among the equivalent units you listed:
+- m³/C is the primary SI unit
+- cm³/C is a commonly used unit in literature (equals 10⁻⁶ m³/C)
+- μΩ·cm (micro-ohm centimeter) is not directly a unit for Hall coefficient, but rather for resistivity. The Hall coefficient is related to resistivity through the Hall mobility, which might explain why this appears in your list.
+
+When reporting Hall coefficient measurements, m³/C is the proper SI unit, though cm³/C is frequently used in practical applications and research papers.",m/s,"Hall coefficient at 300K for single, H//c-axis"
+phc1t,Hc1 at given temperature for single crystal H//ab-plane,"Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at given temperature for single crystal H//ab-plane? Equivalent units are: Oe, mT","The SI unit for critical magnetic field (Hc1) at a given temperature for a single crystal with the field parallel to the ab-plane (H//ab-plane) is **tesla (T)**.
+
+The equivalent units you mentioned convert as follows:
+- Oersted (Oe): 1 Oe = 10^-4 T (or 0.1 mT)
+- Millitesla (mT): 1 mT = 10^-3 T
+
+In scientific publications about superconductors, you'll often see Hc1 values reported in any of these three units, but tesla (T) is the standard SI unit for magnetic field strength.",m^3/C,Hc1 at given temperature for single crystal H//ab-plane
+abres77,resistivity at 77 K for single crystal for J//ab-plane,"mic.ohm.cm, m.ohm.cm, ohm.cm, m-ohmcm, mohmcm, 10-4ohmcm, uohmcm, uOhm.cm, Ohmcm, mOhm.cm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for single crystal for J//ab-plane? Equivalent units are: mic.ohm.cm, m.ohm.cm, ohm.cm, m-ohmcm, mohmcm, 10-4ohmcm, uohmcm, uOhm.cm, Ohmcm, mOhm.cm","The SI unit for resistivity is ohm-meter (Ω⋅m). This applies to resistivity measurements at any temperature, including 77 K, and for any crystal orientation, such as current flowing parallel to the ab-plane in a single crystal.
+
+Looking at the equivalent units you've listed:
+- mic.ohm.cm, μOhm.cm, uohmcm, uOhm.cm all represent microohm-centimeter (10⁻⁶ Ω⋅cm)
+- m.ohm.cm, mOhm.cm, mohmcm all represent milliohm-centimeter (10⁻³ Ω⋅cm)
+- ohm.cm, Ohmcm represent ohm-centimeter (Ω⋅cm)
+- m-ohmcm, 10⁻⁴ohmcm represent 10⁻⁴ Ω⋅cm
+
+To convert any of these to the SI unit (Ω⋅m), you multiply by 0.01 since:
+1 Ω⋅cm = 0.01 Ω⋅m
+
+So, while researchers in this field might commonly use units like μΩ⋅cm for convenience (especially when dealing with low-temperature superconductors or metals), the proper SI unit remains ohm-meter (Ω⋅m).",T,resistivity at 77K for single crystal for J//ab plane
+cres77,resistivity at 77 K for single crystal for J//c-axis,"mic.ohm.cm, m.ohm.cm, 10-4ohmcm, Ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for single crystal for J//c-axis? Equivalent units are: mic.ohm.cm, m.ohm.cm, 10-4ohmcm, Ohmcm, mohmcm","# SI Unit for Resistivity
+
+The SI unit for resistivity (regardless of temperature, crystal type, or measurement direction) is the ohm meter (Ω·m).
+
+For resistivity measured at 77 K for a single crystal along the J//c-axis, the fundamental unit remains Ω·m.
+
+## Conversion of Other Units to SI
+
+The various units you mentioned can be converted to the SI unit as follows:
+
+- μΩ·cm (mic.ohm.cm) = 10⁻⁸ Ω·m
+- mΩ·cm (m.ohm.cm or mohm.cm) = 10⁻⁵ Ω·m
+- 10⁻⁴Ω·cm = 10⁻⁶ Ω·m
+- Ω·cm = 10⁻² Ω·m
+
+Resistivity values for materials at cryogenic temperatures like 77 K are often reported in these alternative units in the literature, but Ω·m remains the proper SI unit.",ohm.m,resistivity at 77K for single crystal for J//c-axis
+dbdt,temperature dependence of LATB,A/GPa,Float,Electronic,0.1% SI,What is the SI unit for temperature dependence of LATB? Equivalent units are: A/GPa,"The SI unit for temperature dependence of Linear Anisotropic Thermo-Birefringence (LATB) that would be equivalent to A/GPa (amperes per gigapascal) would be:
+
+A/(N/m²) or A·m²/N
+
+Breaking this down:
+- Gigapascal (GPa) is a unit of pressure, with 1 GPa = 10⁹ Pa
+- Pascal (Pa) in SI base units is N/m² (newtons per square meter)
+
+So if the equivalent unit is A/GPa, the SI unit would be A/(10⁹ N/m²) or 10⁻⁹ A·m²/N.
+
+The proper SI unit would therefore be ampere square meter per newton (A·m²/N), though you would typically need to include the factor of 10⁻⁹ when converting from A/GPa.",ohm.m,temperature dependence of LATB

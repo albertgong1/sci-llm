@@ -60,6 +60,7 @@ class LLMChatResponse(BaseModel):
     pred: str | dict[str, Any]
     usage: dict[str, Any]
     error: str | None
+    thought: str | None
 
 
 class LLMChat(abc.ABC):

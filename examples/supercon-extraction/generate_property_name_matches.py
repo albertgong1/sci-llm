@@ -17,22 +17,14 @@ import os
 import logging
 import pandas as pd
 from dotenv import load_dotenv
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 import asyncio
-from datasets import load_dataset, load_from_disk
-from tqdm import tqdm
-from collections import OrderedDict
+from datasets import load_dataset
 from pathlib import Path
 
 # llm imports
 from llm_utils import (
     get_llm,
-    LLMChat,
     InferenceGenerationConfig,
-    Conversation,
-    Message,
-    LLMChatResponse,
 )
 
 
@@ -62,100 +54,6 @@ def construct_context(row: pd.Series) -> str:
     )
 
 
-PROMPT_TEMPLATE_2 = """\
-You are an expert condensed matter physicist evaluating whether two property descriptions refer to the same physical measurement.
-
-## Property 1
-- Name: "{name1}"
-- Context: "{context1}"
-
-## Property 2
-- Name: "{name2}"
-- Context: "{context2}"
-
-## Matching Rules:
-
-**SAME property if:**
-- Names are synonymous (e.g., "Tc" = "Critical Temperature" = "Superconducting Transition Temperature")
-- Abbreviation differences only (e.g., "Jc" = "Critical Current Density")
-- Capitalization/formatting differences
-
-**DIFFERENT properties if:**
-- Technically distinct measurements:
-  - "Tc onset" ≠ "Tc zero" ≠ "Tc midpoint"
-  - "Jc" ≠ "Ic" (density vs absolute current)
-  - "lattice constant a" ≠ "lattice constant c"
-  - "upper critical field Hc2" ≠ "lower critical field Hc1"
-- Different measurement orientations when orientation matters (e.g., "resistivity (c-axis)" ≠ "resistivity (ab-plane)")
-- Different conditions not reconcilable (e.g., "Tc at 0 GPa" ≠ "Tc at 10 GPa" unless pressure is tracked separately)
-
-## Response Format:
-Return JSON only:
-{{
-  "is_match": boolean,
-  "confidence": "high" | "medium" | "low",
-  "reason": "concise explanation",
-  "matched_via": "direct" | "synonym" | "abbreviation" | "condition_reconciliation" | null
-}}
-"""
-
-
-async def check_if_same_property(
-    llm: LLMChat,
-    inf_gen_config: InferenceGenerationConfig,
-    name1: str,
-    context1: str,
-    name2: str,
-    context2: str,
-) -> dict:
-    """Check if two property names are the same using an LLM.
-
-    Args:
-        llm: LLM instance
-        inf_gen_config: Inference generation configuration
-        name1: name of the first property
-        context1: context of the first property
-        name2: name of the second property
-        context2: context of the second property
-
-    Returns:
-        dict: Dictionary containing the result of the check
-
-    """
-    # Build conversation
-    prompt = PROMPT_TEMPLATE_2.format(
-        name1=name1,
-        context1=context1,  # use the evidence field as the context
-        name2=name2,
-        context2=context2,
-    )
-    conv = Conversation(messages=[Message(role="user", content=[prompt])])
-
-    # Generate response
-    response: LLMChatResponse = await llm.generate_response_async(conv, inf_gen_config)
-    if response.pred:
-        is_match = response.pred.get("is_match", False)
-        reason = response.pred.get("reason", "No reason provided")
-        confidence = response.pred.get("confidence")
-        matched_via = response.pred.get("matched_via")
-    else:
-        is_match = False
-        reason = "Empty response from LLM"
-        confidence = None
-        matched_via = None
-
-    result = {
-        "is_match": is_match,
-        "reason": reason,
-        "confidence": confidence,
-        "matched_via": matched_via,
-        "model": llm.model_name,
-        "prompt": prompt,
-    }
-
-    return result
-
-
 async def main(args: argparse.Namespace) -> None:
     """Main function to verify alias candidates using Gemini LLM."""
     output_dir = args.output_dir
@@ -164,7 +62,11 @@ async def main(args: argparse.Namespace) -> None:
     force = args.force
 
     # Load prompt template from markdown file
-    prompt_path = Path("prompts") / "property_matching_prompt.md"
+    if True:
+        prompt_path = Path("prompts") / "property_matching_prompt.md"
+    else:
+        # NOTE: this prompt lead to less reliable results with gemini-2.5-flash-lite on Refno JAC2980051
+        prompt_path = Path("prompts") / "property_matching_prompt_cache_friendly.md"
     with open(prompt_path, "r") as f:
         prompt_template = f.read()
 
@@ -190,19 +92,16 @@ async def main(args: argparse.Namespace) -> None:
     #
     # Load ground truth properties
     #
-    if True:
-        dataset_config = pbench.DOMAIN2HF_DATASET_CONFIG["supercon"]
-        hf_dataset_name = dataset_config["name"]
-        revision = dataset_config["revision"]
-        split = args.split or dataset_config["split"]
-        logger.info(
-            f"Loading dataset from HuggingFace: {hf_dataset_name} "
-            f"(revision={revision}, split={split})"
-        )
-        dataset = load_dataset(hf_dataset_name, split=split, revision=revision)
-    else:
-        # NOTE (Albert): for debugging using local version of the dataset
-        dataset = load_from_disk("out-0111/dataset")
+    dataset_config = pbench.DOMAIN2HF_DATASET_CONFIG["supercon"]
+    hf_dataset_name = dataset_config["name"]
+    revision = dataset_config["revision"]
+    split = dataset_config["split"]
+    logger.info(
+        f"Loading dataset from HuggingFace: {hf_dataset_name} "
+        f"(revision={revision}, split={split})"
+    )
+    dataset = load_dataset(hf_dataset_name, split=split, revision=revision)
+
     df_gt: pd.DataFrame = dataset.to_pandas()
     # make the refno column the index
     df_gt.set_index("refno", inplace=True)
@@ -213,8 +112,12 @@ async def main(args: argparse.Namespace) -> None:
     #
     pred_matches_dir = output_dir / "pred_matches"
     pred_matches_dir.mkdir(parents=True, exist_ok=True)
+    pred_responses_dir = output_dir / "pred_responses"
+    pred_responses_dir.mkdir(parents=True, exist_ok=True)
     gt_matches_dir = output_dir / "gt_matches"
     gt_matches_dir.mkdir(parents=True, exist_ok=True)
+    gt_responses_dir = output_dir / "gt_responses"
+    gt_responses_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize LLM
     llm = get_llm(args.server, model_name)
@@ -234,8 +137,14 @@ async def main(args: argparse.Namespace) -> None:
         pred_matches_path = (
             pred_matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
         )
+        pred_responses_path = (
+            pred_responses_dir / f"pred_responses_{refno}_{model_name}_k{top_k}.csv"
+        )
         gt_matches_path = (
             gt_matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+        )
+        gt_responses_path = (
+            gt_responses_dir / f"gt_responses_{refno}_{model_name}_k{top_k}.csv"
         )
         if pred_matches_path.exists() and gt_matches_path.exists() and not force:
             logger.info(f"Skipping refno {refno} because pred matches already exist")
@@ -265,180 +174,41 @@ async def main(args: argparse.Namespace) -> None:
         df_gt_refno["context"] = df_gt_refno.apply(
             lambda row: construct_context(row), axis=1
         )
-
-        if False:
-            # -- Get top-k matches for each predicted property name (to compute precision) --
-            # Compute the similarity matrix between the predicted and ground truth properties
-            similarity_matrix = cosine_similarity(
-                np.vstack(df_pred["embedding"].values),
-                np.vstack(df_gt_embeddings["embedding"].values),
-            )
-            top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
-                :, :top_k
-            ]
-            pred_matches = []
-            for i in tqdm(range(len(df_pred)), desc=f"Processing refno {refno}"):
-                pred = df_pred.iloc[i].to_dict()
-                # get the top-k matches from the ground truth embeddings
-                top_k_matches = df_gt_embeddings.iloc[top_k_matches_indices[i]][
-                    "property_name"
-                ].tolist()
-                df_gt_top_k = df_gt_refno[
-                    df_gt_refno["property_name"].isin(top_k_matches)
-                ]
-                # Create async tasks for all unique matches
-                tasks = OrderedDict()
-                idx_to_task_id = {}
-                for idx, gt in df_gt_top_k.iterrows():
-                    name1 = pred["property_name"]
-                    context1 = pred["location.evidence"]
-                    name2 = gt["property_name"]
-                    context2 = json.dumps(
-                        {
-                            k: v
-                            for k, v in gt.items()
-                            if k.startswith("conditions.") or k == "value_unit"
-                        }
-                    )
-                    task_id = (name1, context1, name2, context2)
-                    idx_to_task_id[idx] = task_id
-                    if task_id not in tasks:
-                        task = check_if_same_property(
-                            llm,
-                            inf_gen_config,
-                            name1,
-                            context1,
-                            name2,
-                            context2,
-                        )
-                        tasks[task_id] = task
-                # Execute all tasks concurrently
-                results = await asyncio.gather(*tasks.values())
-                results = {
-                    task_id: result for task_id, result in zip(tasks.keys(), results)
-                }
-                # Combine the results with the predicted and ground truth properties
-                for idx, gt in df_gt_top_k.iterrows():
-                    result = results[idx_to_task_id[idx]]
-                    pred_matches.append(
-                        {
-                            **pred,
-                            **result,
-                            "gt_id": idx,  # use this to join the results with the ground truth properties
-                        }
-                    )
-            # save pred_matches to csv
-            df_pred_matches = pd.DataFrame(pred_matches)
-            df_pred_matches = df_pred_matches.merge(
-                df_gt_refno,
-                left_on="gt_id",
-                right_index=True,
-                how="left",
-                suffixes=("_pred", "_gt"),
-            )
-        else:
-            df_pred_matches = await generate_property_name_matches(
-                df_pred,
-                df_gt_refno,
-                llm,
-                inf_gen_config,
-                prompt_template,
-                top_k=top_k,
-                left_on=["property_name", "context"],
-                right_on=["property_name", "context"],
-                left_suffix="_pred",
-                right_suffix="_gt",
-            )
+        # -- Get top-k matches for each predicted property name (to compute precision) --
+        df_pred_matches, df_pred_responses = await generate_property_name_matches(
+            df_pred,
+            df_gt_refno,
+            llm,
+            inf_gen_config,
+            prompt_template,
+            top_k=top_k,
+            left_on=["property_name", "context"],
+            right_on=["property_name", "context"],
+            left_suffix="_pred",
+            right_suffix="_gt",
+        )
         df_pred_matches.to_csv(pred_matches_path, index=False)
         logger.info(f"Saved pred matches to {pred_matches_path}")
+        df_pred_responses.to_csv(pred_responses_path, index=False)
+        logger.info(f"Saved pred responses to {pred_responses_path}")
 
-        if False:
-            # -- Get top-k matches for each ground truth property name (to compute recall) --
-            # Compute the similarity matrix between the ground truth and predicted properties
-            similarity_matrix = cosine_similarity(
-                np.vstack(df_gt_refno["embedding"].values),
-                np.vstack(df_pred_embeddings["embedding"].values),
-            )
-            top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][
-                :, :top_k
-            ]
-            gt_matches = []
-            for i in tqdm(
-                range(len(df_gt_refno)), desc=f"Processing refno {refno} (gt)"
-            ):
-                gt = df_gt_refno.iloc[i].to_dict()
-                # get the top-k matches from the predicted embeddings
-                top_k_matches = df_pred_embeddings.iloc[top_k_matches_indices[i]][
-                    "property_name"
-                ].tolist()
-                df_pred_top_k = df_pred[df_pred["property_name"].isin(top_k_matches)]
-                # Create async tasks for all unique matches
-                tasks = OrderedDict()
-                idx_to_task_id = {}
-                for idx, pred in df_pred_top_k.iterrows():
-                    # NOTE: use the same order of property 1 and property 2 as in the previous code block
-                    # TODO (Albert): does this have an impact on the results (even though the classification task should be symmetric)?
-                    name1 = pred["property_name"]
-                    context1 = pred["location.evidence"]
-                    name2 = gt["property_name"]
-                    context2 = json.dumps(
-                        {
-                            k: v
-                            for k, v in gt.items()
-                            if k.startswith("conditions.") or k == "value_unit"
-                        }
-                    )
-                    task_id = (name1, context1, name2, context2)
-                    idx_to_task_id[idx] = task_id
-                    if task_id not in tasks:
-                        task = check_if_same_property(
-                            llm,
-                            inf_gen_config,
-                            name1,
-                            context1,
-                            name2,
-                            context2,
-                        )
-                        tasks[task_id] = task
-                # Execute all tasks concurrently
-                results = await asyncio.gather(*tasks.values())
-                results = {
-                    task_id: result for task_id, result in zip(tasks.keys(), results)
-                }
-                # Combine the results with the ground truth and predicted properties
-                for idx, pred in df_pred_top_k.iterrows():
-                    result = results[idx_to_task_id[idx]]
-                    gt_matches.append(
-                        {
-                            **gt,
-                            **result,
-                            "pred_id": idx,  # use this to join the results with the predicted properties
-                        }
-                    )
-                # save gt_matches to csv
-                df_gt_matches = pd.DataFrame(gt_matches)
-                df_gt_matches = df_gt_matches.merge(
-                    df_pred,
-                    left_on="pred_id",
-                    right_index=True,
-                    how="left",
-                    suffixes=("_gt", "_pred"),
-                )
-        else:
-            df_gt_matches = await generate_property_name_matches(
-                df_gt_refno,
-                df_pred,
-                llm,
-                inf_gen_config,
-                prompt_template,
-                top_k=top_k,
-                left_on=["property_name", "context"],
-                right_on=["property_name", "context"],
-                left_suffix="_gt",
-                right_suffix="_pred",
-            )
+        # -- Get top-k matches for each ground truth property name (to compute recall) --
+        df_gt_matches, df_gt_responses = await generate_property_name_matches(
+            df_gt_refno,
+            df_pred,
+            llm,
+            inf_gen_config,
+            prompt_template,
+            top_k=top_k,
+            left_on=["property_name", "context"],
+            right_on=["property_name", "context"],
+            left_suffix="_gt",
+            right_suffix="_pred",
+        )
         df_gt_matches.to_csv(gt_matches_path, index=False)
         logger.info(f"Saved gt matches to {gt_matches_path}")
+        df_gt_responses.to_csv(gt_responses_path, index=False)
+        logger.info(f"Saved gt responses to {gt_responses_path}")
 
 
 if __name__ == "__main__":

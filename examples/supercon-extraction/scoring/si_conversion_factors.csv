@@ -1,0 +1,324 @@
+property_unit,SI,conversion_factor,comments
+,#N/A,,
+K,K,1,
+A,m,1.00E-10,
+mj/mol.K2,J/mol.K^2,0.001,
+Oe,T,0.0001,1 Oe = 1000/4π A/m ≈ 79.577 A/m; μ₀ = 4π×10⁻⁷ T·m/A; B = μ₀H
+E+19 /cm3,m^-3,1.00E+25,
+Oe/K,T/K,0.0001,
+erg/cc.K2,J/mol.K^2,,conversion_factor = molar_mass / 1e7; material-dependent (erg/cm³ to J/m³ requires molar mass)
+n/cm3,m^-3,1.00E+06,
+kG,T,0.1,
+G/K,T/K,0.0001,
+kOe,T,0.1,
+K/GPa,K/Pa,1.00E-09,
+T,T,1,
+E+3 A/m,T,0.001256637,μ₀ × 10³ A/m = 4π×10⁻⁴ T
+uV/K,V/K,1.00E-06,
+kOe/K,T/K,0.1,
+meV,J,1.60E-22,1 meV = 1.60217663×10⁻²² J
+E+21/cc,m^-3,1.00E+27,
+mJ/mol.K2,J/mol.K^2,0.001,
+E+22 /cm3,m^-3,1.00E+28,
+E+20 /cm3,m^-3,1.00E+26,
+E+19/cc,m^-3,1.00E+25,
+E-4 cm3/C,m^3/C,1.00E-10,
+E+22/cm3,m^-3,1.00E+28,
+T/K,T/K,1,
+mj/mol.K,J/mol.K,0.001,
+uOhm.cm,ohm.m,1.00E-08,
+uB/Ce,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ce_per_formula_unit); material-dependent
+emu/mol-Yb,emu/mol,1,
+emu.K/mol,K.m^3/mol,1.00E-06,1 emu/mol = 10⁻³ A·m²/mol; multiplied by K gives K·m³/mol with factor 10⁻⁶
+mOhm.cm,ohm.m,1.00E-05,
+m3/C,m^3/C,1,
+n/m3,m^-3,1,
+uOhm.m,ohm.m,1.00E-06,
+myu-B/Eu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Eu_per_formula_unit); material-dependent
+cm3/C,m^3/C,1.00E-06,
+m.ohm.cm,ohm.m,0.01,
+nm,m,1.00E-09,
+mT,T,0.001,
+ohmcm,ohm.m,0.01,
+e-3 cm3/C,m^3/C,1.00E-09,
+E+21 /cm3,m^-3,1.00E+27,
+Ohm.cm,ohm.m,0.01,
+cm3/mol,K.m^3/mol,,Likely χ in emu/mol; conversion_factor = 1e-6 if susceptibility
+myu-B/mole,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+My-B/Nb,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Nb_per_formula_unit); material-dependent
+emu/mol,emu/mol,1,
+M/mol,A.m^2/mol,,μ_B context unclear; likely material-dependent
+k0/GPa,1/Pa,1.00E-09,
+muB/f.u.,K.m^3/mol,,Likely χ in emu/mol·K⁻¹; conversion depends on formula unit
+emu mol-1,A.m^2/mol,0.001,1 emu = 10⁻³ A·m²
+micro.V/K,V/K,1.00E-06,
+ohm.cm,ohm.m,0.01,
+/ND,A.m^2/mol,,μ_B per Nd; conversion_factor = 9.274009994e-24 / (Nd_per_formula_unit); material-dependent
+E-8 m3/C,m^3/C,1.00E-08,
+mohm.cm,ohm.m,1.00E-05,
+micron m,m,1.00E-06,
+K/kbar,K/Pa,1.00E-08,
+myu-B/f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+myu-B/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+J/MOLE.K,J/mol.K,1,
+um,m,1.00E-06,
+K/KBAR,K/Pa,1.00E-08,
+GPa,Pa,1.00E+09,
+emu.K/Ru,emu/mol,,Unclear if this is χT or different; needs context
+uB/Ru,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ru_per_formula_unit); material-dependent
+mJ/gat.K2,J/mol.K^2,,conversion_factor = molar_mass_per_gram_atom; material-dependent
+uB/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+myu-B/Ce,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ce_per_formula_unit); material-dependent
+/eV.cm3,m^-3,,Density of states; conversion_factor = 1.60217663e-19 × 1e6 = 1.60217663e-13
+emu/mol-La,emu/mol,1,
+eum/mol,emu/mol,1,Typo for emu/mol
+uB,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+myu-B/Pu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pu_per_formula_unit); material-dependent
+my-B/U,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (U_per_formula_unit); material-dependent
+my-B/Np,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Np_per_formula_unit); material-dependent
+emu/mole,emu/mol,1,
+Myu-B/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+mJ/mol.K,J/mol.K,0.001,
+My-B/Eu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Eu_per_formula_unit); material-dependent
+my-B/Eu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Eu_per_formula_unit); material-dependent
+my-B/f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+K/Gpa,K/Pa,1.00E-09,
+my-B,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+emu.K/Yb,K.m^3/mol,,Needs clarification on normalization
+emu/mol.Oe,K.m^3/mol,,Susceptibility χ = M/H; if in emu/mol·Oe then χ_SI = χ_emu × 4π×10⁻⁶ m³/mol
+My-B/f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+mOhm,ohm.m,,Needs length scale; resistivity = resistance × (A/L)
+myuB/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+uB/Ho,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ho_per_formula_unit); material-dependent
+uB/Er,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Er_per_formula_unit); material-dependent
+uB/Tm,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Tm_per_formula_unit); material-dependent
+mT/K,T/K,0.001,
+J/K2.Mol-C,J/mol.K^2,,Likely per mole carbon; needs clarification
+kTc,J,,k_B × T_c; conversion_factor = 1.380649e-23 × T_c; context-dependent
+uOh.cm,ohm.m,1.00E-08,
+W/m.K,W/m.K,1,
+my-B/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+emu/g,emu/mol,,conversion_factor = molar_mass [g/mol]; material-dependent
+emu.K/g,K.m^3/mol,,conversion_factor = molar_mass × 1e-6; material-dependent
+mJ/gmol.K2,J/mol.K^2,0.001,
+myu-B/Er,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Er_per_formula_unit); material-dependent
+KOe,T,0.1,
+KOe/K,T/K,0.1,
+My-B/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+per Ru,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ru_per_formula_unit); material-dependent
+uB/Pu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pu_per_formula_unit); material-dependent
+myu-B/fu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+(GPa)^(-1),1/Pa,1.00E-09,
+UOhm.cm,ohm.m,1.00E-08,
+uOhmcm,ohm.m,1.00E-08,
+myu-B/Tm,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Tm_per_formula_unit); material-dependent
+T/GPa,K/Pa,,Likely dT_c/dP; units should be K/Pa; conversion_factor = 1e-9
+nyu-B/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+W/K.m,W/m.K,1,
+Myu-B/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+My-B/Ce,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ce_per_formula_unit); material-dependent
+emu/K/mol,K.m^3/mol,,Likely χT; conversion_factor = 1e-6
+K/GP,K/Pa,1.00E-09,
+Myu-B,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+J/mol.K2,J/mol.K^2,1,
+microohm,ohm.m,,Needs length scale for resistivity
+micro-ohm,ohm.m,,Needs length scale for resistivity
+E-3 cm3/C,m^3/C,1.00E-09,
+micron.m,m,1.00E-06,
+uB/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+E+21/cm3,m^-3,1.00E+27,
+myu-B/R,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (R_per_formula_unit); R = rare earth; material-dependent
+kG/K,T/K,0.1,
+kg/mm2,,,Stress/pressure; needs clarification on application
+mj/f.u.K2,J/mol.K^2,,conversion_factor = 0.001 / (formula_units_per_mole); material-dependent
+Myu-B/f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+mOh..cm,ohm.m,1.00E-05,
+EMU/mol,emu/mol,1,
+mJ/mol.K2.,J/mol.K^2,0.001,
+"mOhm,cm",ohm.m,1.00E-05,
+m/s,m/s,1,
+ohm,ohm.m,,Needs geometric factor (A/L) for resistivity
+cm-2,m^-3,,Likely area density; conversion_factor = 1e4 for 2D; or 1e6 for volume if typo
+myu-B/Yb,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Yb_per_formula_unit); material-dependent
+micrometer,m,1.00E-06,
+microohmcm,ohm.m,1.00E-08,
+Myu-B/Fe,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Fe_per_formula_unit); material-dependent
+myu-B/Fe,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Fe_per_formula_unit); material-dependent
+per mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+(dl/dT)/l,m/Pa,,Thermal expansion coefficient; unclear conversion without pressure context
+E-3 /GPa,1/Pa,1.00E-12,
+emu/m.Oe,emu/mol,,Unclear normalization; needs context
+per R-ion,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (R_ions_per_formula_unit); material-dependent
+per f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+per Gd,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Gd_per_formula_unit); material-dependent
+micron-m,m,1.00E-06,
+micron,m,1.00E-06,
+hole/Cu,m^-3,,conversion_factor = N_A / (Cu_per_formula_unit × V_cell); material-dependent
+emh.K/mol,K.m^3/mol,1.00E-06,Typo for emu.K/mol
+nOhm.cm,ohm.m,1.00E-11,
+myu-B,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+/cm3,m^-3,1.00E+06,
+A/GPa,1/Pa,,"Likely length/pressure; conversion_factor = 1e-19 (Å to m, GPa to Pa)"
+myu-B/Co,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Co_per_formula_unit); material-dependent
+emu/mol-Si,emu/mol,1,
+dC/r*Tc,J/mol.K,,Specific heat jump; unclear conversion without context
+mj/K2.m-Re,J/mol.K^2,,conversion_factor = 0.001 / (Re_per_formula_unit); material-dependent
+mj/mol. K2,J/mol.K^2,0.001,
+J/kg.K,J/mol.K,,conversion_factor = molar_mass [kg/mol]; material-dependent
+E+18/cm3,m^-3,1.00E+24,
+EMU.K/G.OE,K.m^3/mol,,Susceptibility; likely 1e-6 if per mole
+/Sm,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Sm_per_formula_unit); material-dependent
+/Gd,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Gd_per_formula_unit); material-dependent
+EMU.K/G,K.m^3/mol,,Likely per mole; conversion_factor ≈ 1e-6
+emu/mol.K,K.m^3/mol,,Likely χT; conversion_factor = 1e-6
+/GPa,1/Pa,1.00E-09,
+emu/cm3.Oe,emu/mol,,Volume susceptibility; conversion_factor = V_molar × 1e6; material-dependent
+moOhm.cm,ohm.m,1.00E-05,
+mJ/K2fu,J/mol.K^2,,conversion_factor = 0.001 / (formula_units_per_mole); material-dependent
+mv/K,V/K,0.001,
+emu.K/mole,K.m^3/mol,1.00E-06,
+micro.B/Mo,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Mo_per_formula_unit); material-dependent
+myuB/Tm,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Tm_per_formula_unit); material-dependent
+myu-B/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+KG,T,0.1,
+K.cm3/mol,K.m^3/mol,1.00E-06,
+uJ/K2.g,J/mol.K^2,,conversion_factor = molar_mass × 1e-6; material-dependent
+"emu,K/mol",K.m^3/mol,1.00E-06,
+kG/T,T/K,,Likely inverse susceptibility field derivative; unclear conversion
+mW/cm.K,W/m.K,10,
+per Ho,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ho_per_formula_unit); material-dependent
+per Eu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Eu_per_formula_unit); material-dependent
+E-10 m3/C,m^3/C,1.00E-10,
+mJ/Ymol.K2,J/mol.K^2,,conversion_factor = 0.001 / (Y_per_formula_unit); material-dependent
+uB/f.u,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+cm3/g,emu/mol,,conversion_factor = molar_mass × 1e-6; material-dependent (mass susceptibility)
+Ohm.m,ohm.m,1,
+K^(-1),m/Pa,,Thermal expansion; unclear without pressure context
+myu-B/Y,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Y_per_formula_unit); material-dependent
+myu-B/Gd,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Gd_per_formula_unit); material-dependent
+myu-B/Nd,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Nd_per_formula_unit); material-dependent
+uOhm.cn,ohm.m,1.00E-08,
+K/kOe,T/K,,Likely inverse; conversion_factor = 10 for K/T
+mJ/Mol.K2,J/mol.K^2,0.001,
+kOhm.cm,ohm.m,10,
+erg/cm3.K2,J/mol.K^2,,Volume specific heat; conversion_factor = V_molar / 1e7; material-dependent
+uB/Cu,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Cu_per_formula_unit); material-dependent
+mic.ohm.cm,ohm.m,1.00E-08,
+W/K.M,W/m.K,1,
+mJ/cm3.K,J/mol.K,,Volume specific heat; conversion_factor = V_molar × 0.001; material-dependent
+mic.ohm.m,ohm.m,1.00E-06,
+cm(-1),J,,Wavenumber to energy; conversion_factor = h×c×100 = 1.98644568e-23 J
+K/kBar,K/Pa,1.00E-08,
+mJ/K2mol,J/mol.K^2,0.001,
+mJ/molK2,J/mol.K^2,0.001,
+mJ/mole.K,J/mol.K,0.001,
+emu/mol Nd,emu/mol,1,
+emu.K/G.g,K.m^3/mol,,conversion_factor = molar_mass × 1e-6; material-dependent
+Bohr magne,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+mJ/Pr mol,J/mol.K^2,,conversion_factor = 0.001 / (Pr_per_formula_unit); material-dependent
+emu.K/cc,K.m^3/mol,,Volume; conversion_factor = V_molar × 1e6; material-dependent
+mic.V/K,V/K,1.00E-06,
+%/GPa,1/Pa,1.00E-11,
+mic. Ohm c,m^3/C,,Unclear unit; possibly typo
+k/kbar,K/Pa,1.00E-08,
+emuK/g,K.m^3/mol,,conversion_factor = molar_mass × 1e-6; material-dependent
+mJ/K2mole,J/mol.K^2,0.001,
+microm,m,1.00E-06,
+/CuO2,m^-3,,conversion_factor = N_A / (CuO2_per_formula_unit × V_cell); material-dependent
+J/K2gat,J/mol.K^2,,conversion_factor = molar_mass_per_gram_atom; material-dependent
+mV/K,V/K,0.001,
+"my/md,K2",J/mol.K^2,,Unclear unit; needs context
+microV/K,V/K,1.00E-06,
+mohmmm,ohm.m,1.00E-05,Typo for mOhm.cm
+uohmcm,ohm.m,1.00E-08,
+mohmcm,ohm.m,1.00E-05,
+mOhmcm,ohm.m,1.00E-05,
+m-ohmcm,ohm.m,1.00E-05,
+K/Kbar,K/Pa,1.00E-08,
+ergK/Oe2g,K.m^3/mol,,conversion_factor = molar_mass / (1e7 × (79.577)²); material-dependent
+A/Ma,m/Pa,,Unclear; possibly length/pressure; needs context
+cm-1,J,1.99E-23,
+mOHM,ohm.m,,Needs geometric factor
+micron. M,m,1.00E-06,
+Wm-1K-1,W/m.K,1,
+uV/K-1,V/K,1.00E-06,
+10-4ohmcm,ohm.m,1.00E-06,
+10-3cm3/C,m^3/C,1.00E-09,
+mV,J,,Unclear; possibly energy or thermoelectric voltage; needs context
+A/T,m/Pa,,Magnetostriction; conversion_factor = 1e-10 / μ₀ ≈ 7.9577e-5
+E-9m3/C,m^3/C,1.00E-09,
+Ohmcm,ohm.m,0.01,
+mJ/Kmol,J/mol.K^2,,Unclear; possibly typo for mJ/K·mol
+mOHMcm,ohm.m,1.00E-05,
+V/K,V/K,1,
+cm3/mole,emu/mol,,Mass susceptibility; conversion_factor = density × 1e-6; material-dependent
+myuB/Np,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Np_per_formula_unit); material-dependent
+cm(-3),m^-3,1.00E+06,
+mJ/Ni.K2,J/mol.K^2,,conversion_factor = 0.001 / (Ni_per_formula_unit); material-dependent
+J/mol.K,J/mol.K,1,
+mJ/m-Co.K2,J/mol.K^2,,conversion_factor = 0.001 / (Co_per_formula_unit); material-dependent
+myu-B/V,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (V_per_formula_unit); material-dependent
+n/f.u,m^-3,,conversion_factor = N_A / (formula_units_per_mole × V_cell); material-dependent
+emu/g.Oe,emu/mol,,conversion_factor = molar_mass; material-dependent (mass susceptibility)
+emu.K/g.Oe,K.m^3/mol,,conversion_factor = molar_mass × 4π×10⁻⁶; material-dependent
+comment,K.m^3/mol,,Not a unit; data entry issue
+nyu-B/mol,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+Myu-B/f.u.,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_formula_unit); material-dependent
+mB/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+Myu-B/Mo,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Mo_per_formula_unit); material-dependent
+uB/Ir,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Ir_per_formula_unit); material-dependent
+cm3K/mol,K.m^3/mol,1.00E-06,
+k,K,1,
+emu.K/Ce,K.m^3/mol,,conversion_factor = 1e-6 / (Ce_per_formula_unit); material-dependent
+emu/g.K,K.m^3/mol,,conversion_factor = molar_mass × 1e-6; material-dependent
+myu-B/U,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (U_per_formula_unit); material-dependent
+emu/mol-Cr,emu/mol,1,
+my-B/Cr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Cr_per_formula_unit); material-dependent
+myu-B/kOe,emu/mol,,Likely susceptibility; conversion_factor = 4π×10⁻⁶ if per kOe field
+mm3/C,m^3/C,1.00E-09,
+emu/mol-Ce,emu/mol,1,
+n/m^3,m^-3,1,
+emu/mol.G,emu/mol,,Likely susceptibility; conversion_factor = 4π×10⁻⁶
+K/mol.G,K.m^3/mol,,Likely χT/field; conversion_factor = 4π×10⁻⁶
+Jmol-1K-2,J/mol.K,,Should be J/mol·K not J/mol·K²
+mJmol-1K-2,J/mol.K^2,0.001,
+mJ/g.K2,J/mol.K^2,,conversion_factor = molar_mass × 0.001; material-dependent
+micro-T,T,1.00E-06,
+mm,m,0.001,
+mJ/K.mol,J/mol.K,0.001,
+emuK/mol,K.m^3/mol,1.00E-06,
+mJ/f.u.K2,J/mol.K^2,,conversion_factor = 0.001 / (formula_units_per_mole); material-dependent
+m3C-1(20K),m^3/C,1,
+mK/MPa,K/Pa,1.00E-09,
+mj/mole.K2,J/mol.K^2,0.001,
+microV/P,V/K,1.00E-06,Typo for microV/K
+gauss,T,0.0001,
+micro-eV,J,1.60E-25,
+uJ/g.K2,J/mol.K^2,,conversion_factor = molar_mass × 1e-6; material-dependent
+myu-B/Cr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Cr_per_formula_unit); material-dependent
+emu/fu,emu/mol,,conversion_factor = 1 / (formula_units_per_mole); material-dependent
+MeV,J,1.60E-13,
+/GD,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Gd_per_formula_unit); material-dependent
+MJ/GAT.K,J/mol.K,,conversion_factor = 1e6 / (atoms_per_mole); unclear normalization
+mj/cm3.K2,J/mol.K^2,,Volume specific heat; conversion_factor = V_molar × 0.001; material-dependent
+EMU/K.OE,K.m^3/mol,,Susceptibility; conversion_factor = 4π×10⁻⁶
+/CELL,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (atoms_per_cell); material-dependent
+E-6%,m/Pa,1.00E-08,
+EMU/G,emu/mol,,Susceptibility; conversion_factor = 4π×10⁻⁶
+K/GPA,K/Pa,1.00E-09,
+/PR ION,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+/PR,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+MEV,J,1.60E-13,
+MJ/MOLE.K2,J/mol.K^2,1.00E+06,
+/Pr,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Pr_per_formula_unit); material-dependent
+EMU.K/MOLE,K.m^3/mol,1.00E-06,
+emu/Oe.g,emu/mol,,conversion_factor = molar_mass; material-dependent
+emu.K/Oe.g,K.m^3/mol,,conversion_factor = molar_mass × 4π×10⁻⁶; material-dependent
+m/Zn,A.m^2/mol,,conversion_factor = 9.274009994e-24 / (Zn_per_formula_unit); material-dependent
+cm3.K/mol,emu/mol,,Likely χT if susceptibility; conversion_factor = 1e-6
+mOrm.cm,ohm.m,1.00E-05,Typo for mOhm.cm
+k<B>T,J,,k_B × T; conversion_factor = 1.380649e-23 × T; temperature-dependent
+gamma*Tc,J/mol.K,,Sommerfeld coefficient × T_c; conversion depends on γ value
+(dL/L)/GPa,1/Pa,1.00E-09,
+microW/mK2,V/K,,Unclear unit; possibly thermoelectric; needs context
+cm3C-1,m^3/C,1.00E-06,

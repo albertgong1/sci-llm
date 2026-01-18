@@ -20,7 +20,6 @@ import pandas as pd
 # pbench imports
 import pbench
 from pbench_eval.metrics import compute_precision_per_material_property
-from pbench_eval.utils import scorer_pymatgen, score_value
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,6 +31,8 @@ parser = ArgumentParser(
 parser = pbench.add_base_args(parser)
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
+
+model_name = args.model_name
 
 # Load all CSV files from output_dir/pred_matches
 pred_matches_dir = args.output_dir / "pred_matches"
@@ -55,7 +56,10 @@ for csv_file in csv_files:
     dfs.append(df)
 
 df_matches = pd.concat(dfs, ignore_index=True)
-logger.info(f"Loaded {len(df_matches)} total rows")
+df_matches = df_matches[df_matches["model"] == model_name]
+logger.info(
+    f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
+)
 
 # Filter for rows where is_match is True
 original_count = len(df_matches)
@@ -65,7 +69,7 @@ logger.info(
 )
 
 # Load rubric
-rubric_path = Path("scoring") / "rubric.csv"
+rubric_path = Path("scoring") / "rubric_2.csv"
 logger.info(f"Loading rubric from {rubric_path}")
 df_rubric = pd.read_csv(rubric_path)
 logger.info(f"Loaded {len(df_rubric)} rows from rubric")
@@ -79,99 +83,17 @@ df = df_matches.merge(
     how="left",
 )
 
+# Load conversion factors
+conversion_factors_path = Path("scoring") / "si_conversion_factors.csv"
+logger.info(f"Loading conversion factors from {conversion_factors_path}")
+conversion_df = pd.read_csv(conversion_factors_path, index_col=0)
+
 # Check for missing rubrics
 missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
     logger.warning(f"{missing_rubric} rows have no matching rubric")
 
-if False:
-    # Group by predicted material and calculate precision scores
-    grouped = df.groupby(["material_or_system_pred", "property_name_pred"])
-    logger.info(f"Processing {len(grouped)} unique predicted materials...")
-    results = []
-
-    for (material_pred, property_pred), group in grouped:
-        # Check which rows have matching materials using scorer_pymatgen
-        matching_rows = []
-
-        for idx, row in group.iterrows():
-            # Check if materials match using pymatgen
-            if pd.notna(material_pred) and pd.notna(row["material_or_system_gt"]):
-                if scorer_pymatgen(
-                    str(material_pred), str(row["material_or_system_gt"])
-                ):
-                    matching_rows.append(row)
-
-        num_matches = len(matching_rows)
-
-        if num_matches == 0:
-            # No matches, score is 0
-            precision_score = 0.0
-        else:
-            # At least one match, calculate scores and take max
-            scores = []
-
-            for row in matching_rows:
-                # Skip if values are missing
-                if (
-                    pd.isna(row["value_string_pred"])
-                    or pd.isna(row["value_string_gt"])
-                    or pd.isna(row["rubric"])
-                ):
-                    continue
-
-                # Calculate score
-                score = score_value(
-                    pred_value=str(row["value_string_pred"]),
-                    answer_value=str(row["value_string_gt"]),
-                    rubric=str(row["rubric"]),
-                    mapping=None,
-                )
-                scores.append(score)
-
-            # Take maximum score
-            precision_score = max(scores) if scores else 0.0
-
-        results.append(
-            {
-                "material_or_system_pred": material_pred,
-                "property_name_pred": property_pred,
-                "value_string_pred": ", ".join(
-                    list(
-                        set(
-                            [
-                                str(row["value_string_pred"])
-                                for _, row in group.iterrows()
-                            ]
-                        )
-                    )
-                ),
-                "num_property_matches": len(group),
-                "num_property_material_matches": num_matches,
-                "precision_score": precision_score,
-                "matches": ", ".join(
-                    [
-                        f"{row['property_name_gt']}: {row['value_string_gt']}"
-                        for row in matching_rows
-                    ]
-                ),
-            }
-        )
-    df_results = pd.DataFrame(results)
-else:
-    df_results = compute_precision_per_material_property(df)
-
-# # Print results
-# logger.info("=" * 60)
-# logger.info("PRECISION SCORES")
-# logger.info("=" * 60)
-
-# for _, row in df_results.iterrows():
-#     print(f"\nMaterial: {row['material_or_system_pred']}")
-#     print(f"  Property: {row['property_name_pred']}")
-#     print(f"  Total rows: {row['num_property_matches']}")
-#     print(f"  Property matches: {row['num_property_material_matches']}")
-#     print(f"  Precision score: {row['precision_score']:.3f}")
+df_results = compute_precision_per_material_property(df, conversion_df=conversion_df)
 
 # Summary statistics
 logger.info("=" * 60)
@@ -185,4 +107,6 @@ print(f"Median precision score: {df_results['precision_score'].median():.3f}")
 # save results to csv
 score_dir = args.output_dir / "scores"
 score_dir.mkdir(parents=True, exist_ok=True)
-df_results.to_csv(score_dir / "score_precision.csv", index=False)
+score_path = score_dir / "score_precision.csv"
+logger.info(f"Saving precision scores to {score_path}")
+df_results.to_csv(score_path, index=False)
