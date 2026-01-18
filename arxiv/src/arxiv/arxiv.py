@@ -120,13 +120,16 @@ def get_arxiv_search_results_by_dois(
     # captcha only required if you make a large volume of requests
     _captcha_auth = captcha_auth
     success = 0
-    for doi in tqdm(true_dois):
+    pbar = tqdm(true_dois)
+    pbar.set_description(
+        f"Looking for arxiv search results by DOI... found {success}: "
+    )
+    for doi in pbar:
         while True:
             try:
                 parsed = _get_arxiv_search_results_by_doi(_captcha_auth, doi)
                 if len(parsed):
                     success += 1
-                    print(success)
                 # append even empty list
                 results.append(parsed)
                 break
@@ -134,6 +137,9 @@ def get_arxiv_search_results_by_dois(
                 # captcha expires every ~1,000 entries or so
                 print(f"Go to: https://arxiv.org/")
                 _captcha_auth = input("Recaptcha expired, enter value: ").strip()
+        pbar.set_description(
+            f"Looking for arxiv search results by DOI... found {success}: "
+        )
     return results
 
 
@@ -217,7 +223,9 @@ def get_arxiv_paper_detail_result_by_abs_links(
     results = []
     # captcha only required if you make a large volume of requests
     _captcha_auth = captcha_auth
-    for abs_url in tqdm(abs_urls):
+    pbar = tqdm(abs_urls)
+    pbar.set_description(f"Getting arxiv paper detail by its url...")
+    for abs_url in pbar:
         while True:
             try:
                 # expect that, with fresh captcha ALL these requests should succeed
