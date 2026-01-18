@@ -179,6 +179,9 @@ class GeminiChat(LLMChat):
                 )
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "cached_tokens": response.usage_metadata.cached_content_token_count
+                if response.usage_metadata.cached_content_token_count
+                else 0,
                 "completion_tokens": response.usage_metadata.candidates_token_count,
                 "thinking_tokens": response.usage_metadata.thoughts_token_count,
                 "total_tokens": response.usage_metadata.total_token_count,
