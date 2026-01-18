@@ -153,6 +153,7 @@ async def check_if_same_property(
         "matched_via": matched_via,
         "model": llm.model_name,
         "prompt": prompt,
+        "serialized_response": json.dumps(response.model_dump()),
     }
 
     # Store in cache by calling the cached function with the real result
@@ -245,8 +246,8 @@ async def generate_property_name_matches(
                 tasks[task_id] = task
         # Execute all tasks concurrently
         # import pdb; pdb.set_trace()
-        results = await asyncio.gather(*tasks.values())
-        results = {task_id: result for task_id, result in zip(tasks.keys(), results)}
+        results_data = await asyncio.gather(*tasks.values())
+        results = {task_id: data for task_id, data in zip(tasks.keys(), results_data)}
         # Step 3. Combine the results with the rows in df2_top_k
         for idx, y in df2_top_k.iterrows():
             result = results[idx_to_task_id[idx]]
