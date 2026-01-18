@@ -65,7 +65,7 @@ logger.info(
 )
 
 # Load rubric
-rubric_path = Path("scoring") / "rubric.csv"
+rubric_path = Path("scoring") / "rubric_2.csv"
 logger.info(f"Loading rubric from {rubric_path}")
 df_rubric = pd.read_csv(rubric_path)
 logger.info(f"Loaded {len(df_rubric)} rows from rubric")
@@ -192,4 +192,6 @@ print(f"Median precision score: {df_results['precision_score'].median():.3f}")
 # save results to csv
 score_dir = args.output_dir / "scores"
 score_dir.mkdir(parents=True, exist_ok=True)
-df_results.to_csv(score_dir / "score_precision.csv", index=False)
+score_path = score_dir / "score_precision.csv"
+logger.info(f"Saving precision scores to {score_path}")
+df_results.to_csv(score_path, index=False)

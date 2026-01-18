@@ -65,7 +65,7 @@ logger.info(
 )
 
 # Load rubric
-rubric_path = Path("scoring") / "rubric.csv"
+rubric_path = Path("scoring") / "rubric_2.csv"
 logger.info(f"Loading rubric from {rubric_path}")
 df_rubric = pd.read_csv(rubric_path)
 logger.info(f"Loaded {len(df_rubric)} rows from rubric")
@@ -78,6 +78,11 @@ df = df_matches.merge(
     right_on="property_name",
     how="left",
 )
+
+# Load conversion factors
+conversion_factors_path = Path("scoring") / "si_conversion_factors.csv"
+logger.info(f"Loading conversion factors from {conversion_factors_path}")
+conversion_df = pd.read_csv(conversion_factors_path, index_col=0)
 
 # Check for missing rubrics
 missing_rubric = df["rubric"].isna().sum()
@@ -171,7 +176,7 @@ if False:
 
     df_results = pd.DataFrame(results)
 else:
-    df_results = compute_recall_per_material_property(df)
+    df_results = compute_recall_per_material_property(df, conversion_df=conversion_df)
 
 # Print results
 # logger.info("=" * 60)

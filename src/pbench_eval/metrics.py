@@ -46,7 +46,9 @@ def construct_context(row: pd.Series) -> str:
     )
 
 
-def compute_recall_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
+def compute_recall_per_material_property(
+    df: pd.DataFrame, conversion_df: pd.DataFrame
+) -> pd.DataFrame:
     """Score recall for a dataframe of predicted-ground truth pairs.
 
     We use the following formula to score recall for each (material, property) pair:
@@ -61,6 +63,7 @@ def compute_recall_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
             - material_or_system_pred: Predicted material or system.
             - value_string_pred: Predicted value string.
             - rubric: Rubric for the property.
+        conversion_df: DataFrame with unit conversion factors.
 
     Returns:
         DataFrame with recall score for each (material, property) pair.
@@ -104,10 +107,10 @@ def compute_recall_per_material_property(df: pd.DataFrame) -> pd.DataFrame:
 
                 # Calculate score
                 score = score_value(
-                    pred_value=str(row["value_string_pred"]),
-                    answer_value=str(row["value_string_gt"]),
-                    rubric=str(row["rubric"]),
-                    mapping=None,
+                    pred_value=row["value_string_pred"],
+                    answer_value=row["value_string_gt"],
+                    rubric=row["rubric"],
+                    conversion_df=conversion_df,
                 )
                 scores.append(score)
 
@@ -205,9 +208,9 @@ def compute_precision_per_material_property(
 
                 # Calculate score
                 score = score_value(
-                    pred_value=str(row["value_string_pred"]),
-                    answer_value=str(row["value_string_gt"]),
-                    rubric=str(row["rubric"]),
+                    pred_value=row["value_string_pred"],
+                    answer_value=row["value_string_gt"],
+                    rubric=row["rubric"],
                     conversion_df=conversion_df,
                 )
                 scores.append(score)
@@ -272,6 +275,7 @@ async def compute_mean_recall_precision(
     df_pred: pd.DataFrame,
     df_gt: pd.DataFrame,
     property_matching_prompt_template: str,
+    conversion_df: pd.DataFrame,
 ) -> tuple[float, float]:
     """Calculate mean recall and precision metrics for a single task.
 
@@ -280,6 +284,7 @@ async def compute_mean_recall_precision(
         df_gt: DataFrame with ground truth properties.
             NOTE: should include a column "rubric"
         property_matching_prompt_template: Prompt template for property matching.
+        conversion_df: DataFrame with unit conversion factors.
 
     Returns:
         tuple[float, float]: Mean recall and precision.
@@ -312,7 +317,7 @@ async def compute_mean_recall_precision(
         left_suffix="_pred",
         right_suffix="_gt",
     )
-    df_recall = compute_recall_per_material_property(df_pred_matches)
+    df_recall = compute_recall_per_material_property(df_pred_matches, conversion_df)
 
     # -- Core functionality to compute precision --
     # Generate matches between predicted and ground truth properties
@@ -328,7 +333,7 @@ async def compute_mean_recall_precision(
         left_suffix="_gt",
         right_suffix="_pred",
     )
-    df_precision = compute_precision_per_material_property(df_gt_matches)
+    df_precision = compute_precision_per_material_property(df_gt_matches, conversion_df)
 
     # Compute mean recall and precision
     mean_recall = df_recall["recall_score"].mean()
