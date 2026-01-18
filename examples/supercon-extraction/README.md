@@ -193,6 +193,16 @@ uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter
     --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
 ```
 
+5. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
+
+```bash
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
+    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
+    --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
+```
+
+
 <!-- ### Validating the dataset construction (SuperCon only)
 
 1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
