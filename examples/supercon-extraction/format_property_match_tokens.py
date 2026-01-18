@@ -83,9 +83,10 @@ def calculate_cost(row: pd.Series) -> float | None:
         / 1_000_000
     )
     cache_cost = row["usage.cached_tokens"] * cache_price / 1_000_000
+    thinking_cost = row["usage.thinking_tokens"] * output_price / 1_000_000
     completion_cost = row["usage.completion_tokens"] * output_price / 1_000_000
 
-    total_cost = prompt_cost + cache_cost + completion_cost
+    total_cost = prompt_cost + cache_cost + thinking_cost + completion_cost
     return total_cost
 
 
