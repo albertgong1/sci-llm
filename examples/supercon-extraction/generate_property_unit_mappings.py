@@ -1,4 +1,3 @@
-#! /usr/bin/env -S uv run --env-file=.env -- python
 """Script to generate a CSV file of SuperCon property-unit mappings from the properties-oxide-metal-glossary.csv file.
 
 NOTE: the unit property is usually found before the property it is associated with.
@@ -163,6 +162,7 @@ PROPERTY_METHOD_MAPPINGS = {
     "gap": "gapmeth",
     "gapene": "gapmeth",
     "debyet": "mdebye",
+    "str1": "analm",
 }
 
 # Define property-to-figure/table mappings
@@ -190,6 +190,7 @@ EXPLICIT_PROPERTY_UNIT_MAPPINGS = {
     "debyet": "utc",
     "curiet": "utc",
     "neelt": "utc",
+    "str1": "",
 }
 
 
