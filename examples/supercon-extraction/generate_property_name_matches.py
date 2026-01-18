@@ -194,7 +194,7 @@ async def main(args: argparse.Namespace) -> None:
         dataset_config = pbench.DOMAIN2HF_DATASET_CONFIG["supercon"]
         hf_dataset_name = dataset_config["name"]
         revision = dataset_config["revision"]
-        split = args.split or dataset_config["split"]
+        split = dataset_config["split"]
         logger.info(
             f"Loading dataset from HuggingFace: {hf_dataset_name} "
             f"(revision={revision}, split={split})"
