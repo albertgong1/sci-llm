@@ -103,7 +103,8 @@ class GeminiChat(LLMChat):
         gen_kwargs: dict[str, Any] = {
             "max_output_tokens": inf_gen_config.max_output_tokens,
             "thinking_config": genai_types.ThinkingConfig(
-                thinking_budget=inf_gen_config.thinking_budget
+                thinking_budget=inf_gen_config.thinking_budget,
+                include_thoughts=True,
             ),
         }
         if inf_gen_config.temperature:
@@ -158,6 +159,15 @@ class GeminiChat(LLMChat):
             Parsed LLM chat response.
 
         """
+        # See https://ai.google.dev/gemini-api/docs/thinking#summaries for instructions
+        # on how to parse thoughts from the response.
+        thought = None
+        for part in response.candidates[0].content.parts:
+            if not part.text:
+                continue
+            if part.thought:
+                thought = part.text
+                break
         try:
             if inf_gen_config.output_format == "json":
                 pred = json.loads(response.text)
@@ -169,17 +179,21 @@ class GeminiChat(LLMChat):
                 )
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "cached_tokens": response.usage_metadata.cached_content_token_count
+                if response.usage_metadata.cached_content_token_count
+                else 0,
                 "completion_tokens": response.usage_metadata.candidates_token_count,
                 "thinking_tokens": response.usage_metadata.thoughts_token_count,
                 "total_tokens": response.usage_metadata.total_token_count,
             }
-            return LLMChatResponse(pred=pred, usage=usage, error=None)
+            return LLMChatResponse(pred=pred, usage=usage, error=None, thought=thought)
         except Exception as e:
             # Handle cases where Gemini refuses to generate
             return LLMChatResponse(
                 pred="",
                 usage={},
                 error=str(e),
+                thought=None,
             )
 
     def upload_file(self, file: File) -> None:
