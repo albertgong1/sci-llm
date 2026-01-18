@@ -213,8 +213,12 @@ async def main(args: argparse.Namespace) -> None:
     #
     pred_matches_dir = output_dir / "pred_matches"
     pred_matches_dir.mkdir(parents=True, exist_ok=True)
+    pred_responses_dir = output_dir / "pred_responses"
+    pred_responses_dir.mkdir(parents=True, exist_ok=True)
     gt_matches_dir = output_dir / "gt_matches"
     gt_matches_dir.mkdir(parents=True, exist_ok=True)
+    gt_responses_dir = output_dir / "gt_responses"
+    gt_responses_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize LLM
     llm = get_llm(args.server, model_name)
@@ -234,8 +238,14 @@ async def main(args: argparse.Namespace) -> None:
         pred_matches_path = (
             pred_matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
         )
+        pred_responses_path = (
+            pred_responses_dir / f"pred_responses_{refno}_{model_name}_k{top_k}.csv"
+        )
         gt_matches_path = (
             gt_matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+        )
+        gt_responses_path = (
+            gt_responses_dir / f"gt_responses_{refno}_{model_name}_k{top_k}.csv"
         )
         if pred_matches_path.exists() and gt_matches_path.exists() and not force:
             logger.info(f"Skipping refno {refno} because pred matches already exist")
@@ -337,7 +347,7 @@ async def main(args: argparse.Namespace) -> None:
                 suffixes=("_pred", "_gt"),
             )
         else:
-            df_pred_matches = await generate_property_name_matches(
+            df_pred_matches, df_pred_responses = await generate_property_name_matches(
                 df_pred,
                 df_gt_refno,
                 llm,
@@ -351,6 +361,8 @@ async def main(args: argparse.Namespace) -> None:
             )
         df_pred_matches.to_csv(pred_matches_path, index=False)
         logger.info(f"Saved pred matches to {pred_matches_path}")
+        df_pred_responses.to_csv(pred_responses_path, index=False)
+        logger.info(f"Saved pred responses to {pred_responses_path}")
 
         if False:
             # -- Get top-k matches for each ground truth property name (to compute recall) --
@@ -425,7 +437,7 @@ async def main(args: argparse.Namespace) -> None:
                     suffixes=("_gt", "_pred"),
                 )
         else:
-            df_gt_matches = await generate_property_name_matches(
+            df_gt_matches, df_gt_responses = await generate_property_name_matches(
                 df_gt_refno,
                 df_pred,
                 llm,
@@ -439,6 +451,8 @@ async def main(args: argparse.Namespace) -> None:
             )
         df_gt_matches.to_csv(gt_matches_path, index=False)
         logger.info(f"Saved gt matches to {gt_matches_path}")
+        df_gt_responses.to_csv(gt_responses_path, index=False)
+        logger.info(f"Saved gt responses to {gt_responses_path}")
 
 
 if __name__ == "__main__":

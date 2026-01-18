@@ -306,7 +306,7 @@ async def compute_mean_recall_precision(
     # -- Core functionality to compute recall --
     # Generate matches between predicted and ground truth properties
     # TODO: save these matches to file so that we can analyze the LLM-as-a-judge predictions in them later
-    df_pred_matches = await generate_property_name_matches(
+    df_pred_matches, _ = await generate_property_name_matches(
         df_pred,
         df_gt,
         llm,
@@ -322,7 +322,7 @@ async def compute_mean_recall_precision(
     # -- Core functionality to compute precision --
     # Generate matches between predicted and ground truth properties
     # TODO: save these matches to file so that we can analyze the LLM-as-a-judge predictions in them later
-    df_gt_matches = await generate_property_name_matches(
+    df_gt_matches, _ = await generate_property_name_matches(
         df_gt,
         df_pred,
         llm,

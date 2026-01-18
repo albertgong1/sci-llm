@@ -96,7 +96,7 @@ async def check_if_same_property(
     inf_gen_config: InferenceGenerationConfig,
     prompt: str,
     use_cache: bool = True,
-) -> dict:
+) -> tuple[dict, dict]:
     """Check if two property names are the same using an LLM.
 
     Args:
@@ -107,28 +107,29 @@ async def check_if_same_property(
 
     Returns:
         dict: Dictionary containing the result of the check
+        dict: Dictionary containing the raw response from the LLM
 
     """
-    # Create cache key from hashable parameters
-    config_json = json.dumps(inf_gen_config.model_dump())
+    # # Create cache key from hashable parameters
+    # config_json = json.dumps(inf_gen_config.model_dump())
 
-    # Try to get from cache - we pass a dummy result to check if it's cached
-    if use_cache:
-        try:
-            # Use call_and_shelve to check cache without executing
-            cached = _store_property_check_result.call_and_shelve(
-                llm.model_name,
-                prompt,
-                config_json,
-                {},  # dummy result
-            )
-            result = cached.get()
-            # If we got a non-empty cached result, return it
-            if result and result.get("model"):
-                logger.debug(f"Cache hit for prompt: {prompt[:50]}...")
-                return result
-        except Exception as e:
-            logger.debug(f"Cache miss or error: {e}")
+    # # Try to get from cache - we pass a dummy result to check if it's cached
+    # if use_cache:
+    #     try:
+    #         # Use call_and_shelve to check cache without executing
+    #         cached = _store_property_check_result.call_and_shelve(
+    #             llm.model_name,
+    #             prompt,
+    #             config_json,
+    #             {},  # dummy result
+    #         )
+    #         result = cached.get()
+    #         # If we got a non-empty cached result, return it
+    #         if result and result.get("model"):
+    #             logger.debug(f"Cache hit for prompt: {prompt[:50]}...")
+    #             return result, cached.get()
+    #     except Exception as e:
+    #         logger.debug(f"Cache miss or error: {e}")
 
     # Build conversation
     conv = Conversation(messages=[Message(role="user", content=[prompt])])
@@ -153,23 +154,22 @@ async def check_if_same_property(
         "matched_via": matched_via,
         "model": llm.model_name,
         "prompt": prompt,
-        "serialized_response": json.dumps(response.model_dump()),
     }
 
-    # Store in cache by calling the cached function with the real result
-    if use_cache:
-        try:
-            _store_property_check_result(
-                llm.model_name,
-                prompt,
-                config_json,
-                result,
-            )
-            logger.debug(f"Cached result for prompt: {prompt[:50]}...")
-        except Exception as e:
-            logger.warning(f"Failed to cache result: {e}")
+    # # Store in cache by calling the cached function with the real result
+    # if use_cache:
+    #     try:
+    #         _store_property_check_result(
+    #             llm.model_name,
+    #             prompt,
+    #             config_json,
+    #             result,
+    #         )
+    #         logger.debug(f"Cached result for prompt: {prompt[:50]}...")
+    #     except Exception as e:
+    #         logger.warning(f"Failed to cache result: {e}")
 
-    return result
+    return result, {**response.model_dump(), "model": llm.model_name}
 
 
 async def generate_property_name_matches(
@@ -216,27 +216,25 @@ async def generate_property_name_matches(
     )
     top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :top_k]
 
-    # further match on additional context using LLM
+    # -- further match on additional context using LLM --
     matches = []
+    # construct all tasks first to run them concurrently
+    tasks = OrderedDict()
+    idx_to_task_id = {}
     for i in tqdm(range(len(df1)), desc="Processing df1"):
-        # if i < 74:
-        #     continue
-        # import pdb; pdb.set_trace()
         x = df1.iloc[i].to_dict()
-        # Step 1. Find the rows in Y whose property name is in the top_k matches for x
+        # Find the rows in Y whose property name is in the top_k matches for x
         # NOTE: this may yield more than k matches since some rows share property name, but not context
         top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
         df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
         logger.info(f"Found {len(df2_top_k)} matches for {x['property_name']}")
-        # Step 2. Construct async tasks, reusing the same task for rows with the same property name and context
-        tasks = OrderedDict()
-        idx_to_task_id = {}
+        # Construct async tasks, reusing the same task for rows with the same property name and context
         for idx, y in df2_top_k.iterrows():
             # NOTE: rename the variables to avoid conflicts when substituting them into the prompt template
             x_variables = {k + "_1": x[k] for k in left_on}
             y_variables = {k + "_2": y[k] for k in right_on}
             task_id = (json.dumps(x_variables), json.dumps(y_variables))
-            idx_to_task_id[idx] = task_id
+            idx_to_task_id[(i, idx)] = task_id
             if task_id not in tasks:
                 prompt = prompt_template.format(
                     **x_variables,
@@ -244,13 +242,19 @@ async def generate_property_name_matches(
                 )
                 task = check_if_same_property(llm, inf_gen_config, prompt)
                 tasks[task_id] = task
-        # Execute all tasks concurrently
-        # import pdb; pdb.set_trace()
-        results_data = await asyncio.gather(*tasks.values())
-        results = {task_id: data for task_id, data in zip(tasks.keys(), results_data)}
-        # Step 3. Combine the results with the rows in df2_top_k
+    # Execute all tasks concurrently
+    results_data = await asyncio.gather(*tasks.values())
+    results = {
+        task_id: result for task_id, (result, _) in zip(tasks.keys(), results_data)
+    }
+
+    # Combine the results with the rows in df2_top_k
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
         for idx, y in df2_top_k.iterrows():
-            result = results[idx_to_task_id[idx]]
+            result = results[idx_to_task_id[(i, idx)]]
             matches.append(
                 {
                     **x,
@@ -267,7 +271,14 @@ async def generate_property_name_matches(
         how="left",
         suffixes=(left_suffix, right_suffix),
     )
-    return df_matches
+
+    # Return LLM responses along with match results
+    responses = [response for _, response in results_data]
+    # df_responses = pd.DataFrame({"responses" : responses})
+    # expand the properties dict into separate columns
+    df_responses = pd.json_normalize(responses)
+
+    return df_matches, df_responses
 
 
 #
