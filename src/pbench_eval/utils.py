@@ -1,23 +1,15 @@
 """Helper functions"""
 
 import re
-from pathlib import Path
 from pymatgen.core import Composition
 import logging
 import pandas as pd
 
-# Load normalized space groups
-import json
+from .space_groups_normalized import (
+    SPACE_GROUPS,
+)
 
 logger = logging.getLogger(__name__)
-
-# Assuming this file is in the same directory as this script (examples/extraction)
-# and assets is a subdirectory (examples/extraction/assets)
-ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-SPACE_GROUPS_PATH = ASSETS_DIR / "hard" / "space_groups_normalized.json"
-
-with open(SPACE_GROUPS_PATH, "r") as f:
-    SPACE_GROUPS = json.load(f)
 
 
 _SUPERSCRIPT_MAP = str.maketrans(
@@ -268,9 +260,15 @@ def scorer_space_group(pred: str, answer: str) -> bool:
     1. Clean input (keep only {letters, numbers, /, -} and lowercase).
     2. Map to ID.
     3. Compare IDs.
+
+    Args:
+        pred: Predicted space group string.
+        answer: Ground truth space group string.
+
+    Returns:
+        True if IDs match, False otherwise.
+
     """
-    if not SPACE_GROUPS:
-        return False
 
     def get_norm_and_id(val: str) -> tuple[str, str | None]:
         if not isinstance(val, str):
@@ -298,7 +296,7 @@ def scorer_space_group(pred: str, answer: str) -> bool:
     return pred_id == answer_id
 
 
-def scorer_categorical(
+def scorer_exact_match(
     pred: str, answer: str, mapping: dict[str, str] | None = None
 ) -> bool:
     """Scores categorical ("method of X") properties.
@@ -307,25 +305,19 @@ def scorer_categorical(
     1. Exact match (after normalization)
     2. Substring match (one canonical category contains the other)
     """
-    pred_str = str(pred).strip()
-    answer_str = str(answer).strip()
+    assert isinstance(pred, str), "pred must be a string"
+    assert isinstance(answer, str), "answer must be a string"
 
-    if mapping:
-        # Normalize to canonical category if available in the map
-        pred_norm = mapping.get(pred_str, pred_str)
-        answer_norm = mapping.get(answer_str, answer_str)
-    else:
-        # If not in map, keep original string
-        pred_norm = pred_str
-        answer_norm = answer_str
+    pred_str = pred.strip()
+    answer_str = answer.strip()
 
     # 1. Exact Match
-    if pred_norm == answer_norm:
+    if pred_str == answer_str:
         return True
 
     # 2. Relaxed Substring Match (Case-insensitive)
-    p_lower = pred_norm.lower()
-    a_lower = answer_norm.lower()
+    p_lower = pred_str.lower()
+    a_lower = answer_str.lower()
 
     if p_lower in a_lower or a_lower in p_lower:
         return True
@@ -337,7 +329,7 @@ def score_value(
     pred_value: str,
     answer_value: str,
     rubric: str,
-    mapping: dict[str, str] | None = None,
+    mapping: dict[str, str] | None = None,  # not used
     conversion_df: pd.DataFrame | None = None,
 ) -> float:
     """Master scoring function (0.0 to 1.0).
@@ -350,46 +342,50 @@ def score_value(
         conversion_df: Optional DataFrame for unit conversion.
 
     """
+    assert isinstance(pred_value, str), "pred_value must be a string"
+    assert isinstance(answer_value, str), "answer_value must be a string"
+    assert isinstance(rubric, str), "rubric must be a string"
+
     logger.debug(
         f"Scoring pred_value='{pred_value}' vs answer_value='{answer_value}' using rubric='{rubric}'"
     )
-    if rubric == "0.1% SI":
-        # Check if ANY predicted candidate matches the first answer candidate
-        answer_nums = parse_numeric_candidates(
-            answer_value
-        )  # return (number, units) tuples
-        if not answer_nums:
+    match rubric:
+        case "0.1% SI":
+            # Check if ANY predicted candidate matches the first answer candidate
+            answer_nums = parse_numeric_candidates(
+                answer_value
+            )  # return (number, units) tuples
+            if not answer_nums:
+                return 0.0
+            # Strict: The ground truth should be unambiguous, so we take the first number found.
+            if len(answer_nums) > 1:
+                logger.warning(
+                    f"Multiple numeric candidates found in answer_value '{answer_value}'. Using the first one: {answer_nums[0][0]}"
+                )
+            answer_num, answer_unit = answer_nums[0]
+            for pred_num, pred_unit in parse_numeric_candidates(pred_value):
+                # TODO: implement unit conversion/checking
+                if scorer_si(
+                    pred_num,
+                    pred_unit,
+                    answer_num,
+                    answer_unit,
+                    conversion_df=conversion_df,
+                ):
+                    return 1.0
             return 0.0
-        # Strict: The ground truth should be unambiguous, so we take the first number found.
-        if len(answer_nums) > 1:
-            logger.warning(
-                f"Multiple numeric candidates found in answer_value '{answer_value}'. Using the first one: {answer_nums[0][0]}"
-            )
-        answer_num, answer_unit = answer_nums[0]
-        for pred_num, pred_unit in parse_numeric_candidates(pred_value):
-            # TODO: implement unit conversion/checking
-            if scorer_si(
-                pred_num,
-                pred_unit,
-                answer_num,
-                answer_unit,
-                conversion_df=conversion_df,
-            ):
-                return 1.0
-        return 0.0
 
-    elif rubric == "pymatgen":
-        # Clean inputs before pymatgen parsing if needed?
-        # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
-        # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
-        pv = normalize_unicode(pred_value).strip()
-        av = normalize_unicode(answer_value).strip()
-        return 1.0 if scorer_pymatgen(pv, av) else 0.0
+        case "pymatgen":
+            # Clean inputs before pymatgen parsing if needed?
+            # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
+            # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
+            pv = normalize_unicode(pred_value).strip()
+            av = normalize_unicode(answer_value).strip()
+            return 1.0 if scorer_pymatgen(pv, av) else 0.0
 
-    else:
-        # Default to categorical
-        return (
-            1.0
-            if scorer_categorical(pred_value, answer_value, mapping=mapping)
-            else 0.0
-        )
+        case "space_group":
+            return 1.0 if scorer_space_group(pred_value, answer_value) else 0.0
+
+        case _:
+            # Default to exact match
+            return 1.0 if scorer_exact_match(pred_value, answer_value) else 0.0
