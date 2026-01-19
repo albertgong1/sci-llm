@@ -90,6 +90,36 @@ python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace j
   where `<TIMESTAMP_DIR>` is the actual job folder (e.g., `2026-01-08__19-56-26`).
 - However, to make sure errors don't happen, we set the number of attempts to 3 in the `job.yaml` config.
 
+### More run examples (different agents)
+
+Run the full job locally (Gemini):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace \
+  jobs start -c out/harbor/precedent-search/tc-precedent-search/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash
+```
+
+Run the full job on Modal (Claude Code):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace \
+  jobs start -c out/harbor/precedent-search/tc-precedent-search/job.yaml \
+  -a claude-code -m anthropic/claude-3-5-sonnet --modal --n-concurrent 4
+```
+
+Run one task (OpenRouter via Terminus 2):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace \
+  trials start -p out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
+  -a terminus-2 -m openrouter/qwen/qwen3-coder-plus
+```
+
+Run one task (Codex):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace \
+  trials start -p out/harbor/precedent-search/tc-precedent-search/tasks/<task_name> \
+  -a codex -m openai/gpt-4o-mini
+```
+
 
 ### 4. Collect Results
 Consolidate the results from the `trials/` directory into a clean format for analysis.

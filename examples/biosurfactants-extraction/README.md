@@ -15,8 +15,8 @@
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  -c out-0114-harbor/ground-template/job.yaml \
-  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  -c out/harbor/biosurfactants-mini/biosurfactants-extraction-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
   --workspace .
 ```
 
@@ -72,19 +72,42 @@ uv run python create_huggingface_dataset.py --output_dir out-0113-for-jiashuo --
 
 ## Constructing Harbor tasks
 
-1. Create Harbor template:
-
+Build tasks from `kilian-group/biosurfactants-mini`:
 ```bash
-# Copy the Harbor workspace template
-cp -r ../harbor-workspace/ground-template .
-# Add placeholder variable to the start of the prompt
-{ echo '{paper_at_command}'; echo; cat prompts/benchmark_soft_prompt_00.md; } > ground-template/instruction.md.template
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --domain biosurfactants \
+  --workspace examples/biosurfactants-extraction \
+  --template biosurfactants-extraction-template \
+  --write-job-config --force
 ```
 
-2. Instantiate the Harbor tasks using the template for all papers:
-
+Run jobs (local or Modal):
 ```bash
-uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
-    --pdf-dir data/Paper_DB --output-dir out-0114-harbor --workspace . --domain biosurfactants \
-    --force
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  --workspace examples/biosurfactants-extraction \
+  -c out/harbor/biosurfactants-mini/biosurfactants-extraction-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash
 ```
+
+Add `--modal` to run on Modal (with cleanup defaults).
+
+### More run examples
+
+Run one task (oracle sanity check):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py trials start \
+  --workspace examples/biosurfactants-extraction \
+  -p out/harbor/biosurfactants-mini/biosurfactants-extraction-template/tasks/<task-id> \
+  -a oracle
+```
+
+Run job with OpenRouter via Terminus 2:
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  --workspace examples/biosurfactants-extraction \
+  -c out/harbor/biosurfactants-mini/biosurfactants-extraction-template/job.yaml \
+  -a terminus-2 -m openrouter/qwen/qwen3-coder-plus --modal
+```
+
+For the full flag reference, see:
+- `src/harbor-task-gen/README.md`

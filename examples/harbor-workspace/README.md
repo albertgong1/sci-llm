@@ -1,30 +1,35 @@
 # Harbor Workspace
 
-This folder is the working directory for Harbor task generation and runs. Templates,
-PDFs, rubrics, and all run outputs live here. The library code lives in
+This folder is the default workspace for task generation and Harbor runs. Templates,
+PDFs, rubrics, and run outputs live here. The library code lives in
 `src/harbor-task-gen/`.
 
 ## Layout
-- `ground-template/` and `ground-template-easy/`: task templates copied into tasks
-- `rubric.csv`: scoring rubric for verifier logic
-- `data/Paper_DB/`: PDF corpus (<refno>.pdf)
-- `out/`: generated tasks and compiled run bundles (created by scripts)
-- `jobs/`: Harbor job runs (created by Harbor)
-- `trials/`: Harbor trial runs (created by Harbor)
-- `collect_harbor_results.py`: optional helper to convert trial verifier outputs
+- `ground-template/` - default task template (add others as sibling folders).
+- `rubric.csv` - scoring rubric used when tasks are built.
+- `data/Paper_DB/` - PDF corpus (`<refno>.pdf`).
+- `out/` - generated tasks and compiled run bundles.
+- `jobs/` - Harbor job runs.
+- `trials/` - Harbor trial runs.
+- `collect_harbor_results.py` - helper to convert verifier outputs into prediction JSON.
+- `clean_harbor_workspace.py` - clean up jobs/trials/out without touching templates.
 
 ## Using the library
 All CLI helpers default to this workspace. From the repo root:
+
 ```bash
 uv run python src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config --force
+
 uv run python src/harbor-task-gen/run_harbor.py jobs start \
   -c out/harbor/supercon-mini-v2/ground-template/job.yaml \
   -a gemini-cli -m gemini/gemini-2.5-flash --modal --n-concurrent 4
 ```
+
 To use a different workspace, pass `--workspace /path/to/workspace` to the scripts.
+To target a different dataset, use `--domain` (see `src/pbench/datasets.yaml`).
 
 ## Cleaning the workspace
-Remove generated outputs (jobs/trials/out/logs) while keeping templates and data:
+Remove generated outputs (jobs/trials/out) while keeping templates and data:
 ```bash
 uv run python examples/harbor-workspace/clean_harbor_workspace.py --dry-run
 uv run python examples/harbor-workspace/clean_harbor_workspace.py
@@ -36,10 +41,10 @@ uv run python examples/harbor-workspace/clean_harbor_workspace.py
 cp -R ground-template my-template
 ```
 2) Edit the template files:
-- `instruction.md.template`: main prompt with placeholders
-- `tests/check_prediction.py`: verifier/scoring logic
-- `task.toml.template`: task resources and environment settings
-- `environment/Dockerfile`: build context used by Harbor
+- `instruction.md.template`
+- `tests/check_prediction.py`
+- `task.toml.template`
+- `environment/Dockerfile`
 
 3) Generate tasks with the new template:
 ```bash
