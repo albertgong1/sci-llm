@@ -243,7 +243,7 @@ knowledgebase.md
 *logs*/
 
 # Harbor workspace scaffolding
-!examples/harbor-workspace/out/
+examples/harbor-workspace/out/*
 !examples/harbor-workspace/out/.gitkeep
 !examples/harbor-workspace/jobs/
 !examples/harbor-workspace/jobs/.gitkeep
@@ -251,3 +251,5 @@ knowledgebase.md
 !examples/harbor-workspace/trials/.gitkeep
 !examples/harbor-workspace/logs/
 !examples/harbor-workspace/logs/.gitkeep
+examples/harbor-workspace/jobs/*
+examples/harbor-workspace/trials/*

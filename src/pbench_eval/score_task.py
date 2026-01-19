@@ -189,7 +189,10 @@ def load_all_predictions(
     args: argparse.Namespace,
 ) -> pd.DataFrame:
     """Load predictions from JSON files in <output_dir>/<domain>/preds/*.json."""
-    preds_dir = args.output_dir / args.domain / "preds"
+    if args.input_preds_dir:
+        preds_dir = args.input_preds_dir
+    else:
+        preds_dir = args.output_dir / args.domain / "preds"
 
     combined_csv = args.output_dir / args.domain / "results.csv"
     if combined_csv.exists():
@@ -201,7 +204,7 @@ def load_all_predictions(
         raise ValueError(f"Predictions directory not found: {preds_dir}")
 
     # Load all JSON files (Harbor generates one per trial)
-    json_files = sorted(preds_dir.glob("*.json"))
+    json_files = sorted(preds_dir.glob(args.file_pattern))
     
     if not json_files:
         raise ValueError(f"No JSON files found in {preds_dir}")
@@ -268,16 +271,16 @@ def main() -> None:
     )
     parser = pbench.add_base_args(parser)
     parser.add_argument(
-        "--input_csv",
+        "--output_tag",
         type=str,
         default=None,
-        help="Path to an existing CSV file containing predictions and scores.",
+        help="Tag to append to output filenames (e.g., 'codex_gpt5').",
     )
     parser.add_argument(
-        "--rubric_csv_filename",
+        "--file_pattern",
         type=str,
-        default=None,
-        help="Filename of the rubric CSV file.",
+        default="*.json",
+        help="Glob pattern to filter JSON prediction files (default: *.json).",
     )
     parser.add_argument(
         "--cluster_file",
@@ -286,9 +289,27 @@ def main() -> None:
         help="Path to property clusters JSON file.",
     )
     parser.add_argument(
+        "--input_csv",
+        type=str,
+        default=None,
+        help="Path to an existing CSV of scored results to analyze.",
+    )
+    parser.add_argument(
+        "--rubric_csv_filename",
+        type=str,
+        default=None,
+        help="Path to a specific rubric CSV file (optional).",
+    )
+    parser.add_argument(
+        "--input_preds_dir",
+        type=Path,
+        default=None,
+        help="Path to directory containing prediction JSON files (overrides default).",
+    )
+    parser.add_argument(
         "--analyze",
         action="store_true",
-        help="Print and save analysis tables.",
+        help="Generate analysis tables from scored results.",
     )
 
     args = parser.parse_args()
@@ -310,6 +331,12 @@ def main() -> None:
     analysis_dir = args.output_dir / args.domain / "analysis"
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
+    # Helper to tag filenames
+    def get_output_path(base_name: str, ext: str) -> Path:
+        if args.output_tag:
+            return analysis_dir / f"{base_name}_{args.output_tag}{ext}"
+        return analysis_dir / f"{base_name}{ext}"
+
     # 1. Try explicit CSV
     if args.input_csv:
         try:
@@ -325,12 +352,6 @@ def main() -> None:
             df = load_all_predictions(args)
             logger.info(f"Loaded {len(df)} rows from JSONs")
             
-            # Score them if they don't have scores (Harbor JSONs coming from collect_harbor_results.py MIGHT miss scores? 
-            # No, details.json HAS scores, but we didn't explicitly put 'score' in the pbench formatted JSON.
-            # Let's check collect_harbor_results.py logic again. 
-            # It saves 'true' and 'pred', but NOT 'score' in the root. 
-            # So we MUST re-score here.
-            
             # Setup Rubric
             if args.rubric_csv_filename:
                 rubric_path = Path(args.rubric_csv_filename)
@@ -341,7 +362,11 @@ def main() -> None:
             
             scores_dir = args.output_dir / args.domain / "scores"
             scores_dir.mkdir(parents=True, exist_ok=True)
-            output_csv = scores_dir / "scored_results.csv"
+            
+            if args.output_tag:
+                output_csv = scores_dir / f"scored_results_{args.output_tag}.csv"
+            else:
+                output_csv = scores_dir / "scored_results.csv"
             
             logger.info("Scoring predictions...")
             df = score_predictions(df, rubric_path, output_csv)
@@ -351,7 +376,76 @@ def main() -> None:
              sys.exit(1)
 
     if args.analyze:
-        analyze_scores(df, analysis_dir)
+        # Modified analyze_scores logic inline to support tagging
+        # (analyze_scores function needs to be updated or we perform logic here)
+        # Let's pass the output_csv path to analyze_scores instead of dir, or update analyze_scores signature?
+        # Only analyze_scores was defined above. Let's update it to take file suffix or handle writing itself.
+        # Actually, simpler to just re-implement the calls here with correct paths.
+        
+        # Analysis by material
+        material_stats = []
+        if "material" in df.columns:
+            for material, group in df.groupby("material"):
+                mean, se, n = compute_mean_se(group["score"])
+                material_stats.append(
+                    {
+                        "material": material,
+                        "mean": mean,
+                        "se": se,
+                        "n": n,
+                        "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                    }
+                )
+
+            material_df = pd.DataFrame(material_stats)
+            material_df = material_df.sort_values("mean", ascending=False, na_position="last")
+            
+            print("\n" + "=" * 60)
+            print("ANALYSIS: Mean Score by Material")
+            print("=" * 60)
+            print(
+                tabulate(
+                    material_df[["material", "mean ± se", "n"]],
+                    headers=["Material", "Mean ± SE", "N"],
+                    tablefmt="github",
+                    showindex=False,
+                )
+            )
+            material_csv = get_output_path("analysis_by_material", ".csv")
+            material_df.to_csv(material_csv, index=False)
+
+        # Analysis by property
+        property_stats = []
+        prop_col = "property_name" if "property_name" in df.columns else "property"
+        if prop_col in df.columns:
+            for prop, group in df.groupby(prop_col):
+                mean, se, n = compute_mean_se(group["score"])
+                property_stats.append(
+                    {
+                        "property_name": prop,
+                        "mean": mean,
+                        "se": se,
+                        "n": n,
+                        "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                    }
+                )
+
+            property_df = pd.DataFrame(property_stats)
+            property_df = property_df.sort_values("mean", ascending=False, na_position="last")
+
+            print("\n" + "=" * 60)
+            print("ANALYSIS: Mean Score by Property")
+            print("=" * 60)
+            print(
+                tabulate(
+                    property_df[["property_name", "mean ± se", "n"]],
+                    headers=["Property", "Mean ± SE", "N"],
+                    tablefmt="github",
+                    showindex=False,
+                )
+            )
+            property_csv = get_output_path("analysis_by_property", ".csv")
+            property_df.to_csv(property_csv, index=False)
 
 
 if __name__ == "__main__":
