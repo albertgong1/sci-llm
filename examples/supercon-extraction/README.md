@@ -6,8 +6,8 @@
 TODO:
 - [X] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
 - [ ] Share embeddings on HF.
-- [ ] Push GT property name embeddings to HF.
-- [ ] Compute interannotator agreement for post-2021 SuperCon.
+- [ ] Add instructions for computing interannotator agreement for post-2021 SuperCon.
+- [ ] Fill in "category" field in GT dataset
 
 ## Setup Instructions
 
@@ -43,7 +43,7 @@ TODO:
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
-  --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks \
+  --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks --hf-tasks-version v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
@@ -162,10 +162,10 @@ uv run python generate_gt_embeddings.py
 6. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
 
 ```bash
-uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
-    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
-    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
+    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision main \
+    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.1.0
 ```
 
 
