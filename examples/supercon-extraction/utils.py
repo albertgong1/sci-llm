@@ -3,10 +3,18 @@
 Reference for SuperCon integer codes: https://mdr.nims.go.jp/filesets/28e52e3f-8f92-4656-abb6-354e4cef11a1/download
 """
 
+import json
+import re
+from json import JSONDecoder
+from pathlib import Path
+from typing import Any
+import pandas as pd
+
 # Dataset configuration
 HF_DATASET_NAME = "kilian-group/supercon-extraction"
-HF_DATASET_REVISION = "v0.0.0"
+HF_DATASET_REVISION = "main"  # "v0.0.0"
 HF_DATASET_SPLIT = "full"
+GT_EMBEDDINGS_PATH = Path("scoring/gt_property_name_gemini-embedding-001.json")
 
 # Crystal structure symmetry mapping
 CRYSTAL_SYMMETRY: dict[int, str] = {
@@ -94,3 +102,205 @@ TC_MEASUREMENT_METHOD: dict[int, str] = {
     13: "microwave transmission",
     14: "Others",
 }
+
+
+#
+# Helper functions to load predictions from Harbor jobs
+#
+
+
+def _extract_text_from_jsonlines_log(text: str) -> str | None:
+    """Decode assistant output embedded in JSONL agent logs (e.g., Claude Code)."""
+    decoded_parts: list[str] = []
+    any_json = False
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if not line.startswith("{"):
+            return None
+        try:
+            obj = json.loads(line)
+        except Exception:
+            return None
+        any_json = True
+
+        if isinstance(obj, dict):
+            message = obj.get("message")
+            if isinstance(message, dict):
+                content = message.get("content")
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, dict) and isinstance(
+                            block.get("text"), str
+                        ):
+                            decoded_parts.append(block["text"])
+
+            result_text = obj.get("result")
+            if isinstance(result_text, str):
+                decoded_parts.append(result_text)
+
+    if not any_json:
+        return None
+
+    combined = "\n\n".join(
+        part.strip() for part in decoded_parts if part and part.strip()
+    )
+    return combined or None
+
+
+def _extract_first_json_object(text: str) -> dict[str, Any] | None:
+    """Extract the first JSON object from mixed text (handles fenced blocks)."""
+    fence_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
+    if fence_match:
+        try:
+            obj = json.loads(fence_match.group(1))
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            pass
+
+    decoder = JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            obj, _ = decoder.raw_decode(text[match.start() :])
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            continue
+    return None
+
+
+def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
+    """Extract the first JSON array from mixed text (handles fenced blocks)."""
+    fence_match = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text, re.IGNORECASE)
+    if fence_match:
+        try:
+            obj = json.loads(fence_match.group(1))
+            if isinstance(obj, list):
+                return obj
+        except Exception:
+            pass
+
+    decoder = JSONDecoder()
+    for match in re.finditer(r"\[", text):
+        try:
+            obj, _ = decoder.raw_decode(text[match.start() :])
+            if isinstance(obj, list):
+                return obj
+        except Exception:
+            continue
+    return None
+
+
+def _load_trial_predictions(
+    trial_dir: Path,
+) -> dict[str, Any] | list[dict[str, Any]] | None:
+    """Load JSON predictions from gemini-cli.txt file in a single trial directory.
+
+    Args:
+        trial_dir: Path to the Harbor trial directory
+
+    Returns:
+        Parsed JSON data (either dict or list), or None if not found
+
+    Raises:
+        ValueError: If JSON parsing fails
+
+    """
+    log_path = trial_dir / "agent" / "gemini-cli.txt"
+
+    if not log_path.exists():
+        return None
+
+    try:
+        content = log_path.read_text()
+    except Exception:
+        return None
+    # if trial_dir.name == "prb076212504__2s8uVnW":
+    # import pdb; pdb.set_trace()
+    # First try to extract text from JSONL format
+    decoded = _extract_text_from_jsonlines_log(content)
+    text = decoded or content
+
+    # Try to extract JSON object first
+    extracted_obj = _extract_first_json_object(text)
+    if extracted_obj is not None:
+        return extracted_obj
+
+    # Fall back to extracting JSON array
+    extracted_arr = _extract_first_json_array(text)
+    if extracted_arr is not None:
+        return extracted_arr
+
+    return None
+
+
+def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
+    """Load predictions from all trials in a Harbor jobs directory.
+
+    Iterates through batches and trials in the jobs directory structure:
+    jobs_dir/
+      batch_1/
+        trial_1/agent/gemini-cli.txt
+        trial_2/agent/gemini-cli.txt
+      batch_2/
+        ...
+
+    Args:
+        jobs_dir: Path to the Harbor jobs directory containing batch subdirectories
+
+    Returns:
+        DataFrame containing:
+        - batch: batch directory name
+        - trial_id: trial directory name
+        - refno: reference number (if available in trial data)
+        - exploded predictions: parsed JSON data from the trial
+
+    Raises:
+        FileNotFoundError: If jobs_dir doesn't exist
+        ValueError: If no valid trials found
+
+    """
+    jobs_dir = jobs_dir.resolve()
+    if not jobs_dir.exists():
+        raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
+
+    dfs = []
+    for batch_dir in sorted(jobs_dir.iterdir()):
+        if not batch_dir.is_dir():
+            continue
+
+        for trial_dir in sorted(batch_dir.iterdir()):
+            if not trial_dir.is_dir():
+                continue
+
+            # Skip non-trial directories (e.g., config.json, result.json)
+            if not (trial_dir / "agent").exists():
+                continue
+
+            predictions = _load_trial_predictions(trial_dir)
+            if predictions is None:
+                continue
+
+            # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
+            # if trial_dir.name == "prb076212504__2s8uVnW":
+            #     import pdb; pdb.set_trace()
+            refno, _ = trial_dir.name.split("__")
+
+            df = pd.DataFrame(
+                data={
+                    "batch": batch_dir.name,
+                    "trial_id": trial_dir.name,
+                    "refno": refno,
+                    "properties": predictions,
+                }
+            )
+            # explode predictions into separate rows
+            df = df.explode(column="properties").reset_index(drop=True)
+            df_properties = pd.json_normalize(df["properties"])
+            df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
+            dfs.append(df)
+    df = pd.concat(dfs, ignore_index=True)
+    return df
