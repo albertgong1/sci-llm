@@ -37,13 +37,7 @@ def construct_context(row: pd.Series) -> str:
         Context string
 
     """
-    return json.dumps(
-        {
-            k: v
-            for k, v in row.items()
-            if k.startswith("conditions.") or k == "value_unit"
-        }
-    )
+    return json.dumps({k: v for k, v in row.items() if k == "value_unit"})
 
 
 def compute_recall_per_material_property(
@@ -70,12 +64,14 @@ def compute_recall_per_material_property(
 
     """
     # Group by ground truth material AND property name to calculate recall scores
-    grouped = df.groupby(["material_or_system_gt", "property_name_gt"])
+    grouped = df.groupby(
+        ["refno", "model", "material_or_system_gt", "property_name_gt"]
+    )
     logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
     # import pdb; pdb.set_trace()
     results = []
 
-    for (material_gt, property_gt), group in grouped:
+    for (refno, model, material_gt, property_gt), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -119,6 +115,8 @@ def compute_recall_per_material_property(
 
         results.append(
             {
+                "refno": refno,
+                "model": model,
                 "material_or_system_gt": material_gt,
                 "property_name_gt": property_gt,
                 "value_string_gt": ", ".join(
@@ -172,11 +170,13 @@ def compute_precision_per_material_property(
 
     """
     # Group by predicted material and calculate precision scores
-    grouped = df.groupby(["material_or_system_pred", "property_name_pred"])
+    grouped = df.groupby(
+        ["refno", "model", "material_or_system_pred", "property_name_pred"]
+    )
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 
-    for (material_pred, property_pred), group in grouped:
+    for (refno, model, material_pred, property_pred), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -220,6 +220,8 @@ def compute_precision_per_material_property(
 
         results.append(
             {
+                "refno": refno,
+                "model": model,
                 "material_or_system_pred": material_pred,
                 "property_name_pred": property_pred,
                 "value_string_pred": ", ".join(

@@ -24,6 +24,33 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default="out/",
         help="Output directory (default: out)",
     )
+    parser.add_argument(
+        "--jobs_dir",
+        "-jd",
+        type=Path,
+        default=None,
+        help="Jobs directory for Harbor runs (default: jobs)",
+    )
+
+    # Dataset args
+    parser.add_argument(
+        "--hf_repo",
+        type=str,
+        default=None,
+        help="HuggingFace dataset name",
+    )
+    parser.add_argument(
+        "--hf_split",
+        type=str,
+        default=None,
+        help="HuggingFace dataset split",
+    )
+    parser.add_argument(
+        "--hf_revision",
+        type=str,
+        default=None,
+        help="HuggingFace dataset revision",
+    )
 
     # LLM args
     parser.add_argument(

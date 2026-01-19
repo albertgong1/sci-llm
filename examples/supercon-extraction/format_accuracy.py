@@ -1,21 +1,3 @@
-#! /usr/bin/env -S uv run --env-file=.env -- python
-# ---
-# jupyter:
-#   jupytext:
-#     cell_metadata_filter: -all
-#     custom_cell_magics: kql
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.11.2
-#   kernelspec:
-#     display_name: sci-llm
-#     language: python
-#     name: python3
-# ---
-
-# %%
 """Format accuracy results from Harbor job directories.
 
 Usage:
@@ -25,12 +7,10 @@ This script iterates over batches in a job directory, reads the verifier/details
 from each trial, and prints combined accuracy statistics.
 """
 
-# %%
 import json
 from argparse import ArgumentParser
 from pathlib import Path
 
-# %%
 parser = ArgumentParser(
     description="Format accuracy results from Harbor job directories."
 )
@@ -46,7 +26,6 @@ jobs_dir = args.jobs_dir.resolve()
 if not jobs_dir.exists():
     raise SystemExit(f"Jobs directory not found: {jobs_dir}")
 
-# %%
 # Collect results from all batches and trials
 all_results: list[dict] = []
 
@@ -85,7 +64,6 @@ for batch_dir in sorted(jobs_dir.iterdir()):
             }
         )
 
-# %%
 # Print formatted accuracy results
 if not all_results:
     print("No results found.")
