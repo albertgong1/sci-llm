@@ -9,6 +9,9 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Any
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Dataset configuration
 HF_DATASET_NAME = "kilian-group/supercon-extraction"
@@ -197,7 +200,7 @@ def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
 def _load_trial_predictions(
     trial_dir: Path,
 ) -> dict[str, Any] | list[dict[str, Any]] | None:
-    """Load JSON predictions from gemini-cli.txt file in a single trial directory.
+    """Load JSON predictions from predictions.json file in a single trial directory.
 
     Args:
         trial_dir: Path to the Harbor trial directory
@@ -209,10 +212,10 @@ def _load_trial_predictions(
         ValueError: If JSON parsing fails
 
     """
-    log_path = trial_dir / "agent" / "gemini-cli.txt"
-
+    # Try to load from predictions.json first
+    log_path = trial_dir / "verifier" / "app_output" / "predictions.json"
     if not log_path.exists():
-        return None
+        log_path = trial_dir / "agent" / "gemini-cli.txt"
 
     try:
         content = log_path.read_text()
@@ -243,8 +246,8 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     Iterates through batches and trials in the jobs directory structure:
     jobs_dir/
       batch_1/
-        trial_1/agent/gemini-cli.txt
-        trial_2/agent/gemini-cli.txt
+        trial_1/verifier/app_output/predictions.json
+        trial_2/verifier/app_output/predictions.json
       batch_2/
         ...
 
@@ -276,17 +279,12 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             if not trial_dir.is_dir():
                 continue
 
-            # Skip non-trial directories (e.g., config.json, result.json)
-            if not (trial_dir / "agent").exists():
-                continue
-
             predictions = _load_trial_predictions(trial_dir)
             if predictions is None:
+                logger.warning(f"No valid predictions found in trial: {trial_dir}")
                 continue
 
             # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
-            # if trial_dir.name == "prb076212504__2s8uVnW":
-            #     import pdb; pdb.set_trace()
             refno, _ = trial_dir.name.split("__")
 
             df = pd.DataFrame(
