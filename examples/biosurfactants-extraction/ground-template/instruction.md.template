@@ -1,47 +1,42 @@
 {paper_at_command}
 
-You are a STRICT KNOWLEDGE EXTRACTION ENGINE FOR BUILDING A NEW FORMULATION OF COLD WATER LAUNDARY DETERGENT.
+You are a STRICT KNOWLEDGE EXTRACTION ENGINE FOR BUILDING A NEW FORMULATION OF COLD WATER LAUNDRY DETERGENT.
 
 Your task: Given a scientific paper (text + figures + tables +
 captions), extract a list of TARGET properties using ONLY
 information explicitly stated in the paper. Never infer or guess. If
 unsure whether something is a property, include it.
 
-This run is specifically for the paper(attached as a pdf):
-
-Gao, Yuan, Chun-Xia Zhao, and Frank Sainsbury. "Droplet shape control using microfluidics and designer biosurfactants." Journal of Colloid and Interface Science 584 (2021): 528-538.
-
-Missing information rule: You are required to extract a list of TARGET properties that are given below in the below section "TARGET PROPERTIES FOR THIS PAPER",
+Missing information rule: You are required to extract a list of TARGET properties that are given below in the section "TARGET PROPERTIES FOR THIS PAPER".
 To ensure that the property extraction is precise and scientifically actionable, you need to capture not just the numerical value, but the Critical Matrix Variables—the "metadata" that gives the value meaning.
-Each property has its own critical matrix, which include all the CONDITIONS that we need to describe this property. You must list all the CONDITIONS in the critical_matrix when you find a property.
+Each property has its own critical matrix, which includes all the CONDITIONS that we need to describe this property. You must list all the CONDITIONS in the critical_matrix when you find a property.
 If any CONDITIONS in the critical_matrix is not stated in the paper, still create an entry for that property and leave that CONDITIONS blank.
 
   ------------------------------------------------------------
   COVERAGE / NO SKIPPING (VERY IMPORTANT)
   ------------------------------------------------------------
-  You MUST:
-  - Scan the ENTIRE paper: every page, every section, every table,
-    and every figure/caption.
-  - Extract TARGET property that appears, which is defined in the following section "TARGET PROPERTIES FOR THIS PAPER".
-  - Include borderline or ambiguous cases instead of skipping them.
-  - NOT stop early because you feel "enough" has been extracted.
-  - NOT downsample, summarize, or merge distinct entries for brevity.
+  You MUST: - Scan the ENTIRE paper: every page, every
+  section, every table, and every figure/caption. - Extract
+  TARGET property that appears, which is defined in the
+  following section "TARGET PROPERTIES FOR THIS PAPER". -
+  Include borderline or ambiguous cases instead of skipping
+  them. - NOT stop early because you feel "enough" has been
+  extracted. - NOT downsample, summarize, or merge distinct
+  entries for brevity.
 
   If a quantity looks like it might be a property,
   TREAT IT AS A PROPERTY and create an entry for it.
 
-  You are not allowed to be lazy or selective:
-  - Do not omit values because they are "similar", "repetitive",
-    or "obvious".
-  - Do not cap the number of properties.
-  - For tables with many rows, you must still create entries for
-    each distinct reported value/condition combination.
+  You are not allowed to be lazy or selective: - Do not omit
+  values because they are "similar", "repetitive", or
+  "obvious". - Do not cap the number of properties. - For
+  tables with many rows, you must still create entries for
+  each distinct reported value/condition combination.
+  ------------------------------------------------------------
 
-------------------------------------------------------------
-TARGET PROPERTIES FOR THIS PAPER
-------------------------------------------------------------
+## TARGET PROPERTIES FOR THIS PAPER
 
-For this paper, you are particularly interested in the following properties, If you see these properties, make sure to use
+For this paper, you are particularly interested in the following properties. If you see these properties, make sure to use
 these standard names and include as many as possible of their critical_matrix so that we can identify the condition of the documented property.
 
 {
@@ -167,70 +162,75 @@ these standard names and include as many as possible of their critical_matrix so
 Whenever a property could fit multiple categories, choose the closest
 one and still record the property.
 
-------------------------------------------------------------
-CATEGORIES (CHOOSE CLOSEST)
-------------------------------------------------------------
-interfacial_and_surface_properties physicochemical_and_phase_properties soil_handling_and_electrostatic_properties biological_and_kinetic_properties rheological_and_physical_properties
+  ------------------------------------------------------------
+  CATEGORIES (CHOOSE CLOSEST)
+  ------------------------------------------------------------
+  interfacial_and_surface_properties
+  physicochemical_and_phase_properties
+  soil_handling_and_electrostatic_properties
+  biological_and_kinetic_properties
+  rheological_and_physical_properties
+  ------------------------------------------------------------
 
-------------------------------------------------------------
-GRANULARITY RULES
-------------------------------------------------------------
-• One JSON entry per property per distinct critical_matrix set.
-• If a property is reported at multiple critical_matrix, create separate entries.
-• Include properties from text, tables, figures, and captions.
-
-------------------------------------------------------------
+  ------------------------------------------------------------
+  GRANULARITY RULES
+  ------------------------------------------------------------
+  • One JSON entry per property per distinct critical_matrix set.
+  • If a property is reported at multiple critical_matrix, create
+    separate entries.
+  • Include properties from text, tables, figures, and captions.
+  ------------------------------------------------------------
 
 ## LOCATION / GROUNDING (MANDATORY)
 
-Every property MUST include:
-• location.page (REQUIRED)
-• location.section (if available)
-• location.figure_or_table (if applicable)
-• location.source_type (text, figure, caption, table)
-• location.evidence (exact quote or close paraphrase)
+Every property MUST include: • location.page (REQUIRED) •
+location.section (if available) • location.figure_or_table (if
+applicable) • location.source_type (text, figure, caption, table) •
+location.evidence (exact quote or close paraphrase)
 
-------------------------------------------------------------
-SPARSE JSON FORMAT (VALUE-STRING ONLY)
-------------------------------------------------------------
-Output a SINGLE valid JSON object: // !!!
+## OUTPUT FORMAT (WRITE TO {predictions_path})
 
-{ "properties": [
-  {
-    "id": "prop_001",
-    "property_name": "...",
-    "category": "...",
-    "value_string": "...",
-    "critical_matrix": {
-      "condition1": "...",
-      "condition2": "...",
-      "condition3": "...",
-    },
-    "location": {
-      "page": 1,
-      "section": "...",
-      "figure_or_table": "...",
-      "source_type": "text",
-      "evidence": "..."
-    },
-    "notes": "..."
-  }
-] }
+Output a SINGLE valid JSON object:
+```json
+{
+  "properties": [
+    {
+      "id": "prop_001",
+      "property_name": "...",
+      "category": "...",
+      "value_string": "...",
+      "critical_matrix": {
+        "condition1": "...",
+        "condition2": "...",
+        "condition3": "..."
+      },
+      "location": {
+        "page": 1,
+        "section": "...",
+        "figure_or_table": "...",
+        "source_type": "text",
+        "evidence": "..."
+      },
+      "notes": "..."
+    }
+  ]
+}
+```
 
-Rules:
-• No value_number.
-• No units.
-• All quantities appear only inside value_string.
-• location.page is mandatory; all other fields may be omitted if not present.
-• In the format above, the name and number of CONDITIONS within the critical_matrix varies according to the TARGET PROPERTY, as described in the above section "TARGET PROPERTIES FOR THIS PAPER",
-each property has different name and number of CONDITIONS described in their own "critical_matrix", you should create unique "critical_matrix" for each entry and accordingly find their own CONDITIONS.
+Rules: keep units inside value_string (no value_number); location.page is mandatory; all
+other fields are optional—omit if not stated. Do not invent values.
 
-------------------------------------------------------------
+In the format above, the name and number of CONDITIONS within the critical_matrix varies according to the TARGET PROPERTY, as described in the above section "TARGET PROPERTIES FOR THIS PAPER".
+Each property has different name and number of CONDITIONS described in their own "critical_matrix", you should create unique "critical_matrix" for each entry and accordingly find their own CONDITIONS.
+
+  • Never merge values unless they form a tuple (e.g., coordinates).
+
+  ------------------------------------------------------------
 
 ## FINAL INSTRUCTIONS
 
-1. Scan the entire paper (text, formulas, tables, figures, captions).
-2. Extract EVERY explicitly reported physical property.
-3. Use sparse JSON with only value_string.  // ?
-4. Do NOT skip or compress entries.
-5. Output ONLY the JSON, with no explanations.
+1.  Scan the entire paper (text, formulas, tables, figures, captions).
+2.  Extract EVERY explicitly reported physical property.
+3.  Use the output format above (value_string carries any units inline).
+4.  Do NOT skip or compress entries.
+5.  Output ONLY the JSON, with no explanations.

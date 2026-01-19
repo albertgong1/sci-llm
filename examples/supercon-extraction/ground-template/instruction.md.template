@@ -118,8 +118,53 @@ For atomic sites in tables:
   If a property is reported at multiple temperatures, fields,
   pressures, or orientations, create separate entries. •
   Include properties from text, tables, figures, and captions.
-  • Never merge values unless they form a tuple (e.g.,
-  coordinates).
+
+## OUTPUT FORMAT (WRITE TO {predictions_path})
+
+Return a SINGLE valid JSON payload containing an array of properties. Below is the full schema.
+
+```json
+{
+  "properties": [
+    {
+      "id": "prop_001",
+      "material_or_system": "...",
+      "sample_label": "...",
+      "property_name": "...",
+      "category": "...",
+      "value_string": "...",         // value string from paper
+      "value_unit": "",             // usually blank; keep units inline in value_string
+      "qualifier": "...",
+      "value_detail": "...",
+      "conditions": {
+        "temperature": "...",
+        "pressure": "...",
+        "field": "...",
+        "frequency": "...",
+        "orientation": "...",
+        "environment": "...",
+        "sample_state": "...",
+        "other_conditions": "..."
+      },
+      "method": "...",
+      "model_or_fit": "...",
+      "location": {
+        "page": 1,
+        "section": "...",
+        "figure_or_table": "...",
+        "source_type": "text",
+        "evidence": "..."
+      },
+      "notes": "..."
+    }
+  ]
+}
+```
+Rules: keep units inside pred_value (no value_number); location.page is mandatory; all
+other fields are optional—omit if not stated. Do not invent values. Save this JSON to
+`{predictions_path}` and print only the JSON as your final response.
+
+  • Never merge values unless they form a tuple (e.g., coordinates).
 
   ------------------------------------------------------------
 
@@ -130,34 +175,12 @@ location.section (if available) • location.figure_or_table (if
 applicable) • location.source_type (text, figure, caption, table) •
 location.evidence (exact quote or close paraphrase)
 
-  ------------------------------------------------------------
-  SPARSE JSON FORMAT (VALUE-STRING ONLY)
-  ------------------------------------------------------------
-  Output a SINGLE valid JSON object:
-
-  { "properties": \[ { "id": "prop_001", "material_or_system":
-  "...", "sample_label": "...", "property_name": "...",
-  "category": "...", "value_string": "...", "qualifier":
-  "...", "value_detail": "...", "conditions": { "temperature":
-  "...", "pressure": "...", "field": "...", "frequency":
-  "...", "orientation": "...", "environment": "...",
-  "sample_state": "...", "other_conditions": "..." },
-  "method": "...", "model_or_fit": "...", "location": {
-  "page": 1, "section": "...", "figure_or_table": "...",
-  "source_type": "text", "evidence": "..." }, "notes": "..."
-  }\] }
-
-  Rules: • No value_number. • No units. • All quantities
-  appear only inside value_string. • location.page is
-  mandatory; all other fields may be omitted if not present.
-  ------------------------------------------------------------
-
 ## FINAL INSTRUCTIONS
 
 1.  Scan the entire paper (text, formulas, tables, figures, captions).
 2.  Extract EVERY explicitly reported physical property.
 3.  Apply symmetry rules, prototype rules, and atomic coordinate rules
     exactly.
-4.  Use sparse JSON with only value_string.
+4.  Use the output format above (value_string carries any units inline).
 5.  Do NOT skip or compress entries.
 6.  Output ONLY the JSON, with no explanations.

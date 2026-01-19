@@ -98,6 +98,12 @@ parser.add_argument(
     action="store_true",
     help="If true, filter out rows where paper PDF is not found at data_dir/Paper_DB",
 )
+parser.add_argument(
+    "--split",
+    type=str,
+    default="test",
+    help="Name of the split to use for the dataset (default: test)",
+)
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 
@@ -191,17 +197,17 @@ if args.filter_pdf:
     logger.info(f"{len(df_grouped)} rows have paper PDF")
 
 logger.info("Saving dataset to CSV...")
-save_path = args.output_dir / "dataset.csv"
+save_path = args.output_dir / f"{args.split}.csv"
 save_path.parent.mkdir(parents=True, exist_ok=True)
 df_grouped.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
 dataset = Dataset.from_pandas(df_grouped)
-dataset.save_to_disk(args.output_dir / "dataset")
-logger.info(f"Dataset saved to {args.output_dir / 'dataset'}")
+dataset.save_to_disk(args.output_dir / f"{args.split}")
+logger.info(f"Dataset saved to {args.output_dir / f'{args.split}'}")
 
 # Load the dataset from disk and print the first row
-loaded_dataset = Dataset.load_from_disk(args.output_dir / "dataset")
+loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.split}")
 logger.info("Loading first row from saved dataset:")
 first_row = loaded_dataset[0]
 print("\n" + "=" * 80)
@@ -219,7 +225,7 @@ if args.repo_name is not None:
     logger.info(f"Pushing dataset to HuggingFace Hub: {args.repo_name}")
     logger.info(f"Uploading {len(df_grouped)} rows...")
     dataset = Dataset.from_pandas(df_grouped)
-    dataset.push_to_hub(args.repo_name, private=True, split="test")
+    dataset.push_to_hub(args.repo_name, private=False, split=args.split)
     logger.info(f"All {len(df_grouped)} rows pushed to {args.repo_name}")
 
     # Tag the dataset so that we can easily refer to different versions of the dataset

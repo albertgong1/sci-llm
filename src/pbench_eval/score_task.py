@@ -41,7 +41,9 @@ from pbench_eval.utils import score_value, ASSETS_DIR
 logger = logging.getLogger(__name__)
 
 # Updated path for property clusters
-CLUSTER_FILE = Path("examples/supercon-extraction/scoring/property_clusters_gemini-3-pro-preview.json")
+CLUSTER_FILE = Path(
+    "examples/supercon-extraction/scoring/property_clusters_gemini-3-pro-preview.json"
+)
 
 CLUSTERS = {}
 if CLUSTER_FILE.exists():
@@ -64,7 +66,7 @@ def score_row(
 
     # Get specific mapping for this property if available
     mapping = CLUSTERS.get(property_name, None) if property_name else None
-    
+
     return score_value(
         str(pred_value), str(answer_value), rubric=rubric, mapping=mapping
     )
@@ -101,13 +103,17 @@ def analyze_scores(df: pd.DataFrame, output_dir: Path) -> None:
                     "mean": mean,
                     "se": se,
                     "n": n,
-                    "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                    "mean ± se": f"{mean:.3f} ± {se:.3f}"
+                    if not np.isnan(mean)
+                    else "N/A",
                 }
             )
 
         material_df = pd.DataFrame(material_stats)
-        material_df = material_df.sort_values("mean", ascending=False, na_position="last")
-        
+        material_df = material_df.sort_values(
+            "mean", ascending=False, na_position="last"
+        )
+
         print("\n" + "=" * 60)
         print("ANALYSIS: Mean Score by Material")
         print("=" * 60)
@@ -134,12 +140,16 @@ def analyze_scores(df: pd.DataFrame, output_dir: Path) -> None:
                     "mean": mean,
                     "se": se,
                     "n": n,
-                    "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                    "mean ± se": f"{mean:.3f} ± {se:.3f}"
+                    if not np.isnan(mean)
+                    else "N/A",
                 }
             )
 
         property_df = pd.DataFrame(property_stats)
-        property_df = property_df.sort_values("mean", ascending=False, na_position="last")
+        property_df = property_df.sort_values(
+            "mean", ascending=False, na_position="last"
+        )
 
         print("\n" + "=" * 60)
         print("ANALYSIS: Mean Score by Property")
@@ -197,12 +207,12 @@ def load_all_predictions(
         return pd.read_csv(combined_csv)
 
     if not preds_dir.exists():
-         # If input_csv was provided, main() handles it. Here we just fail if directory missing.
+        # If input_csv was provided, main() handles it. Here we just fail if directory missing.
         raise ValueError(f"Predictions directory not found: {preds_dir}")
 
     # Load all JSON files (Harbor generates one per trial)
     json_files = sorted(preds_dir.glob("*.json"))
-    
+
     if not json_files:
         raise ValueError(f"No JSON files found in {preds_dir}")
 
@@ -241,7 +251,7 @@ def score_predictions(
         rubric = rubric_mapping.get(property_name)
 
         if rubric is None and "rubric" in row:
-             rubric = row["rubric"]
+            rubric = row["rubric"]
 
         if rubric is None or pd.isna(rubric):
             scores.append(None)
@@ -267,6 +277,31 @@ def main() -> None:
         description="Score and analyze extraction results."
     )
     parser = pbench.add_base_args(parser)
+    # Domain args
+    parser.add_argument(
+        "--domain",
+        type=str,
+        default="supercon",
+        help="Material science domain",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="kilian-group/supercon-mini-v2",
+        help="Path to Ground Truth CSV or Hugging Face dataset name",
+    )
+    parser.add_argument(
+        "--task",
+        type=str,
+        default=None,
+        help="HuggingFace dataset configuration name, depending on the domain (e.g., 'tc', 'gap')",
+    )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="test",
+        help="Split of the dataset to use",
+    )
     parser.add_argument(
         "--input_csv",
         type=str,
@@ -313,24 +348,24 @@ def main() -> None:
     # 1. Try explicit CSV
     if args.input_csv:
         try:
-           df = pd.read_csv(args.input_csv)
-           logger.info(f"Loaded {len(df)} rows from {args.input_csv}")
+            df = pd.read_csv(args.input_csv)
+            logger.info(f"Loaded {len(df)} rows from {args.input_csv}")
         except Exception as e:
-           logger.error(f"Failed to load CSV: {e}")
-           sys.exit(1)
-           
+            logger.error(f"Failed to load CSV: {e}")
+            sys.exit(1)
+
     else:
         # 2. Try loading JSONs from standard directory structure
         try:
             df = load_all_predictions(args)
             logger.info(f"Loaded {len(df)} rows from JSONs")
-            
-            # Score them if they don't have scores (Harbor JSONs coming from collect_harbor_results.py MIGHT miss scores? 
+
+            # Score them if they don't have scores (Harbor JSONs coming from collect_harbor_results.py MIGHT miss scores?
             # No, details.json HAS scores, but we didn't explicitly put 'score' in the pbench formatted JSON.
-            # Let's check collect_harbor_results.py logic again. 
-            # It saves 'true' and 'pred', but NOT 'score' in the root. 
+            # Let's check collect_harbor_results.py logic again.
+            # It saves 'true' and 'pred', but NOT 'score' in the root.
             # So we MUST re-score here.
-            
+
             # Setup Rubric
             if args.rubric_csv_filename:
                 rubric_path = Path(args.rubric_csv_filename)
@@ -338,17 +373,17 @@ def main() -> None:
                 rubric_path = ASSETS_DIR / "hard" / "rubric.csv"
             else:
                 rubric_path = ASSETS_DIR / args.domain / "rubric.csv"
-            
+
             scores_dir = args.output_dir / args.domain / "scores"
             scores_dir.mkdir(parents=True, exist_ok=True)
             output_csv = scores_dir / "scored_results.csv"
-            
+
             logger.info("Scoring predictions...")
             df = score_predictions(df, rubric_path, output_csv)
-            
+
         except ValueError as e:
-             logger.error(e)
-             sys.exit(1)
+            logger.error(e)
+            sys.exit(1)
 
     if args.analyze:
         analyze_scores(df, analysis_dir)
