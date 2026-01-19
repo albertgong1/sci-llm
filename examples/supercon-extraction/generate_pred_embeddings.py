@@ -24,6 +24,7 @@ parser = pbench.add_base_args(parser)
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 jobs_dir = args.jobs_dir
+force = args.force
 
 if jobs_dir is not None:
     # Load predictions from Harbor jobs directory
@@ -50,6 +51,11 @@ embeddings_dir = args.output_dir / "pred_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
 
 for refno in df["refno"].unique():
+    save_path = embeddings_dir / f"{refno}.parquet"
+    if save_path.exists() and not force:
+        logger.info(f"Embeddings already exist for refno {refno}, skipping...")
+        continue
+
     # import pdb; pdb.set_trace()
     print(f"Generating embeddings for refno {refno}...")
     preds_df = df[df["refno"] == refno]
@@ -68,6 +74,5 @@ for refno in df["refno"].unique():
             "embedding": embeddings,
         }
     )
-    save_path = embeddings_dir / f"{refno}.parquet"
     embeddings_df.to_parquet(save_path)
     print(f"Saved embeddings to {save_path} with {len(embeddings_df)} rows")
