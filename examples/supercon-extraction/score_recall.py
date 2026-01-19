@@ -61,13 +61,6 @@ logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
 
-# Filter for rows where is_match is True
-original_count = len(df_matches)
-df_matches = df_matches[df_matches["is_match"] == True]  # noqa: E712
-logger.info(
-    f"Filtered to {len(df_matches)} rows where is_match=True (from {original_count} total)"
-)
-
 # Load rubric
 rubric_path = Path("scoring") / "rubric_2.csv"
 logger.info(f"Loading rubric from {rubric_path}")

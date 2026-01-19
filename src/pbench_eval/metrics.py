@@ -76,8 +76,14 @@ def compute_recall_per_material_property(
         matching_rows = []
 
         for idx, row in group.iterrows():
-            # Check if materials match using pymatgen
-            if pd.notna(material_gt) and pd.notna(row["material_or_system_pred"]):
+            # In order for a row to be considered a match:
+            # - The properties must match (using the "is_match" column)
+            # - The materials must match using scorer_pymatgen
+            if (
+                row["is_match"]
+                and pd.notna(material_gt)
+                and pd.notna(row["material_or_system_pred"])
+            ):
                 if scorer_pymatgen(
                     str(material_gt), str(row["material_or_system_pred"])
                 ):
@@ -182,7 +188,11 @@ def compute_precision_per_material_property(
 
         for idx, row in group.iterrows():
             # Check if materials match using pymatgen
-            if pd.notna(material_pred) and pd.notna(row["material_or_system_gt"]):
+            if (
+                row["is_match"]
+                and pd.notna(material_pred)
+                and pd.notna(row["material_or_system_gt"])
+            ):
                 if scorer_pymatgen(
                     str(material_pred), str(row["material_or_system_gt"])
                 ):
