@@ -64,6 +64,10 @@ def parse_numeric_candidates(value: str) -> list[tuple[float, str | None]]:
         [(1200.0, 'K')]
         >>> parse_numeric_candidates("12.34")
         [(12.34, None)]
+        >>> parse_numeric_candidates("100 mJ/mol.K2")
+        [(100.0, 'mJ/mol.K2')]
+        >>> parse_numeric_candidates("-3.774 E-3 cm3/C")
+        [(-0.003774, 'cm3/C')]
 
     """
     if value is None:
@@ -76,10 +80,13 @@ def parse_numeric_candidates(value: str) -> list[tuple[float, str | None]]:
     value_str = re.sub(r"\(\d+\)", "", value_str)
 
     candidates: list[tuple[float, str | None, int]] = []  # (value, unit, end_position)
+    sci_notation_positions: set[tuple[int, int]] = (
+        set()
+    )  # Track positions matched by sci notation
 
-    # Scientific notation: 1.2 x 10^3 with optional unit
+    # Scientific notation: 1.2 x 10^3 or 1.2 E-3 with optional unit
     sci_pattern = re.compile(
-        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:x|×)\s*10(?:\s*\^)?\s*(?P<exp>[-+]?\d+)\s*(?P<unit>[a-zA-Z/°%]+)?",
+        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:(?:x|×)\s*10(?:\s*\^)?|[eE])\s*(?P<exp>[-+]?\d+)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?",
         re.IGNORECASE,
     )
     for match in sci_pattern.finditer(value_str):
@@ -88,15 +95,27 @@ def parse_numeric_candidates(value: str) -> list[tuple[float, str | None]]:
             exp = int(match.group("exp"))
             unit = match.group("unit")
             candidates.append((base * (10**exp), unit, match.end()))
+            # Track the full range covered by this scientific notation match
+            sci_notation_positions.add((match.start(), match.end()))
         except Exception:
             continue
 
     # Standard float/int with optional unit: 12.34 nm, .5 K, 1e5 Pa
     num_pattern = re.compile(
-        r"(?P<num>[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)\s*(?P<unit>[a-zA-Z/°%]+)?"
+        r"(?P<num>[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?"
     )
     for match in num_pattern.finditer(value_str):
         try:
+            # Skip if this match overlaps with a scientific notation match
+            match_start = match.start()
+            match_end = match.end()
+            overlaps = any(
+                not (match_end <= sci_start or match_start >= sci_end)
+                for sci_start, sci_end in sci_notation_positions
+            )
+            if overlaps:
+                continue
+
             num = float(match.group("num"))
             unit = match.group("unit")
             candidates.append((num, unit, match.end()))
