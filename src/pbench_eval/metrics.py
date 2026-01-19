@@ -119,6 +119,7 @@ def compute_recall_per_material_property(
 
         results.append(
             {
+                "refno": group.iloc[0]["refno"],
                 "material_or_system_gt": material_gt,
                 "property_name_gt": property_gt,
                 "value_string_gt": ", ".join(
@@ -177,6 +178,18 @@ def compute_precision_per_material_property(
     results = []
 
     for (material_pred, property_pred), group in grouped:
+        # Get refno
+        if "refno" in group.columns:
+            assert len(group["refno"].unique()) == 1, "Expected single refno per group"
+            refno = group.iloc[0]["refno"]
+        else:
+            refno = None
+        # Get model
+        if "model" in group.columns:
+            assert len(group["model"].unique()) == 1, "Expected single model per group"
+            model = group.iloc[0]["model"]
+        else:
+            model = None
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -220,6 +233,8 @@ def compute_precision_per_material_property(
 
         results.append(
             {
+                "refno": refno,
+                "model": model,
                 "material_or_system_pred": material_pred,
                 "property_name_pred": property_pred,
                 "value_string_pred": ", ".join(
