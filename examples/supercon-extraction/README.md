@@ -4,8 +4,10 @@
 > Currently, we are using the original SuperCon dataset as the ground-truth, so please follow the instructions under [Constructing the Dataset from SuperCon original](#constructing-the-dataset-from-supercon-original) to construct the dataset.
 
 TODO:
-- [ ] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
+- [X] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
+- [ ] Share embeddings on HF.
 - [ ] Push GT property name embeddings to HF.
+- [ ] Compute interannotator agreement for post-2021 SuperCon.
 
 ## Setup Instructions
 
@@ -64,7 +66,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
 uv run python format_accuracy.py -jd JOBS_DIR
 ```
 
-<!-- ## Experiments using simple LLM API (for debugging only)
+## Experiments using simple LLM API (for debugging only)
 
 1. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task.
 This uses the existing huggingface repo https://huggingface.co/datasets/kilian-group/supercon-mini.
@@ -79,15 +81,31 @@ Outputs are stored at `out/supercon/preds/*.json`.
     --model_name gemini-2.5-flash \
     -od out/
 ```
+- [ ] Update these instructions
 
-2. Compute the accuracy of the extracted information:
+2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
-./src/pbench_eval/score_task.py \
-    --domain supercon \
-    --task tc \
-    -od out/
-``` -->
+uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+```
+
+3. Query LLM to determine best match between generated and ground-truth property name:
+
+```bash
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
+```
+
+4. Compute precision:
+
+```bash
+uv run python score_precision.py -od OUTPUT_DIR
+```
+
+5. Compute recall:
+
+```bash
+uv run python score_recall.py -od OUTPUT_DIR
+```
 
 ## Constructing the Dataset from SuperCon original
 
@@ -124,26 +142,24 @@ mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 uv run python generate_property_unit_mappings.py
 ```
 
-3. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction.
+4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction.
 
 > \[!NOTE\]
 > Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+> Also make sure to update HF_DATASET_NAME, HF_DATASET_REVISION, and HF_DATASET_SPLIT accordingly.
 
 ```bash
 uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
     --tag_name v0.0.0 --repo_name kilian-group/supercon-extraction --split SPLIT
 ```
 
-4. Create Harbor template for SuperCon:
+5. Generate embeddings for the ground-truth property names for scoring:
 
 ```bash
-# Copy the Harbor workspace template
-cp -r ../harbor-workspace/ground-template .
-# Add placeholder variable to the start of the prompt
-{ echo '{paper_at_command}'; echo; cat prompts/unsupervised_extraction_prompt.md; } > ground-template/instruction.md.template
+uv run python generate_gt_embeddings.py
 ```
 
-5. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
+6. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
@@ -201,36 +217,3 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
 ```
-
-
-<!-- ### Validating the dataset construction (SuperCon only)
-
-1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
-
-```bash
-uv run python generate_pred_embeddings.py -od OUTPUT_DIR
-uv run python generate_gt_embeddings.py -od OUTPUT_DIR
-```
-
-2. Query LLM to determine best match between generated and ground-truth property name:
-
-```bash
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
-```
-
-3. Compute recall:
-
-```bash
-uv run python score_recall.py -od OUTPUT_DIR
-```
-
-4. Compute precision:
-
-```bash
-uv run python score_precision.py -od OUTPUT_DIR
-```
-
-5. Compute inter-annotator agreement:
-
-```bash
-``` -->
