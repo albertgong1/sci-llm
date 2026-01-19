@@ -171,22 +171,28 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
 
 ## Constructing the Post-2021 version of the SuperCon Dataset from Scratch
 
-1. Download PDFs and place them in `DATA_DIR/Paper_DB`.
-- [ ] TODO (Anmol): Manually download the 19 PDFs listed in https://docs.google.com/spreadsheets/d/1vrHiEV15S39tHtsq-_T6-1Ei0yeSpLTMI7b1t5USagY/edit?usp=sharing
-- [ ] TODO (Anmol): Upload PDFs to Google Drive and add download link here.
+1. Download PDFs from [Google Drive Folder](https://drive.google.com/file/d/1yrZJkDAYQpLPpgqtEqU2gn6VGjrckXFa/view?usp=drive_link) and place them in `data/new-supercon-papers/Paper_DB`:
+```bash
+# Assumes new-supercon-papers.tar is in the current directory
+tar -xvf new-supercon-papers.tar
+mkdir -p data/new-supercon-papers/ && mv supercon-new-papers data/new-supercon-papers/Paper_DB
+```
 
-2. Obtain candidate properties:
+2. Obtain candidate properties (skip as Anmol did this step already):
+
+> \[!NOTE\]
+> Anmol created a `out-new-supercon-papers.zip` in [Google Drive](https://drive.google.com/file/d/164MrUNANseRpk88vdl35tDMKMORY3Lsk/view?usp=drive_link). Download it and place it in current directory.
 
 - Extract properties from PDFs using an LLM:
 
 ```bash
-uv run pbench-extract --server gemini --model_name gemini-3-pro-preview -dd DATA_DIR -od OUTPUT_DIR -pp prompts/unsupervised_extraction_prompt.md
+uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -dd data/new-supercon-papers -od out-new-supercon-papers -pp prompts/unsupervised_extraction_prompt.md
 ```
 
-- Add `data_type` column to the CSV. The resulting CSV will be saved to `OUTPUT_DIR/candidates`.
+- Add `data_type` column to the CSV. The resulting CSV will be saved to `out-new-supercon-papers/candidates`.
 
 ```bash
-uv run pbench-filter -dd DATA_DIR -od OUTPUT_DIR
+uv run pbench-filter -dd data/new-supercon-papers -od out-new-supercon-papers
 ```
 
 3. Launch the validator app and accept/reject the candidates:
@@ -195,25 +201,27 @@ uv run pbench-filter -dd DATA_DIR -od OUTPUT_DIR
 > This step requires manual effort and is not fully reproducibile.
 
 ```bash
+# Assumes out-new-supercon-papers/ exists in this directory
+
 uv sync --group validator
-uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
+uv run streamlit run ../../src/pbench_validator_app/app.py -- -od out-new-supercon-papers
 ```
 
-4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
+4. Create a local HuggingFace dataset `out-new-supercon-papers/SPLIT` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
 
 > \[!NOTE\]
 > Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
 
 ```bash
-uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
+uv run python create_huggingface_dataset.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
     --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
 ```
 
-5. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
+5. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
-    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --pdf-dir data/new-supercon-papers/Paper_DB --output-dir out-new-supercon-papers --workspace . \
     --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
 ```
