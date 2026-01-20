@@ -5,10 +5,6 @@ captions), extract a list of TARGET properties using ONLY
 information explicitly stated in the paper. Never infer or guess. If
 unsure whether something is a property, include it.
 
-This run is specifically for the paper(attached as a pdf):
-
-Gao, Yuan, Chun-Xia Zhao, and Frank Sainsbury. "Droplet shape control using microfluidics and designer biosurfactants." Journal of Colloid and Interface Science 584 (2021): 528-538.
-
 Missing information rule: You are required to extract a list of TARGET properties that are given below in the below section "TARGET PROPERTIES FOR THIS PAPER",
 To ensure that the property extraction is precise and scientifically actionable, you need to capture not just the numerical value, but the Critical Matrix Variables—the "metadata" that gives the value meaning.
 Each property has its own critical matrix, which include all the CONDITIONS that we need to describe this property. You must list all the CONDITIONS in the critical_matrix when you find a property.
