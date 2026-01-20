@@ -66,22 +66,13 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 uv run python format_accuracy.py -jd JOBS_DIR
 ```
 
-## Experiments using simple LLM API (for debugging only)
+### Using the LLM API (no Harbor)
 
-1. Generate predictions using `gemini-2.5-flash` for the `tc` (short for "Tc (of this sample) recommended") task.
-This uses the existing huggingface repo https://huggingface.co/datasets/kilian-group/supercon-mini.
-
-Outputs are stored at `out/supercon/preds/*.json`.
+1. Please run the following command to generate the predictions:
 
 ```bash
-./src/pbench_eval/extract_properties.py \
-    --domain supercon \
-    --task tc \
-    --server gemini \
-    --model_name gemini-2.5-flash \
-    -od out/
+uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md
 ```
-- [ ] Update these instructions
 
 2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
@@ -184,6 +175,7 @@ mkdir -p data/new-supercon-papers/ && mv supercon-new-papers data/new-supercon-p
 > Anmol created a `out-new-supercon-papers.zip` in [Google Drive](https://drive.google.com/file/d/164MrUNANseRpk88vdl35tDMKMORY3Lsk/view?usp=drive_link). Download it and place it in current directory.
 
 - Extract properties from PDFs using an LLM:
+- [ ] @anmolkabra: Replace the prompt with [targeted_extraction_prompt.md](prompts/targeted_extraction_prompt.md)
 
 ```bash
 uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -dd data/new-supercon-papers -od out-new-supercon-papers -pp prompts/unsupervised_extraction_prompt.md
