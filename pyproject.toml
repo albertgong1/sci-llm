@@ -24,6 +24,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "pymatgen",
+    "python-dotenv",
     "pyyaml",
     "tqdm",
     "google-genai",

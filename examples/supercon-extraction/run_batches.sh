@@ -11,9 +11,9 @@ jobs_dir=$1
 shift
 cmd_args=$@
 
-for batch in {1..10}; do
+for batch in {1..1}; do
   echo "Running batch ${batch}..."
-  uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+  uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
     --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks --hf-tasks-version v0.1.0 \
     -a gemini-cli -m gemini/gemini-3-pro-preview \
     --workspace . --jobs-dir "${jobs_dir}" --seed 1 --batch-size 10 --batch-number "${batch}" \
