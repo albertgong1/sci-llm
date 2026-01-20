@@ -508,6 +508,11 @@ def main() -> None:
         help="Overwrite the output task directory if it already exists.",
     )
     parser.add_argument(
+        "--write-job-config",
+        action="store_true",
+        help="Also emit a Harbor job config pointing at the generated tasks.",
+    )
+    parser.add_argument(
         "--upload-hf",
         action="store_true",
         help="Upload the generated tasks to a Hugging Face repo (writes registry.json).",
