@@ -6,6 +6,15 @@ import json
 
 from google import genai
 from google.genai import types as genai_types
+from google.genai.errors import ServerError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+import logging
 
 from llm_utils.common import (
     Conversation,
@@ -13,6 +22,18 @@ from llm_utils.common import (
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
+)
+
+
+logger = logging.getLogger(__name__)
+
+# Retry decorator for Gemini API calls
+_retry_decorator = retry(
+    retry=retry_if_exception_type(ServerError),
+    stop=stop_after_attempt(6),
+    wait=wait_exponential_jitter(initial=1, max=60),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
 )
 
 
@@ -83,21 +104,17 @@ class GeminiChat(LLMChat):
 
         return messages
 
-    def _call_api(
-        self,
-        messages: list[dict[str, Any]],
-        inf_gen_config: InferenceGenerationConfig,
-        use_async: bool = False,
-    ) -> Any:
-        """Call the Gemini API.
+    def _build_gen_kwargs(
+        self, messages: list[dict[str, Any]], inf_gen_config: InferenceGenerationConfig
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Build generation kwargs for the Gemini API.
 
         Args:
             messages: Messages in Gemini's format.
             inf_gen_config: Inference generation configuration.
-            use_async: Whether to return an async coroutine.
 
         Returns:
-            Raw API response or async coroutine.
+            Tuple of (possibly modified messages, generation kwargs).
 
         """
         gen_kwargs: dict[str, Any] = {
@@ -133,18 +150,57 @@ class GeminiChat(LLMChat):
             gen_kwargs["system_instruction"] = messages[0]["parts"][0]
             messages = messages[1:]
 
-        # Gemini's chat expects history (all but last message) and current message
+        return messages, gen_kwargs
+
+    def _call_api(
+        self,
+        messages: list[dict[str, Any]],
+        inf_gen_config: InferenceGenerationConfig,
+        use_async: bool = False,
+    ) -> Any:
+        """Call the Gemini API with retry/backoff for transient errors.
+
+        Args:
+            messages: Messages in Gemini's format.
+            inf_gen_config: Inference generation configuration.
+            use_async: Whether to return an async coroutine.
+
+        Returns:
+            Raw API response or async coroutine.
+
+        """
+        messages, gen_kwargs = self._build_gen_kwargs(messages, inf_gen_config)
+
         if use_async:
-            client = self.client.aio
+            return self._call_api_async_with_retry(messages, gen_kwargs)
         else:
-            client = self.client
-        response = client.models.generate_content(
+            return self._call_api_sync_with_retry(messages, gen_kwargs)
+
+    @_retry_decorator
+    def _call_api_sync_with_retry(
+        self,
+        messages: list[dict[str, Any]],
+        gen_kwargs: dict[str, Any],
+    ) -> Any:
+        """Call the Gemini API synchronously with retry/backoff."""
+        return self.client.models.generate_content(
             model=self.model_name,
             contents=messages,
             config=genai_types.GenerateContentConfig(**gen_kwargs),
         )
 
-        return response
+    @_retry_decorator
+    async def _call_api_async_with_retry(
+        self,
+        messages: list[dict[str, Any]],
+        gen_kwargs: dict[str, Any],
+    ) -> Any:
+        """Call the Gemini API asynchronously with retry/backoff."""
+        return await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=messages,
+            config=genai_types.GenerateContentConfig(**gen_kwargs),
+        )
 
     def _parse_api_output(
         self, response: Any, inf_gen_config: InferenceGenerationConfig
