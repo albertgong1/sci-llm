@@ -165,6 +165,32 @@ property_name = "structure prototype" OR "crystal structure
 type" value_string = full descriptive phrase (e.g.,
 "Th7Fe3-type hexagonal structure")
 
+## ATOMIC COORDINATES & WYCKOFF POSITION RULES (VERY IMPORTANT)
+
+For atomic sites in tables:
+
+1.  Fractional coordinates (x, y, z): • property_name = "atomic
+    fractional coordinates" • value_string MUST be exactly "(x, y, z)" •
+    DO NOT include units (fractional coordinates are dimensionless)
+
+2.  Wyckoff positions (e.g., "2b", "6c"): • property_name = "Wyckoff
+    position" • value_string = the Wyckoff label
+
+3.  Each atomic site generates TWO entries:
+
+    a)  one for the Wyckoff position
+    b)  one for the fractional coordinates
+
+4.  Do NOT merge sites. Multiple sites in 6c → separate entries.
+
+5.  The atom label (e.g., "Th1", "Ru3") must appear in
+    material_or_system.
+
+**GRANULARITY RULES**
+- One JSON entry per property per distinct condition set.
+- If a property is reported at multiple temperatures, fields, pressures, or orientations, create separate entries.
+- Include properties from text, tables, figures, and captions.
+
 ## LOCATION / GROUNDING (MANDATORY)
 
 Every property MUST include:
