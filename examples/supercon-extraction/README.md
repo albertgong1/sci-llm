@@ -71,31 +71,34 @@ uv run python format_accuracy.py -jd JOBS_DIR
 1. Please run the following command to generate the predictions:
 
 ```bash
-uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md
+# Registry and max num papers flags define an ordering to process the big list of papers and a limit. Remove them
+# to process the full dataset in DATA_DIR=data
+uv run --env-file=.env pbench-extract -dd DATA_DIR --server gemini -m gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50
 ```
 
 2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
-uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+uv run --env-file=.env python generate_pred_embeddings.py -od OUTPUT_DIR
 ```
 
 3. Query LLM to determine best match between generated and ground-truth property name:
 
 ```bash
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
+uv run --env-file=.env generate_gt_embeddings.py
+uv run --env-file=.env python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
 ```
 
 4. Compute precision:
 
 ```bash
-uv run python score_precision.py -od OUTPUT_DIR
+uv run --env-file=.env python score_precision.py -od OUTPUT_DIR
 ```
 
 5. Compute recall:
 
 ```bash
-uv run python score_recall.py -od OUTPUT_DIR
+uv run --env-file=.env python score_recall.py -od OUTPUT_DIR
 ```
 
 ## Constructing the Dataset from SuperCon original
