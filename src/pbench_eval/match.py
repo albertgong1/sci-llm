@@ -88,7 +88,7 @@ async def check_if_same_property(
             "reason": "Property names are identical",
             "confidence": "high",
             "matched_via": "exact",
-            "model": None,
+            "judge": None,
             "prompt": None,
         }
         return result, {}
@@ -114,11 +114,11 @@ async def check_if_same_property(
         "reason": reason,
         "confidence": confidence,
         "matched_via": matched_via,
-        "model": llm.model_name,
+        "judge": llm.model_name,
         "prompt": prompt,
     }
 
-    return result, {**response.model_dump(), "model": llm.model_name}
+    return result, {**response.model_dump(), "judge": llm.model_name}
 
 
 async def generate_property_name_matches(
