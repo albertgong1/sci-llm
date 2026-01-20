@@ -42,7 +42,7 @@ TODO:
 1. Please run the following command to execute the Harbor tasks in batches of size 10:
 
 ```bash
-uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks --hf-tasks-version v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
@@ -52,7 +52,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
     <summary>Instructions for running Harbor tasks saved locally</summary>
 
 ```bash
-uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --registry-path OUTPUT_DIR/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10

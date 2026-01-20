@@ -14,7 +14,7 @@
 > Adding the `--seed 1` flag will randomly shuffle the tasks.
 
 ```bash
-uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --seed 1 --jobs-dir JOBS_DIR
@@ -24,7 +24,7 @@ uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
     <summary>Instructions for running Harbor on Modal</summary>
 
 ```bash
-uv run python ../../src/harbor-task-gen/run_harbor.py jobs start \
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
   -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
   --seed 1 --jobs-dir JOBS_DIR
