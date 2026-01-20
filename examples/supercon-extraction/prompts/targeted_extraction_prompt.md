@@ -16,7 +16,7 @@ positive integer.
 
 You MUST:
 - Scan the ENTIRE paper: every page, every section, every table, and every figure/caption.
-- Extract EVERY physical property that appears, not just the most important ones.
+- Extract EVERY target property that appears.
 - Include borderline or ambiguous cases instead of skipping them.
 - NOT stop early because you feel "enough" has been extracted.
 - NOT downsample, summarize, or merge distinct entries for brevity.
@@ -252,7 +252,7 @@ Rules:
 ## FINAL INSTRUCTIONS
 
 1.  Scan the entire paper (text, formulas, tables, figures, captions).
-2.  Extract EVERY explicitly reported physical property.
+2.  Extract EVERY explicitly reported target property.
 3.  Apply symmetry rules, prototype rules, and atomic coordinate rules
     exactly.
 4.  Use the output format above (value_string carries any units inline).
