@@ -184,7 +184,7 @@ one and still record the property.
 Every property MUST include: • location.page (REQUIRED) •
 location.section (if available) • location.figure_or_table (if
 applicable) • location.source_type (text, figure, caption, table) •
-location.evidence (exact quote or close paraphrase)
+location.evidence (exact quote --- IT MUST EXACTLY MATCH THE PAPER)
 
 ## OUTPUT FORMAT
 
