@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 import asyncio
 from datasets import load_dataset
 from pathlib import Path
+from slugify import slugify
 
 # llm imports
 from llm_utils import (
@@ -93,6 +94,8 @@ async def main(args: argparse.Namespace) -> None:
     if jobs_dir is not None:
         # Load predictions from Harbor jobs directory
         df = get_harbor_data(jobs_dir)
+        # HACK
+        df = df[df["agent"].isin(["gemini-cli", "codex"])]
     else:
         # Load predictions from CSV files
         pred_properties_dir = output_dir / "unsupervised_llm_extraction"
@@ -154,14 +157,18 @@ async def main(args: argparse.Namespace) -> None:
         output_format="json",
     )
 
-    for refno in df["refno"].unique():
+    for (agent, model, refno), group in df.groupby(["agent", "model", "refno"]):
+        # for refno in group["refno"].unique():
         if args.refno is not None and refno != args.refno:
             continue
         logger.info(f"Processing refno {refno}...")
         # Get predicted properties for this refno
-        df_pred = df[df["refno"] == refno]
+        # df_pred = df[df["refno"] == refno]
+        df_pred = group
         # Obtain the embeddings for the predicted properties
-        df_pred_embeddings = pd.read_parquet(pred_embeddings_dir / f"{refno}.parquet")
+        df_pred_embeddings = pd.read_parquet(
+            pred_embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
+        )
         # Join df_pred and df_pred_embeddings on property_name
         df_pred = df_pred.merge(
             df_pred_embeddings[["property_name", "embedding"]],
@@ -178,13 +185,17 @@ async def main(args: argparse.Namespace) -> None:
 
         # -- Get top-k matches for each predicted property name (to compute precision) --
         pred_matches_path = (
-            pred_matches_dir / f"pred_matches_{refno}_{model_name}_k{top_k}.csv"
+            pred_matches_dir
+            / f"pred_matches_{slugify(agent)}_{slugify(model)}_{refno}_judge={model_name}_k={top_k}.csv"
         )
         pred_responses_path = (
-            pred_responses_dir / f"pred_responses_{refno}_{model_name}_k{top_k}.csv"
+            pred_responses_dir
+            / f"pred_responses_{slugify(agent)}_{slugify(model)}_{refno}_judge={model_name}_k={top_k}.csv"
         )
         if pred_matches_path.exists() and not force:
-            logger.info(f"Skipping refno {refno} because pred matches already exist")
+            logger.info(
+                f"Skipping {agent=} {model=} {refno=} because pred matches already exist"
+            )
         else:
             df_pred_matches, df_pred_responses = await generate_property_name_matches(
                 df_pred,
@@ -208,13 +219,17 @@ async def main(args: argparse.Namespace) -> None:
 
         # -- Get top-k matches for each ground truth property name (to compute recall) --
         gt_matches_path = (
-            gt_matches_dir / f"gt_matches_{refno}_{model_name}_k{top_k}.csv"
+            gt_matches_dir
+            / f"gt_matches_{slugify(agent)}_{slugify(model)}_{refno}_judge={model_name}_k={top_k}.csv"
         )
         gt_responses_path = (
-            gt_responses_dir / f"gt_responses_{refno}_{model_name}_k{top_k}.csv"
+            gt_responses_dir
+            / f"gt_responses_{slugify(agent)}_{slugify(model)}_{refno}_judge={model_name}_k={top_k}.csv"
         )
         if gt_matches_path.exists() and not force:
-            logger.info(f"Skipping refno {refno} because gt matches already exist")
+            logger.info(
+                f"Skipping {agent=} {model=} {refno=} because gt matches already exist"
+            )
         else:
             df_gt_matches, df_gt_responses = await generate_property_name_matches(
                 df_gt_refno,

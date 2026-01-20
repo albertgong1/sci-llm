@@ -274,21 +274,39 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
+        # get the agent and model name from the batch_dir config.json
+        agent, model = None, None
+        config_path = batch_dir / "config.json"
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text())
+                if config.get("agents"):
+                    agent = config["agents"][0].get("name")
+                    model = config["agents"][0].get("model_name")
+            except Exception:
+                pass
 
         for trial_dir in sorted(batch_dir.iterdir()):
             if not trial_dir.is_dir():
                 continue
-
+            # if trial_dir == Path("/Users/ag2435/sci_llm/src/sci-llm/examples/supercon-extraction/jobs-0119-2/bn4-bs10-gemini-cli-gemini-3-flash-preview-s1/epl10417003__N7A2Qhh"):
+            #     import pdb; pdb.set_trace()
             predictions = _load_trial_predictions(trial_dir)
             if predictions is None:
                 logger.warning(f"No valid predictions found in trial: {trial_dir}")
                 continue
-
+            if "properties" not in str(predictions):
+                logger.warning(
+                    f"'properties' key not found in predictions for trial: {trial_dir}"
+                )
+                continue
             # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
             refno, _ = trial_dir.name.split("__")
 
             df = pd.DataFrame(
                 data={
+                    "agent": agent,
+                    "model": model,
                     "batch": batch_dir.name,
                     "trial_id": trial_dir.name,
                     "refno": refno,
@@ -300,5 +318,7 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             df_properties = pd.json_normalize(df["properties"])
             df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
             dfs.append(df)
+    if not dfs:
+        raise ValueError(f"No valid trials found in jobs directory: {jobs_dir}")
     df = pd.concat(dfs, ignore_index=True)
     return df
