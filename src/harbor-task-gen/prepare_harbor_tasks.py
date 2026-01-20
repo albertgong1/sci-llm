@@ -235,6 +235,36 @@ def flatten_dataset(
     return grouped
 
 
+def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> None:
+    """Write a Harbor job YAML pointing at the generated tasks."""
+    if tasks_dir.is_absolute():
+        try:
+            tasks_rel = tasks_dir.relative_to(workspace)
+        except ValueError:
+            tasks_rel = tasks_dir
+    else:
+        tasks_rel = tasks_dir
+    job_yaml = f"""\
+jobs_dir: jobs
+n_attempts: 1
+timeout_multiplier: 1.0
+orchestrator:
+  type: local
+  n_concurrent_trials: 2
+  quiet: false
+environment:
+  type: docker
+  force_build: true
+  delete: true
+agents:
+  - name: oracle
+datasets:
+  - path: {tasks_rel.as_posix()}
+"""
+    job_path.parent.mkdir(parents=True, exist_ok=True)
+    job_path.write_text(job_yaml)
+
+
 def write_local_registry(
     task_dirs: list[Path],
     registry_path: Path,
@@ -656,7 +686,18 @@ def main() -> None:
             task_rel = task_dir
         print(f"Wrote task {task_id} -> {task_rel}")
 
-    # Write local registry.json
+    if args.write_job_config:
+        job_path = task_root / "job.yaml"
+        write_job_config(tasks_dir, job_path, workspace=resolved_workspace)
+        try:
+            job_rel = job_path.relative_to(resolved_workspace)
+        except ValueError:
+            job_rel = job_path
+        print(f"Wrote job config -> {job_rel}")
+
+    # -- Write local registry.json --
+    # NOTE: the local registry JSON is consistent with the HF upload registry JSON,
+    # just with local task paths.
     generated_task_dirs = _collect_task_dirs(tasks_dir)
     if generated_task_dirs:
         registry_path = task_root / "registry.json"
