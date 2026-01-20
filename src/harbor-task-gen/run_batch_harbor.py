@@ -182,7 +182,9 @@ def _get_agent_model_from_argv(argv: list[str]) -> tuple[str | None, str | None]
     return agent_name, model_name
 
 
-def _get_batch_job_name(argv: list[str], batch_number: int, seed: int | None) -> str:
+def _get_batch_job_name(
+    argv: list[str], batch_size: int, batch_number: int, seed: int | None
+) -> str:
     """Generate the job name that would be used for a batch.
 
     This mirrors the logic in _apply_batching_to_argv to determine
@@ -196,14 +198,18 @@ def _get_batch_job_name(argv: list[str], batch_number: int, seed: int | None) ->
     else:
         model_part = "model"
     seed_part = f"-s{seed}" if seed is not None else ""
-    return f"bn{batch_number}-{agent_part}-{model_part}{seed_part}"
+    return f"bn{batch_number}-bs{batch_size}-{agent_part}-{model_part}{seed_part}"
 
 
 def _batch_already_processed(
-    workspace: Path, argv: list[str], batch_number: int, seed: int | None
-) -> bool:
+    workspace: Path,
+    argv: list[str],
+    batch_size: int,
+    batch_number: int,
+    seed: int | None,
+) -> Path | None:
     """Check if a batch has already been processed by looking for the job directory."""
-    job_name = _get_batch_job_name(argv, batch_number, seed)
+    job_name = _get_batch_job_name(argv, batch_size, batch_number, seed)
 
     # Determine where jobs are stored based on command type
     run_roots = _run_roots_from_args(argv, workspace=workspace)
@@ -214,9 +220,9 @@ def _batch_already_processed(
             continue
         job_dir = root / job_name
         if job_dir.exists():
-            return True
+            return job_dir
 
-    return False
+    return None
 
 
 def _apply_batching_to_argv(
@@ -276,7 +282,7 @@ def _apply_batching_to_argv(
 
     new_argv = _replace_registry_path_in_argv(argv, str(batch_registry_path))
 
-    # Set job name: bn{batch_number}-{agent_name}-{model_name}{seed_suffix}
+    # Set job name: bn{batch_number}-bs{batch_size}-{agent_name}-{model_name}{seed_suffix}
     agent_name, model_name = _get_agent_model_from_argv(argv)
     agent_part = agent_name or "agent"
     # Clean model name: remove provider prefix and special chars
@@ -285,7 +291,7 @@ def _apply_batching_to_argv(
     else:
         model_part = "model"
     seed_part = f"-s{seed}" if seed is not None else ""
-    job_name = f"bn{batch_number}-{agent_part}-{model_part}{seed_part}"
+    job_name = f"bn{batch_number}-bs{batch_size}-{agent_part}-{model_part}{seed_part}"
 
     # Add --job-name argument for the job name (always use the auto-generated name)
     new_argv = [*new_argv, "--job-name", job_name]
@@ -531,13 +537,21 @@ def main() -> int:
         exit_code = 0
         for bn in batch_indices:
             # Check if batch has already been processed (unless --force is set)
-            if not force and _batch_already_processed(workspace, argv, bn, seed):
-                job_name = _get_batch_job_name(argv, bn, seed)
-                print(
-                    f"\n=== Skipping batch {bn}/{total_batches} (already processed: {job_name}) ===",
-                    file=sys.stderr,
-                )
-                continue
+            if job_dir := _batch_already_processed(
+                workspace, argv, batch_size, bn, seed
+            ):
+                if force:
+                    print(
+                        f"\n=== Reprocessing batch {bn}/{total_batches} (deleting existing: {job_dir}) ===",
+                        file=sys.stderr,
+                    )
+                    shutil.rmtree(job_dir)
+                else:
+                    print(
+                        f"\n=== Skipping batch {bn}/{total_batches} (already processed: {job_dir}) ===",
+                        file=sys.stderr,
+                    )
+                    continue
 
             print(
                 f"\n=== Running batch {bn}/{total_batches} ===",
