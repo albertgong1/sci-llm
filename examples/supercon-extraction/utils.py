@@ -19,6 +19,8 @@ HF_DATASET_REVISION = "main"  # "v0.0.0"
 HF_DATASET_SPLIT = "full"
 GT_EMBEDDINGS_PATH = Path("scoring/gt_property_name_gemini-embedding-001.json")
 
+RUBRIC_PATH = Path("scoring") / "rubric_4.csv"
+
 # Crystal structure symmetry mapping
 CRYSTAL_SYMMETRY: dict[int, str] = {
     1: "cubic",

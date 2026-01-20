@@ -121,10 +121,10 @@ these standard names and include as many conditions as possible.
 - isotope element
 - -slope in Hc2 vs T at Tc for single crystal for H //c-axis
 - -slope in Hc2 vs T at Tc for single crystal for H //ab-plane
-- coherence length at 0 K for single crystal for H ���ab-plane
+- coherence length at 0 K for single crystal for H ⊥ab-plane
 - exchange ratio of isotope(%)
 - DTC = Tc - Tc0 for isotope element
-- penetration depth at 0 K for single crystal for H���ab-plane
+- penetration depth at 0 K for single crystal for H⊥ab-plane
 - Hc2 at given temperature for poly crystal
 - Hc1 at given temperature for poly crystal
 - Hc1 at 0 K for single crystal for H //c-axis
