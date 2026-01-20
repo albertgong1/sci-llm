@@ -46,7 +46,7 @@ df_token_usage = (
 print(tabulate(df_token_usage, headers="keys", tablefmt="github", showindex=False))
 
 # Load pricing data
-pricing_file = "model_pricing.yaml"
+pricing_file = "../../src/llm_utils/model_pricing.yaml"
 with open(pricing_file, "r") as f:
     pricing_map = yaml.safe_load(f)
 
