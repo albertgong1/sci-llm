@@ -347,7 +347,28 @@ async def extract_properties(args: argparse.Namespace) -> None:
         if excluded_count > 0:
             logger.info(f"Excluded {excluded_count} PDF file(s) based on exclude list")
 
-    num_pdfs = len(pdf_files)
+    # Default ordering is by filename
+    refnos_ordering: list[str] = [pdf.stem for pdf in pdf_files]
+    if args.harbor_task_ordering_registry_path is not None:
+        logger.info(f"Loading harbor task ordering from {args.harbor_task_ordering_registry_path}")
+        with open(args.harbor_task_ordering_registry_path, "r") as f:
+            harbor_task_ordering = json.load(f)
+        
+        # Load the refnos from harbor_task_ordering[0]["tasks"][:]["name"]
+        refnos_ordering = [task["name"].strip().upper() for task in harbor_task_ordering[0]["tasks"]]
+
+    if args.max_num_papers is not None:
+        refnos_ordering = refnos_ordering[:args.max_num_papers]
+    
+    # Reorder the pdf_files based on the refnos_ordering
+    reordered_pdf_files = []
+    for refno in refnos_ordering:
+        for pdf in pdf_files:
+            if pdf.stem == refno:
+                reordered_pdf_files.append(pdf)
+                break
+
+    num_pdfs = len(reordered_pdf_files)
     logger.info(f"Found {num_pdfs} PDF files in {paper_dir}")
 
     if num_pdfs == 0:
@@ -370,7 +391,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
     model_name_safe = args.model_name.replace("/", "--")
 
     # Process each PDF
-    for pdf_path in tqdm(pdf_files, desc="Processing PDFs"):
+    for pdf_path in tqdm(reordered_pdf_files, desc="Processing PDFs"):
         refno = pdf_path.stem
 
         # Skip if refno is specified and this isn't it
@@ -438,7 +459,18 @@ def main() -> None:
         default=None,
         help="Path to file containing list of PDF filenames to exclude (one per line)",
     )
-
+    parser.add_argument(
+        "--harbor_task_ordering_registry_path",
+        type=Path,
+        default=None,
+        help="Path to the registry_data.json file that defines the ordering of the papers to process (default: None)",
+    )
+    parser.add_argument(
+        "--max_num_papers",
+        type=int,
+        default=None,
+        help="Maximum number of papers to process (default: None)",
+    )
     # LLM generation arguments
     parser.add_argument(
         "--max_output_tokens",

@@ -62,6 +62,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model_name",
+        "-m",
         type=str,
         default="gemini-3-flash-preview",
         help="Model name (e.g., 'gemini-3-flash-preview').",
