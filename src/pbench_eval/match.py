@@ -9,8 +9,7 @@ import asyncio
 import json
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from pathlib import Path
-from joblib import Memory
+
 
 # llm imports
 from google import genai
@@ -60,42 +59,12 @@ def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
     return embeddings
 
 
-# Initialize joblib Memory for persistent caching
-_cache_dir = Path(".cache/property_matching")
-_cache_dir.mkdir(parents=True, exist_ok=True)
-memory = Memory(_cache_dir, verbose=0)
-
-
-@memory.cache
-def _store_property_check_result(
-    model_name: str,
-    prompt: str,
-    config_json: str,
-    result: dict,
-) -> dict:
-    """Store and retrieve cached property check results.
-
-    This is a simple pass-through function that joblib caches.
-    When called with the same inputs, it returns the cached result.
-
-    Args:
-        model_name: Name of the LLM model
-        prompt: Input prompt
-        config_json: JSON string of inference config
-        result: Result dictionary to cache
-
-    Returns:
-        The result dictionary
-
-    """
-    return result
-
-
 async def check_if_same_property(
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
     prompt: str,
-    use_cache: bool = True,
+    property_name_1: str,
+    property_name_2: str,
 ) -> tuple[dict, dict]:
     """Check if two property names are the same using an LLM.
 
@@ -103,33 +72,26 @@ async def check_if_same_property(
         llm: LLM instance
         inf_gen_config: Inference generation configuration
         prompt: input to the LLM
-        use_cache: Whether to use caching (default: True)
+        property_name_1: First property name
+        property_name_2: Second property name
 
     Returns:
         dict: Dictionary containing the result of the check
         dict: Dictionary containing the raw response from the LLM
 
     """
-    # # Create cache key from hashable parameters
-    # config_json = json.dumps(inf_gen_config.model_dump())
-
-    # # Try to get from cache - we pass a dummy result to check if it's cached
-    # if use_cache:
-    #     try:
-    #         # Use call_and_shelve to check cache without executing
-    #         cached = _store_property_check_result.call_and_shelve(
-    #             llm.model_name,
-    #             prompt,
-    #             config_json,
-    #             {},  # dummy result
-    #         )
-    #         result = cached.get()
-    #         # If we got a non-empty cached result, return it
-    #         if result and result.get("model"):
-    #             logger.debug(f"Cache hit for prompt: {prompt[:50]}...")
-    #             return result, cached.get()
-    #     except Exception as e:
-    #         logger.debug(f"Cache miss or error: {e}")
+    if property_name_1.strip() == property_name_2.strip():
+        # import pdb; pdb.set_trace()
+        # Shortcut: if property names are identical, return match
+        result = {
+            "is_match": True,
+            "reason": "Property names are identical",
+            "confidence": "high",
+            "matched_via": "exact",
+            "model": None,
+            "prompt": None,
+        }
+        return result, {}
 
     # Build conversation
     conv = Conversation(messages=[Message(role="user", content=[prompt])])
@@ -155,19 +117,6 @@ async def check_if_same_property(
         "model": llm.model_name,
         "prompt": prompt,
     }
-
-    # # Store in cache by calling the cached function with the real result
-    # if use_cache:
-    #     try:
-    #         _store_property_check_result(
-    #             llm.model_name,
-    #             prompt,
-    #             config_json,
-    #             result,
-    #         )
-    #         logger.debug(f"Cached result for prompt: {prompt[:50]}...")
-    #     except Exception as e:
-    #         logger.warning(f"Failed to cache result: {e}")
 
     return result, {**response.model_dump(), "model": llm.model_name}
 
@@ -240,10 +189,18 @@ async def generate_property_name_matches(
                     **x_variables,
                     **y_variables,
                 )
-                task = check_if_same_property(llm, inf_gen_config, prompt)
+                task = check_if_same_property(
+                    llm, inf_gen_config, prompt, x["property_name"], y["property_name"]
+                )
                 tasks[task_id] = task
     # Execute all tasks concurrently
-    results_data = await asyncio.gather(*tasks.values())
+    BATCH_SIZE = 50
+    results_data = []
+    for i in range(0, len(tasks), BATCH_SIZE):
+        batch_tasks = {k: tasks[k] for k in list(tasks.keys())[i : i + BATCH_SIZE]}
+        batch_results = await asyncio.gather(*batch_tasks.values())
+        results_data.extend(batch_results)
+        await asyncio.sleep(1)  # brief pause to avoid overwhelming the API
     results = {
         task_id: result for task_id, (result, _) in zip(tasks.keys(), results_data)
     }

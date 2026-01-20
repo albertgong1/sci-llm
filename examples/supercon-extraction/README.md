@@ -1,23 +1,69 @@
 # SuperCon Property Extraction
 
 > \[!NOTE\]
-> We only need to construct the dataset following [Construct the Dataset from Scratch](#constructing-the-dataset-from-scratch) once.
-> For now, we will use the orignal SuperCon dataset as the ground-truth.
+> Currently, we are using the original SuperCon dataset as the ground-truth, so please follow the instructions under [Constructing the Dataset from SuperCon original](#constructing-the-dataset-from-supercon-original) to construct the dataset.
 
 TODO:
-- [ ] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
-- [ ] Push GT property name embeddings to HF.
+- [X] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
+- [ ] Share embeddings on HF.
+- [ ] Add instructions for computing interannotator agreement for post-2021 SuperCon.
+- [ ] Fill in "category" field in GT dataset
 
-## Experiments
+## Setup Instructions
 
-1. Run the tasks using Harbor/Modal:
+1. Follow the setup instructions at [README.md](../../README.md#getting-started).
+
+2. Additional setup instructions:
+
+<details>
+    <summary>Instructions for running Harbor locally</summary>
+
+* Install Docker Desktop following [these](https://docs.docker.com/desktop/setup/install/mac-install/) instructions.
+
+</details>
+
+<details>
+    <summary>Instructions for running Harbor on Modal</summary>
+
+* Create a Modal API key at https://modal.com/settings/kilian-group/tokens (email ag2435@cornell.edu to be added to the group) and follow the onscreen instructions to activate it.
+
+</details>
+
+3. Optional: If running Harbor locally, launch Docker Desktop.
+
+## Reproducing Experiments
+
+> \[!IMPORTANT\]
+> To obtain results incrementally, batching functionality is available. Simply specificy the `--batch-size` in the commands below. To obtain an unbiased estimate of the average accuracy across all tasks, please shuffle the tasks using the `--seed 1` flag.
+
+> \[!TIP\]
+> To run on Modal, simply add the `--modal` flag to any of the commands below.
+
+1. Please run the following command to execute the Harbor tasks in batches of size 10:
 
 ```bash
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
+  --hf-tasks-repo kilian-group/supercon-extraction-harbor-tasks --hf-tasks-version v0.0.0 \
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
 
-2. Compute accuracy:
+<details>
+    <summary>Instructions for running Harbor tasks saved locally</summary>
 
 ```bash
+uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
+  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
+```
+
+</details>
+
+2. Compute accuracy across tasks:
+
+```bash
+uv run python format_accuracy.py -jd JOBS_DIR
 ```
 
 ## Experiments using simple LLM API (for debugging only)
@@ -35,55 +81,18 @@ Outputs are stored at `out/supercon/preds/*.json`.
     --model_name gemini-2.5-flash \
     -od out/
 ```
+- [ ] Update these instructions
 
-2. Compute the accuracy of the extracted information:
-
-```bash
-./src/pbench_eval/score_task.py \
-    --domain supercon \
-    --task tc \
-    -od out/
-```
-
-## Constructing the Dataset from Scratch
-
-1. Mass-extract properties on supercon papers with an LLM:
-
-```bash
-./src/pbench/mass_extract_properties_from_llm.py --domain supercon --server gemini --model_name gemini-2.5-flash -od out/
-```
-
-Outputs of the LLM are saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
-Once you verify the format of the CSV, you can move them to `assets/supercon/validate_csv/*.csv`.
-
-2. Run the validator app with the following:
-
-```bash
-./src/pbench_validator_app/app.py --csv_folder out/supercon/unsupervised_llm_extraction/ --paper_folder data/supercon/Paper_DB/
-```
-
-It will save a copy of the CSV file with `_validated.csv` suffix under the same folder `/out/supercon/unsupervised/llm_extraction/`.
-There are more instructions in `docs/VALIDATOR_GUIDE.md`.
-
-### Validating the dataset construction (SuperCon only)
-
-1. Generate embeddings for the predicted and ground-truth properties in SuperCon:
+2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
 uv run python generate_pred_embeddings.py -od OUTPUT_DIR
-uv run python generate_gt_embeddings.py -od OUTPUT_DIR
 ```
 
-2. Query LLM to determine best match between generated and ground-truth property name:
+3. Query LLM to determine best match between generated and ground-truth property name:
 
 ```bash
 uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
-```
-
-3. Compute recall:
-
-```bash
-uv run python score_recall.py -od OUTPUT_DIR
 ```
 
 4. Compute precision:
@@ -92,9 +101,10 @@ uv run python score_recall.py -od OUTPUT_DIR
 uv run python score_precision.py -od OUTPUT_DIR
 ```
 
-5. Compute inter-annotator agreement:
+5. Compute recall:
 
 ```bash
+uv run python score_recall.py -od OUTPUT_DIR
 ```
 
 ## Constructing the Dataset from SuperCon original
@@ -121,6 +131,8 @@ Link: [Paper_DB.tar](https://drive.google.com/file/d/1Uq90PLAfUWSec_GusnSPWuVoLc
 mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 ```
 
+</details>
+
 2. Download [SuperCon.csv](https://drive.google.com/file/d/1Vod_pLOV3O8Sm4glyeSVc9AMbO_XEuxZ/view?usp=drive_link) and save to `DATA_DIR/SuperCon.csv`.
 
 3. Generate mappings from properties to their corresponding units:
@@ -130,29 +142,86 @@ mkdir -p data && tar -xvf Paper_DB.tar -C DATA_DIR
 uv run python generate_property_unit_mappings.py
 ```
 
-3. Generate a CSV version of the SuperCon property extraction dataset for the PDFs present in `DATA_DIR/Paper_DB` and save to `OUTPUT_DIR`:
+4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `DATA_DIR/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction.
 
 > \[!NOTE\]
 > Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+> Also make sure to update HF_DATASET_NAME, HF_DATASET_REVISION, and HF_DATASET_SPLIT accordingly.
 
 ```bash
 uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
     --tag_name v0.0.0 --repo_name kilian-group/supercon-extraction --split SPLIT
 ```
 
-4. Create Harbor template for SuperCon:
+5. Generate embeddings for the ground-truth property names for scoring:
 
 ```bash
-# Copy the Harbor workspace template
-cp -r ../harbor-workspace/ground-template .
-# Add placeholder variable to the start of the prompt
-{ echo '{paper_at_command}'; echo; cat prompts/unsupervised_extraction_prompt.md; } > ground-template/instruction.md.template
+uv run python generate_gt_embeddings.py
 ```
 
-5. Instantiate the Harbor template using the papers from `DATA_DIR/Paper_DB`:
+6. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
 
 ```bash
-uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py --write-job-config \
-    --pdf-dir data-arxiv/Paper_DB --output-dir out-0114 --workspace . --domain supercon \
-    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.0.0
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
+    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision main \
+    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.1.0
+```
+
+
+## Constructing the Post-2021 version of the SuperCon Dataset from Scratch
+
+1. Download PDFs from [Google Drive Folder](https://drive.google.com/file/d/1yrZJkDAYQpLPpgqtEqU2gn6VGjrckXFa/view?usp=drive_link) and place them in `data/new-supercon-papers/Paper_DB`:
+```bash
+# Assumes new-supercon-papers.tar is in the current directory
+tar -xvf new-supercon-papers.tar
+mkdir -p data/new-supercon-papers/ && mv supercon-new-papers data/new-supercon-papers/Paper_DB
+```
+
+2. Obtain candidate properties (skip as Anmol did this step already):
+
+> \[!NOTE\]
+> Anmol created a `out-new-supercon-papers.zip` in [Google Drive](https://drive.google.com/file/d/164MrUNANseRpk88vdl35tDMKMORY3Lsk/view?usp=drive_link). Download it and place it in current directory.
+
+- Extract properties from PDFs using an LLM:
+
+```bash
+uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -dd data/new-supercon-papers -od out-new-supercon-papers -pp prompts/unsupervised_extraction_prompt.md
+```
+
+- Add `data_type` column to the CSV. The resulting CSV will be saved to `out-new-supercon-papers/candidates`.
+
+```bash
+uv run pbench-filter -dd data/new-supercon-papers -od out-new-supercon-papers
+```
+
+3. Launch the validator app and accept/reject the candidates:
+
+> \[!NOTE\]
+> This step requires manual effort and is not fully reproducibile.
+
+```bash
+# Assumes out-new-supercon-papers/ exists in this directory
+
+uv sync --group validator
+uv run streamlit run ../../src/pbench_validator_app/app.py -- -od out-new-supercon-papers
+```
+
+4. Create a local HuggingFace dataset `out-new-supercon-papers/SPLIT` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
+
+> \[!NOTE\]
+> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+
+```bash
+uv run python create_huggingface_dataset.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
+    --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
+```
+
+5. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
+
+```bash
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
+    --pdf-dir data/new-supercon-papers/Paper_DB --output-dir out-new-supercon-papers --workspace . \
+    --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
+    --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
 ```

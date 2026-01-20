@@ -14,7 +14,7 @@ Example:
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
-
+from tabulate import tabulate
 import pandas as pd
 
 # pbench imports
@@ -31,7 +31,7 @@ parser = ArgumentParser(
 parser = pbench.add_base_args(parser)
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
-
+# model used for property matching
 model_name = args.model_name
 
 # Load all CSV files from output_dir/pred_matches
@@ -61,13 +61,6 @@ logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
 
-# Filter for rows where is_match is True
-original_count = len(df_matches)
-df_matches = df_matches[df_matches["is_match"] == True]  # noqa: E712
-logger.info(
-    f"Filtered to {len(df_matches)} rows where is_match=True (from {original_count} total)"
-)
-
 # Load rubric
 rubric_path = Path("scoring") / "rubric_2.csv"
 logger.info(f"Loading rubric from {rubric_path}")
@@ -95,18 +88,24 @@ if missing_rubric > 0:
 
 df_results = compute_precision_per_material_property(df, conversion_df=conversion_df)
 
-# Summary statistics
-logger.info("=" * 60)
-logger.info("SUMMARY")
-logger.info("=" * 60)
-print(f"Total (material, property) pairs: {len(df_results)}")
-print(f"Pairs with matches: {(df_results['num_property_material_matches'] > 0).sum()}")
-print(f"Average precision score: {df_results['precision_score'].mean():.3f}")
-print(f"Median precision score: {df_results['precision_score'].median():.3f}")
-
-# save results to csv
-score_dir = args.output_dir / "scores"
-score_dir.mkdir(parents=True, exist_ok=True)
-score_path = score_dir / "score_precision.csv"
-logger.info(f"Saving precision scores to {score_path}")
-df_results.to_csv(score_path, index=False)
+counta = lambda x: (x > 0).sum()  # noqa: E731
+acc_by_refno = (
+    df_results.groupby(["model", "refno"], dropna=False)
+    .agg(
+        precision_score=pd.NamedAgg(column="precision_score", aggfunc="mean"),
+        matches=pd.NamedAgg(column="num_property_material_matches", aggfunc=counta),
+    )
+    .reset_index()
+)
+mean_sem = lambda x: f"{x.mean():.2f} ± {x.sem():.2f}"  # noqa: E731
+acc = (
+    acc_by_refno.groupby("model")
+    .agg(
+        avg_precision=pd.NamedAgg(column="precision_score", aggfunc=mean_sem),
+        avg_matches=pd.NamedAgg(column="matches", aggfunc="sum"),
+        count=pd.NamedAgg(column="model", aggfunc="count"),
+    )
+    .reset_index()
+)
+# print acc as table using the tabulate library with 'github' format
+print(tabulate(acc, headers="keys", tablefmt="github", showindex=False))
