@@ -174,7 +174,7 @@ Every property MUST include:
 - location.source_type (text, figure, caption, table)
 - location.evidence (exact quote --- IT MUST EXACTLY MATCH THE PAPER)
 
-## OUTPUT FORMAT (WRITE TO {predictions_path})
+## OUTPUT FORMAT
 
 Return a SINGLE valid JSON payload containing an array of properties. Below is the full schema.
 
@@ -220,7 +220,7 @@ Rules:
 - Keep units inside pred_value (no value_number).
 - location.page is mandatory; all other fields are optional—omit if not stated.
 - Do not invent values.
-- Save this JSON to `{predictions_path}` and print only the JSON as your final response.
+- Print only the JSON as your final response.
 - Never merge values unless they form a tuple (e.g., coordinates).
 
 ## FINAL INSTRUCTIONS
