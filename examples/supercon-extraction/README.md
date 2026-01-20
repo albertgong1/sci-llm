@@ -163,9 +163,9 @@ uv run python generate_gt_embeddings.py
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
-    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
+    --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-template \
     --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision main \
-    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.1.0
+    --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.2.0
 ```
 
 
