@@ -169,12 +169,14 @@ type" value_string = full descriptive phrase (e.g.,
 
 For atomic sites in tables:
 
-1.  Fractional coordinates (x, y, z): • property_name = "atomic
-    fractional coordinates" • value_string MUST be exactly "(x, y, z)" •
-    DO NOT include units (fractional coordinates are dimensionless)
+1. Fractional coordinates (x, y, z):
+   - property_name = "atomic fractional coordinates"
+   - value_string MUST be exactly "(x, y, z)"
+   - DO NOT include units (fractional coordinates are dimensionless)
 
-2.  Wyckoff positions (e.g., "2b", "6c"): • property_name = "Wyckoff
-    position" • value_string = the Wyckoff label
+2. Wyckoff positions (e.g., "2b", "6c"):
+   - property_name = "Wyckoff position"
+   - value_string = the Wyckoff label
 
 3.  Each atomic site generates TWO entries:
 
