@@ -79,7 +79,7 @@ uv run --env-file=.env pbench-extract -dd DATA_DIR --server gemini -m gemini-3-p
 2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
 
 ```bash
-uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+uv run --env-file=.env python generate_pred_embeddings.py -od OUTPUT_DIR
 ```
 
 3. Query LLM to determine best match between generated and ground-truth property name:
