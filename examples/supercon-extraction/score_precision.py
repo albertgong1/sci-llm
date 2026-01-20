@@ -51,12 +51,12 @@ logger.info(f"Found {len(csv_files)} CSV file(s) in {pred_matches_dir}")
 
 dfs = []
 for csv_file in csv_files:
-    logger.info(f"Loading {csv_file.name}")
+    logger.debug(f"Loading {csv_file.name}")
     df = pd.read_csv(csv_file)
     dfs.append(df)
 
 df_matches = pd.concat(dfs, ignore_index=True)
-df_matches = df_matches[df_matches["model"] == model_name]
+df_matches = df_matches[df_matches["judge"] == model_name]
 logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
