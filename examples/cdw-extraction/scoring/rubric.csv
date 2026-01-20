@@ -1,0 +1,94 @@
+property_name,category
+q-vector,Structural
+q-vector components,Structural
+modulation vector direction,Structural
+modulation amplitude,Structural
+modulation period,Structural
+harmonic content,Structural
+primary modulation,Structural
+secondary modulation,Structural
+CDW displacement pattern,Structural
+superlattice periodicity length,Structural
+superlattice peak intensity,Structural
+atomic sites that modulate,Structural
+modulation phase shift,Structural
+CDW transition temperature (T_CDW),Environmental
+multiple CDW transitions,Environmental
+lock-in transition temperature,Environmental
+order of CDW transition,Structural
+hysteresis width,Environmental
+temperature range of incommensurate phase,Environmental
+commensurate CDW,Structural
+incommensurate CDW,Structural
+nearly commensurate CDW,Structural
+unidirectional CDW,Structural
+bidirectional CDW,Structural
+triple-q CDW,Structural
+multi-q CDW,Structural
+stripe-like CDW,Structural
+checkerboard CDW,Structural
+spin density wave,Electronic
+symmetry change at CDW transition,Structural
+high-T space group,Structural
+low-T space group,Structural
+point group,Structural
+crystallographic class,Structural
+magnetic space group,Structural
+propagation vector symmetry direction,Structural
+crystal structure type / prototype,Structural
+lattice constant a,Structural
+lattice constant b,Structural
+lattice constant c,Structural
+"lattice angles (alpha, beta, gamma)",Structural
+unit-cell volume,Structural
+interlayer spacing,Structural
+bond lengths,Chemical
+bond angles,Chemical
+atomic fractional coordinates,Structural
+Wyckoff position,Structural
+atomic site label,Structural
+displacement amplitude per atom,Structural
+coordination number changes,Chemical
+structural distortion vectors,Structural
+electronic band gap,Electronic
+partial gap size,Electronic
+pseudogap,Electronic
+Fermi surface reconstruction features,Electronic
+band folding vector,Electronic
+spectral weight suppression,Electronic
+carrier concentration,Electronic
+effective mass,Electronic
+density of states at Fermi level,Electronic
+mobility change,Electronic
+ARPES peak intensity,Methods
+phonon soft mode frequency,Electronic
+phonon softening amplitude,Electronic
+phonon linewidth,Electronic
+temperature dependence of phonon frequency,Electronic
+Raman mode frequency,Methods
+Raman intensity anomaly,Methods
+IR absorption frequency,Methods
+IR mode intensity,Methods
+phonon gap opening,Electronic
+resistivity,Electronic
+conductivity,Electronic
+dœÅ/dT slope,Electronic
+Hall coefficient,Electronic
+magnetoresistance,Electronic
+Seebeck coefficient,Electronic
+thermal conductivity,Electronic
+resistivity anisotropy,Electronic
+activation energy,Electronic
+magnetic susceptibility,Electronic
+magnetization,Electronic
+field-induced CDW changes,Electronic
+magnetic field for CDW melting,Environmental
+spin-related anomalies,Electronic
+measurement temperature,Environmental
+applied pressure,Environmental
+magnetic field,Environmental
+electric field,Environmental
+measurement frequency,Methods
+sample orientation,Methods
+environment,Environmental
+sample state,Methods
