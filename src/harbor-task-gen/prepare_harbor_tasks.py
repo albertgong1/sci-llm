@@ -47,6 +47,7 @@ from typing import Any, Iterable, Mapping, cast
 from datasets import load_dataset
 from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
+from slugify import slugify
 
 
 def repo_root() -> Path:
@@ -128,17 +129,6 @@ def _format_template(template: str, values: Mapping[str, Any]) -> str:
 
     rendered = re.sub(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", replace, protected)
     return rendered.replace(_LBRACE_SENTINEL, "{").replace(_RBRACE_SENTINEL, "}")
-
-
-def slugify(value: str) -> str:
-    """Normalize strings for file-safe task IDs."""
-    return (
-        value.lower()
-        .replace(" ", "-")
-        .replace("/", "-")
-        .replace("(", "")
-        .replace(")", "")
-    )
 
 
 def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
