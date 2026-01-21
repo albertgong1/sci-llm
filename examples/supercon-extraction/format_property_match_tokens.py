@@ -69,7 +69,7 @@ def calculate_cost(row: pd.Series) -> float | None:
         return None
 
     input_price = prices.get("input")  # USD per 1M tokens
-    cache_price = prices.get("context_cache_read")  # USD per 1M tokens
+    cache_price = prices.get("context_cache_read") or prices.get("cached_input")  # USD per 1M tokens
     output_price = prices.get("output")  # USD per 1M tokens
 
     if input_price is None or output_price is None:
