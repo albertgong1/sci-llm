@@ -29,6 +29,11 @@ class InferenceGenerationConfig(BaseModel):
     # Docs: https://ai.google.dev/api/generate-content#generationconfig
     output_format: Literal["text", "json"] = Field(default="text")
 
+    # Web search / grounding
+    # Gemini: https://ai.google.dev/gemini-api/docs/google-search
+    # OpenAI: https://platform.openai.com/docs/guides/tools-web-search
+    use_web_search: bool = Field(default=False)
+
 
 class File(BaseModel):
     """A file wrapper to interface with the LLM server."""
@@ -54,13 +59,26 @@ class Conversation(BaseModel):
     messages: list[Message]
 
 
+class WebSearchMetadata(BaseModel):
+    """Metadata about the web search uris.
+    
+    Args:
+        queries: The queries used to search the web.
+        uris: The uris of the web search results.
+    """
+
+    queries: list[str]
+    uris: list[str]
+
+
 class LLMChatResponse(BaseModel):
     """Response from an LLM chat completion."""
 
     pred: str | dict[str, Any]
     usage: dict[str, Any]
     error: str | None
-    thought: str | None
+    thought: str | None = None
+    web_search_metadata: WebSearchMetadata | None = None
 
 
 class LLMChat(abc.ABC):

@@ -118,11 +118,14 @@ class OpenAIChat(LLMChat):
         )
         return response
 
-    def _parse_api_output(self, response: Any) -> LLMChatResponse:
+    def _parse_api_output(
+        self, response: Any, inf_gen_config: InferenceGenerationConfig
+    ) -> LLMChatResponse:
         """Parse OpenAI's response.
 
         Args:
             response: Raw OpenAI API response.
+            inf_gen_config: Inference generation configuration.
 
         Returns:
             Parsed LLM chat response.
@@ -135,9 +138,10 @@ class OpenAIChat(LLMChat):
                 "completion_tokens": response.usage.output_tokens,
                 "total_tokens": response.usage.total_tokens,
             }
-            return LLMChatResponse(pred=pred, usage=usage, error=None)
+            # TODO: Add web_search_metadata extraction when implemented
+            return LLMChatResponse(pred=pred, usage=usage, error=None, web_search_metadata=None)
         except Exception as e:
-            return LLMChatResponse(pred="", usage={}, error=str(e))
+            return LLMChatResponse(pred="", usage={}, error=str(e), web_search_metadata=None)
 
     def upload_file(self, file: File) -> None:
         """Upload a file to OpenAI server.

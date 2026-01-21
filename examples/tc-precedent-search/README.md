@@ -134,3 +134,11 @@ PYTHONPATH=src python src/pbench_eval/score_task.py \
   --analyze \
   --split ""
 ```
+
+## LLM API Workflow
+
+We can prompt LLMs with web search grounding to perform Tc precedent search as well. After creating the Tc dev set in step 1:
+
+```bash
+uv run python run_precedent_search_with_llms.py --server gemini -m gemini-3-pro-preview -od out --use_web_search
+```
