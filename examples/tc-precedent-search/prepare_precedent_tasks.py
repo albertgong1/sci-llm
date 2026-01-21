@@ -114,7 +114,8 @@ def build_task(task_dir: Path, row: dict[str, str], task_name: str) -> None:
     # We'll just regex replace it or string replace safely
     import re
     # Pattern matches the import block down to the json load
-    pattern = r'ASSETS_DIR = Path\(__file__\)\.parent\.parent\.parent / "assets".*?SPACE_GROUPS = json\.load\(f\)'
+    # Pattern matches the relative import block
+    pattern = r'from \.space_groups_normalized import\s*\([^)]+\)'
     # Replace with empty dict
     patched_content = re.sub(pattern, 'SPACE_GROUPS = {}', content, flags=re.DOTALL)
     utils_path.write_text(patched_content)
