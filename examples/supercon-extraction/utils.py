@@ -9,6 +9,7 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Any
 import pandas as pd
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -273,6 +274,7 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
 
     dfs = []
+    refnos = []
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
@@ -297,9 +299,14 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             if predictions is None:
                 logger.warning(f"No valid predictions found in trial: {trial_dir}")
                 continue
-            if "properties" not in str(predictions):
+            if "properties" not in predictions:
                 logger.warning(
                     f"'properties' key not found in predictions for trial: {trial_dir}"
+                )
+                continue
+            if len(predictions["properties"]) == 0:
+                logger.warning(
+                    f"No properties found in predictions for trial: {trial_dir}"
                 )
                 continue
             # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
@@ -320,7 +327,22 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             df_properties = pd.json_normalize(df["properties"])
             df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
             dfs.append(df)
+            refnos.append(refno)
     if not dfs:
         raise ValueError(f"No valid trials found in jobs directory: {jobs_dir}")
     df = pd.concat(dfs, ignore_index=True)
     return df
+
+
+def sem(x: list, n: int) -> float:
+    """Standard error of the mean.
+
+    Args:
+        x: List of sample values
+        n: Total number of samples (including missing)
+
+    Returns:
+        Standard error of the mean
+
+    """
+    return np.std(np.concatenate((x, np.zeros(n - len(x)))), ddof=1) / (n**0.5)

@@ -21,7 +21,7 @@ import logging
 # pbench imports
 import pbench
 from pbench_eval.metrics import compute_precision_per_material_property
-from utils import RUBRIC_PATH
+from utils import RUBRIC_PATH, sem
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,8 @@ args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 # model used for property matching
 model_name = args.model_name
+
+NUM_REFNOS = 50
 
 # Load all CSV files from output_dir/pred_matches
 pred_matches_dir = args.output_dir / "pred_matches"
@@ -114,16 +116,23 @@ acc_by_refno = (
     df_results.groupby(["agent", "model", "refno"], dropna=False)
     .agg(
         precision_score=pd.NamedAgg(column="precision_score", aggfunc="mean"),
-        matches=pd.NamedAgg(column="num_property_material_matches", aggfunc=counta),
+        property_matches=pd.NamedAgg(column="num_property_matches", aggfunc="count"),
+        property_material_matches=pd.NamedAgg(
+            column="num_property_material_matches", aggfunc=counta
+        ),
     )
     .reset_index()
 )
-mean_sem = lambda x: f"{x.mean():.2f} ± {x.sem():.2f}"  # noqa: E731
+
+mean_sem = lambda x: f"{x.sum() / NUM_REFNOS:.2f} ± {sem(x, NUM_REFNOS):.2f}"  # noqa: E731
 acc = (
     acc_by_refno.groupby(["agent", "model"])
     .agg(
         avg_precision=pd.NamedAgg(column="precision_score", aggfunc=mean_sem),
-        avg_matches=pd.NamedAgg(column="matches", aggfunc="sum"),
+        avg_property_matches=pd.NamedAgg(column="property_matches", aggfunc=mean_sem),
+        avg_property_material_matches=pd.NamedAgg(
+            column="property_material_matches", aggfunc=mean_sem
+        ),
         count=pd.NamedAgg(column="model", aggfunc="count"),
     )
     .reset_index()
