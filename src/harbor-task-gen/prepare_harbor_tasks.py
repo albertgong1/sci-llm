@@ -8,6 +8,10 @@ each with:
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
   - `registry.json`: a local task registry for Harbor to discover and load tasks
 
+When `--no-score` is set, tasks are built from PDFs only (no dataset), and no
+verifier/solution files are written. Use `--disable-verification` at runtime (or
+the generated job.yaml with `verifier.disable=true`) to skip scoring.
+
 The ground truth source is specified via --gt-hf-repo, --gt-hf-split, and optionally
 --gt-hf-revision (defaults to main).
 
@@ -24,10 +28,9 @@ Example (from repo root):
     uv run python src/harbor-task-gen/run_harbor.py jobs start \
       --registry out/harbor/supercon-extraction/tc/ground-template/registry.json -a oracle
 
-    # To use the guided template:
+    # To build tasks without a dataset (no scoring):
     uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
-      --task tc --template ground-template-easy --force \
-      --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full
+      --no-score --force
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import textwrap
 from collections import defaultdict
 from pathlib import Path
@@ -225,7 +229,14 @@ def flatten_dataset(
     return grouped
 
 
-def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> None:
+def write_job_config(
+    tasks_dir: Path,
+    job_path: Path,
+    *,
+    workspace: Path,
+    disable_verification: bool = False,
+    agent_name: str = "oracle",
+) -> None:
     """Write a Harbor job YAML pointing at the generated tasks."""
     if tasks_dir.is_absolute():
         try:
@@ -234,6 +245,7 @@ def write_job_config(tasks_dir: Path, job_path: Path, *, workspace: Path) -> Non
             tasks_rel = tasks_dir
     else:
         tasks_rel = tasks_dir
+    verifier_block = "verifier:\n  disable: true\n" if disable_verification else ""
     job_yaml = f"""\
 jobs_dir: jobs
 n_attempts: 1
@@ -246,8 +258,8 @@ environment:
   type: docker
   force_build: true
   delete: true
-agents:
-  - name: oracle
+{verifier_block}agents:
+  - name: {agent_name}
 datasets:
   - path: {tasks_rel.as_posix()}
 """
@@ -415,6 +427,59 @@ EOF
         script.chmod(0o755)
 
 
+def build_task_no_score(
+    task_dir: Path,
+    *,
+    pdf_path: Path,
+    task_name: str,
+    refno: str,
+) -> None:
+    """Build a task without ground-truth, verifier, or solution."""
+    env_dir = task_dir / "environment"
+    env_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(pdf_path, env_dir / "paper.pdf")
+
+    task_meta = {
+        "refno": refno,
+        "pdf_path": "/app/paper.pdf",
+        "predictions_path": "/app/output/predictions.json",
+        "questions": [],
+    }
+    (env_dir / "task_meta.json").write_text(json.dumps(task_meta, indent=2))
+
+    instruction_template = read_template("instruction.md.template")
+    instruction_values = {
+        # Identifiers
+        "task": task_name,
+        "task_name": task_name,
+        "task_id": task_dir.name,
+        "refno": refno,
+        # Standard in-container paths
+        "pdf_path": "/app/paper.pdf",
+        "meta_path": "/app/task_meta.json",
+        "predictions_path": "/app/output/predictions.json",
+        # Prompt building blocks (optional; templates may ignore these)
+        "question_blocks": "No required properties for this run.",
+        "questions_json": "[]",
+        "task_meta_json": json.dumps(task_meta, indent=2),
+        # Agent affordances (optional)
+        "paper_at_command": "@paper.pdf",
+        "gemini_at_commands": "`@paper.pdf`",
+        "claude_file_examples": "`/app/paper.pdf`",
+    }
+    instruction = _format_template(instruction_template, instruction_values)
+    (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
+
+    task_toml = _format_template(
+        read_template("task.toml.template"),
+        {"task_name": task_name, "task": task_name},
+    )
+    (task_dir / "task.toml").write_text(task_toml)
+
+    (env_dir / "Dockerfile").write_text(dockerfile_contents())
+
+
 def main() -> None:
     """Generate Harbor tasks for the benchmark.
 
@@ -423,6 +488,7 @@ def main() -> None:
       2) Flatten rows into per-paper questions.
       3) Materialize Harbor tasks on disk (env/tests/solution + prompt).
       4) Optionally upload tasks to HF and write a registry.json.
+    With `--no-score`, steps 1-2 are skipped and tasks are built from PDFs only.
     """
     global _TEMPLATES_SUBDIR
 
@@ -432,13 +498,13 @@ def main() -> None:
     parser.add_argument(
         "--gt-hf-repo",
         type=str,
-        required=True,
+        required=False,
         help="Hugging Face repo name for ground truth dataset (e.g., kilian-group/supercon-extraction).",
     )
     parser.add_argument(
         "--gt-hf-split",
         type=str,
-        required=True,
+        required=False,
         help="Split of the ground truth HF dataset (e.g., full, test).",
     )
     parser.add_argument(
@@ -446,6 +512,14 @@ def main() -> None:
         type=str,
         default="main",
         help="Revision/version of the ground truth HF dataset (e.g., v0.0.0, main). Defaults to main.",
+    )
+    parser.add_argument(
+        "--no-score",
+        action="store_true",
+        help=(
+            "Build tasks from PDFs only (no dataset, no verifier/solution). "
+            "Run Harbor with --disable-verification or use the generated job.yaml."
+        ),
     )
     parser.add_argument(
         "--workspace",
@@ -477,7 +551,7 @@ def main() -> None:
         default=None,
         help=(
             "Where to write generated Harbor tasks "
-            "(default: <workspace>/out/harbor/supercon-mini-v2)."
+            "(default: <workspace>/out/harbor/<dataset>)."
         ),
     )
     parser.add_argument(
@@ -581,9 +655,23 @@ def main() -> None:
     resolved_workspace.mkdir(parents=True, exist_ok=True)
 
     # Load dataset configuration from CLI args
-    dataset_name = args.gt_hf_repo
-    dataset_split = args.gt_hf_split
-    dataset_revision = args.gt_hf_revision
+    if args.no_score:
+        if args.gt_hf_repo or args.gt_hf_split:
+            print(
+                "Note: --gt-hf-* flags are ignored when --no-score is set.",
+                file=sys.stderr,
+            )
+        dataset_name = "no-score"
+        dataset_split = "none"
+        dataset_revision = "none"
+    else:
+        if not args.gt_hf_repo or not args.gt_hf_split:
+            raise SystemExit(
+                "--gt-hf-repo and --gt-hf-split are required unless --no-score is set."
+            )
+        dataset_name = args.gt_hf_repo
+        dataset_split = args.gt_hf_split
+        dataset_revision = args.gt_hf_revision
 
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
@@ -623,23 +711,35 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = resolved_workspace / "scoring" / "rubric.csv"
-    rubric_mapping = load_rubric_mapping(rubric_path)
-    definitions = load_definitions(rubric_path)
+    rubric_mapping: dict[str, str] = {}
+    definitions: dict[str, str] = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
 
-    # Load dataset from configuration
-    print(
-        f"Loading dataset: {dataset_name} (revision: {dataset_revision}, split: {dataset_split})"
-    )
-    dataset = load_dataset(dataset_name, split=dataset_split, revision=dataset_revision)
-    property_filter = resolve_property_filter(args.task)
-    grouped = flatten_dataset(
-        cast(Iterable[dict[str, Any]], dataset),
-        definitions=definitions,
-        property_filter=property_filter,
-    )
+    if not args.no_score:
+        rubric_path = resolved_workspace / "scoring" / "rubric.csv"
+        rubric_mapping = load_rubric_mapping(rubric_path)
+        definitions = load_definitions(rubric_path)
 
-    refnos = list(grouped.keys())
+        # Load dataset from configuration
+        print(
+            f"Loading dataset: {dataset_name} (revision: {dataset_revision}, split: {dataset_split})"
+        )
+        dataset = load_dataset(
+            dataset_name, split=dataset_split, revision=dataset_revision
+        )
+        property_filter = resolve_property_filter(args.task)
+        grouped = flatten_dataset(
+            cast(Iterable[dict[str, Any]], dataset),
+            definitions=definitions,
+            property_filter=property_filter,
+        )
+
+        refnos = list(grouped.keys())
+    else:
+        pdf_paths = sorted(
+            path for path in args.pdf_dir.iterdir() if path.suffix.lower() == ".pdf"
+        )
+        refnos = [path.stem for path in pdf_paths]
     if args.refno:
         requested = {value.strip() for value in args.refno if value and value.strip()}
         missing = sorted(requested - set(refnos))
@@ -648,6 +748,9 @@ def main() -> None:
         refnos = [refno for refno in refnos if refno in requested]
     if args.limit is not None:
         refnos = refnos[: args.limit]
+
+    if args.no_score and not refnos:
+        raise FileNotFoundError(f"No PDFs found under {args.pdf_dir}")
 
     for refno in refnos:
         pdf_path = args.pdf_dir / f"{refno}.pdf"
@@ -662,19 +765,27 @@ def main() -> None:
         task_dir = tasks_dir / task_id
         task_dir.mkdir(parents=True, exist_ok=True)
 
-        rows = grouped.get(refno, [])
-        if not rows:
-            print(f"Skipping {refno}: no properties matched task '{args.task}'.")
-            continue
+        if args.no_score:
+            build_task_no_score(
+                task_dir,
+                pdf_path=pdf_path,
+                task_name=task_label,
+                refno=refno,
+            )
+        else:
+            rows = grouped.get(refno, [])
+            if not rows:
+                print(f"Skipping {refno}: no properties matched task '{args.task}'.")
+                continue
 
-        build_task(
-            task_dir,
-            pdf_path=pdf_path,
-            task_name=task_label,
-            refno=refno,
-            rows=rows,
-            rubric_mapping=rubric_mapping,
-        )
+            build_task(
+                task_dir,
+                pdf_path=pdf_path,
+                task_name=task_label,
+                refno=refno,
+                rows=rows,
+                rubric_mapping=rubric_mapping,
+            )
         try:
             task_rel = task_dir.relative_to(resolved_workspace)
         except ValueError:
@@ -683,7 +794,13 @@ def main() -> None:
 
     if args.write_job_config:
         job_path = task_root / "job.yaml"
-        write_job_config(tasks_dir, job_path, workspace=resolved_workspace)
+        write_job_config(
+            tasks_dir,
+            job_path,
+            workspace=resolved_workspace,
+            disable_verification=bool(args.no_score),
+            agent_name="gemini-cli" if args.no_score else "oracle",
+        )
         try:
             job_rel = job_path.relative_to(resolved_workspace)
         except ValueError:
@@ -693,7 +810,9 @@ def main() -> None:
     # -- Write local registry.json --
     # NOTE: the local registry JSON is consistent with the HF upload registry JSON,
     # just with local task paths.
-    generated_task_dirs = _collect_task_dirs(tasks_dir)
+    generated_task_dirs = _collect_task_dirs(
+        tasks_dir, disable_verification=bool(args.no_score)
+    )
     if generated_task_dirs:
         registry_path = task_root / "registry.json"
         dataset_short_name = dataset_name.split("/")[-1]
@@ -709,6 +828,12 @@ def main() -> None:
         except ValueError:
             registry_rel = registry_path
         print(f"Wrote registry -> {registry_rel}")
+
+    if args.no_score:
+        print(
+            "No-score mode: tasks omit verifier/solution. Run Harbor with "
+            "--disable-verification (or use the generated job.yaml)."
+        )
 
     if args.upload_hf:
         # import pdb; pdb.set_trace()
@@ -741,12 +866,15 @@ def _resolve_tasks_root(path: Path) -> Path:
     return path
 
 
-def _collect_task_dirs(tasks_root: Path) -> list[Path]:
+def _collect_task_dirs(
+    tasks_root: Path, *, disable_verification: bool = False
+) -> list[Path]:
     """Return Harbor-valid task directories under the tasks root."""
     return [
         child
         for child in sorted(tasks_root.iterdir())
-        if child.is_dir() and TaskPaths(child).is_valid()
+        if child.is_dir()
+        and TaskPaths(child).is_valid(disable_verification=disable_verification)
     ]
 
 
@@ -815,12 +943,15 @@ def upload_tasks_to_hf(
     create: bool = True,
     private: bool | None = None,
     token: str | None = None,
+    disable_verification: bool = False,
 ) -> dict[str, str]:
     """Upload Harbor tasks and registry.json to a Hugging Face repo.
 
     Returns a small summary dict for logging.
     """
-    task_dirs = _collect_task_dirs(tasks_root / "tasks")
+    task_dirs = _collect_task_dirs(
+        tasks_root / "tasks", disable_verification=disable_verification
+    )
 
     dataset_name = dataset_name or repo_id
     registry_path = str(registry_path).strip("/")
@@ -911,6 +1042,7 @@ def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> 
         description=str(args.hf_description),
         create=bool(args.hf_create),
         private=private,
+        disable_verification=bool(getattr(args, "no_score", False)),
     )
 
     print(

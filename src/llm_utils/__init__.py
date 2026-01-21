@@ -1,5 +1,8 @@
 """LLM utilities module for sci-llm project."""
 
+from pathlib import Path
+import yaml
+
 from llm_utils.common import (
     Conversation,
     InferenceGenerationConfig,
@@ -8,6 +11,11 @@ from llm_utils.common import (
     Message,
 )
 
+# Load model pricing configuration from YAML
+_PRICING_CONFIG_PATH = Path(__file__).parent / "model_pricing.yaml"
+with open(_PRICING_CONFIG_PATH, "r") as f:
+    MODEL_PRICING: dict = yaml.safe_load(f)
+
 __all__ = [
     "Conversation",
     "InferenceGenerationConfig",
@@ -15,6 +23,7 @@ __all__ = [
     "LLMChatResponse",
     "Message",
     "get_llm",
+    "MODEL_PRICING"
 ]
 
 # Supported LLM servers

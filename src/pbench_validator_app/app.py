@@ -915,30 +915,31 @@ def main() -> None:
         )
 
     # Filter Data based on selection
-    df = st.session_state.df
+    # We will display using the masked dataframe but save on the original dataframe (st.session_state.df)
+    df_selected_pdf = st.session_state.df
 
     # First, filter by PDF if one is selected
     if st.session_state.get("selected_pdf"):
         selected_pdf_basename = st.session_state.selected_pdf
         # Filter to only rows where paper_pdf_path ends with the selected PDF filename
-        pdf_mask = df["paper_pdf_path"].apply(
+        pdf_mask = df_selected_pdf["paper_pdf_path"].apply(
             lambda x: os.path.basename(str(x)) == selected_pdf_basename
             if pd.notna(x)
             else False
         )
-        df = df[pdf_mask]
+        df_selected_pdf = df_selected_pdf[pdf_mask]
 
     # Then filter by validation status
     if filter_status == "Pending":
-        filtered_indices = df[df["validated"].isna()].index
+        filtered_indices = df_selected_pdf[df_selected_pdf["validated"].isna()].index
     elif filter_status == "Valid":
-        filtered_indices = df[df["validated"] == True].index  # noqa: E712
+        filtered_indices = df_selected_pdf[df_selected_pdf["validated"] == True].index  # noqa: E712
     elif filter_status == "Invalid":
-        filtered_indices = df[df["validated"] == False].index  # noqa: E712
+        filtered_indices = df_selected_pdf[df_selected_pdf["validated"] == False].index  # noqa: E712
     elif filter_status == "Flagged":
-        filtered_indices = df[df["flagged"] == True].index  # noqa: E712
+        filtered_indices = df_selected_pdf[df_selected_pdf["flagged"] == True].index  # noqa: E712
     else:
-        filtered_indices = df.index
+        filtered_indices = df_selected_pdf.index
 
     if len(filtered_indices) == 0:
         st.info("No properties found for this filter.")
@@ -971,7 +972,7 @@ def main() -> None:
 
     # Create a nice label for the dropdown
     def get_label(idx: int) -> str:
-        row = df.loc[idx]
+        row = df_selected_pdf.loc[idx]
         val_status = "❓"
         if row["validated"]:
             val_status = "✅"
@@ -1074,7 +1075,7 @@ def main() -> None:
     # Get selected index from current position
     selected_index = filtered_indices[st.session_state.current_property_index]
 
-    row = df.loc[selected_index]
+    row = df_selected_pdf.loc[selected_index]
 
     # Layout
     col1, col2 = st.columns([1, 1.5])  # Left panel (info + list), Right panel (PDF)
@@ -1150,6 +1151,9 @@ def main() -> None:
             invalid_type = "primary" if is_validated is False else "secondary"
             flag_type = "primary" if is_flagged else "secondary"
 
+            # Alias the original dataframe to df for easy access
+            df_for_saving = st.session_state.df
+
             with col_valid:
                 # Modifying Valid Button to Handle Pending AI Matches
                 if st.button(
@@ -1165,21 +1169,21 @@ def main() -> None:
                         == selected_index
                     ):
                         suggestion = st.session_state.pending_ai_match
-                        df.at[selected_index, "location.page"] = suggestion["page"]
-                        df.at[selected_index, "location.evidence"] = suggestion[
+                        df_for_saving.at[selected_index, "location.page"] = suggestion["page"]
+                        df_for_saving.at[selected_index, "location.evidence"] = suggestion[
                             "evidence"
                         ]
-                        df.at[selected_index, "location.section"] = "AI Discovered"
-                        df.at[selected_index, "location.source_type"] = "text"
+                        df_for_saving.at[selected_index, "location.section"] = "AI Discovered"
+                        df_for_saving.at[selected_index, "location.source_type"] = "text"
 
                         # Clear the pending match after accepting
                         del st.session_state.pending_ai_match
 
-                    df.at[selected_index, "validated"] = True
-                    df.at[selected_index, "validator_name"] = (
+                    df_for_saving.at[selected_index, "validated"] = True
+                    df_for_saving.at[selected_index, "validator_name"] = (
                         st.session_state.validator_name
                     )
-                    df.at[selected_index, "validation_date"] = datetime.now().strftime(
+                    df_for_saving.at[selected_index, "validation_date"] = datetime.now().strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
                     # Auto-advance if filter preserves the item (All, Flagged, etc)
@@ -1187,12 +1191,12 @@ def main() -> None:
                         current_pos = st.session_state.current_property_index
                         for i in range(current_pos + 1, len(filtered_indices)):
                             idx = filtered_indices[i]
-                            if pd.isna(df.at[idx, "validated"]):
+                            if pd.isna(df_for_saving.at[idx, "validated"]):
                                 st.session_state.current_property_index = i
                                 break
 
-                    save_data(df)
-                    st.session_state.df = df
+                    save_data(df_for_saving)
+                    st.session_state.df = df_for_saving
                     st.rerun()
 
             with col_invalid:
@@ -1202,11 +1206,11 @@ def main() -> None:
                     width="stretch",
                     disabled=not name_provided,
                 ):
-                    df.at[selected_index, "validated"] = False
-                    df.at[selected_index, "validator_name"] = (
+                    df_for_saving.at[selected_index, "validated"] = False
+                    df_for_saving.at[selected_index, "validator_name"] = (
                         st.session_state.validator_name
                     )
-                    df.at[selected_index, "validation_date"] = datetime.now().strftime(
+                    df_for_saving.at[selected_index, "validation_date"] = datetime.now().strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
 
@@ -1223,19 +1227,19 @@ def main() -> None:
                         current_pos = st.session_state.current_property_index
                         for i in range(current_pos + 1, len(filtered_indices)):
                             idx = filtered_indices[i]
-                            if pd.isna(df.at[idx, "validated"]):
+                            if pd.isna(df_for_saving.at[idx, "validated"]):
                                 st.session_state.current_property_index = i
                                 break
 
-                    save_data(df)
-                    st.session_state.df = df
+                    save_data(df_for_saving)
+                    st.session_state.df = df_for_saving
                     st.rerun()
 
             with col_flag:
                 flag_label = "Unflag (F)" if is_flagged else "Flag (F)"
                 if st.button(flag_label, type=flag_type, width="stretch"):
                     new_flag_state = not is_flagged
-                    df.at[selected_index, "flagged"] = new_flag_state
+                    df_for_saving.at[selected_index, "flagged"] = new_flag_state
 
                     # Auto-advance to next property
                     if (
@@ -1244,15 +1248,15 @@ def main() -> None:
                     ):
                         st.session_state.current_property_index += 1
 
-                    save_data(df)
-                    st.session_state.df = df
+                    save_data(df_for_saving)
+                    st.session_state.df = df_for_saving
                     st.rerun()
 
             with col_reset:
                 if st.button("Reset", type="secondary", width="stretch"):
-                    df.at[selected_index, "validated"] = None
-                    df.at[selected_index, "validator_name"] = ""
-                    df.at[selected_index, "validation_date"] = ""
+                    df_for_saving.at[selected_index, "validated"] = None
+                    df_for_saving.at[selected_index, "validator_name"] = ""
+                    df_for_saving.at[selected_index, "validation_date"] = ""
 
                     # Clear pending match
                     if (
@@ -1262,8 +1266,8 @@ def main() -> None:
                     ):
                         del st.session_state.pending_ai_match
 
-                    save_data(df)
-                    st.session_state.df = df
+                    save_data(df_for_saving)
+                    st.session_state.df = df_for_saving
                     st.rerun()
 
             # Notes Section
@@ -1281,9 +1285,9 @@ def main() -> None:
             )
 
             if new_note != current_note:
-                df.at[selected_index, "validator_note"] = str(new_note)
-                save_data(df)
-                st.session_state.df = df
+                df_for_saving.at[selected_index, "validator_note"] = str(new_note)
+                save_data(df_for_saving)
+                st.session_state.df = df_for_saving
                 st.toast("Note saved!")
 
         # Prepare display dataframe (just for data access)
@@ -1293,7 +1297,7 @@ def main() -> None:
         # DataFrame Implementation with Sticky "Status | ID"
 
         # Create a display copy to manipulate
-        display_df = df.loc[filtered_indices].copy()
+        display_df = df_selected_pdf.loc[filtered_indices].copy()
 
         # 1. Helper to get icons
         def get_status_icon(val: bool) -> str:
@@ -1472,9 +1476,10 @@ def main() -> None:
 
                             if new_page_int != old_page_int:
                                 # Auto-Correction event
-                                df.at[selected_index, "location.page"] = p_num
-                                save_data(df)
-                                st.session_state.df = df
+                                df_for_saving = st.session_state.df
+                                df_for_saving.at[selected_index, "location.page"] = p_num
+                                save_data(df_for_saving)
+                                st.session_state.df = df_for_saving
                                 st.toast(f"Page auto-corrected to {p_num}", icon="🔄")
 
                 # Filter out low confidence matches
