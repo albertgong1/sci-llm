@@ -65,13 +65,13 @@ def compute_recall_per_material_property(
     """
     # Group by ground truth material AND property name to calculate recall scores
     grouped = df.groupby(
-        ["refno", "model", "material_or_system_gt", "property_name_gt"]
+        ["refno", "agent", "model", "material_or_system_gt", "property_name_gt"]
     )
     logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
     # import pdb; pdb.set_trace()
     results = []
 
-    for (refno, model, material_gt, property_gt), group in grouped:
+    for (refno, agent, model, material_gt, property_gt), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -122,6 +122,7 @@ def compute_recall_per_material_property(
         results.append(
             {
                 "refno": refno,
+                "agent": agent,
                 "model": model,
                 "material_or_system_gt": material_gt,
                 "property_name_gt": property_gt,
@@ -151,6 +152,13 @@ def compute_recall_per_material_property(
                         for row in matching_rows
                     ]
                 ),
+                "answers": ", ".join(
+                    [
+                        f"{row['material_or_system_pred']}: {row['value_string_pred']}"
+                        for _, row in group.iterrows()
+                        if row["is_match"]
+                    ]
+                ),
             }
         )
 
@@ -177,17 +185,19 @@ def compute_precision_per_material_property(
     """
     # Group by predicted material and calculate precision scores
     grouped = df.groupby(
-        ["refno", "model", "material_or_system_pred", "property_name_pred"]
+        ["refno", "agent", "model", "material_or_system_pred", "property_name_pred"]
     )
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 
-    for (refno, model, material_pred, property_pred), group in grouped:
+    for (refno, agent, model, material_pred, property_pred), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
         for idx, row in group.iterrows():
-            # Check if materials match using pymatgen
+            # In order for a row to be considered a match:
+            # - The properties must match (using the "is_match" column)
+            # - The materials must match using scorer_pymatgen
             if (
                 row["is_match"]
                 and pd.notna(material_pred)
@@ -231,6 +241,7 @@ def compute_precision_per_material_property(
         results.append(
             {
                 "refno": refno,
+                "agent": agent,
                 "model": model,
                 "material_or_system_pred": material_pred,
                 "property_name_pred": property_pred,
@@ -251,6 +262,13 @@ def compute_precision_per_material_property(
                     [
                         f"{row['property_name_gt']}: {row['value_string_gt']}"
                         for row in matching_rows
+                    ]
+                ),
+                "answers": ", ".join(
+                    [
+                        f"{row['material_or_system_gt']}: {row['value_string_gt']}"
+                        for _, row in group.iterrows()
+                        if row["is_match"]
                     ]
                 ),
             }
