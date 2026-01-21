@@ -17,12 +17,20 @@ Generally:
 - Avoid long and nested for loops, create separate functions and files for complex logic
 
 For python files:
-- Start with shebang `#!/usr/bin/env -S uv run --env-file=.env -- python` to ensure the script can be run with correct python paths and environment variables
 - Use python 3.13 version
 - Use type hints like `x: int, list, dict, Any, Literal["value"], df: pd.DataFrame`. Also use nested types like `convo: list[dict[str, str]]`. Always use such type hints for function signatures, and often for variables that could be difficult to understand.
 - Use `Path` for file paths
 - Use a docstring at the top of a python file: 1-2 lines for the purpose, and a command usage
 - Use pandas dataframes and CSVs generally for data analysis
+- For CLI argument parsing, use the starter code below and add additional arguments using parser.add_argument(...):
+
+```python
+parser = argparse.ArgumentParser(
+    description="Mass extract properties from PDF files using unsupervised LLM extraction"
+)
+parser = pbench.add_base_args(parser)
+```
+- Use a flat script structure for Python scripts within an examples/ subdirectory. Assume that the script will never be imported as a module, so do not use if __name__ == "__main__" to run the script.
 
 For bash files:
 - Start with shebang `!/usr/bin/env bash`

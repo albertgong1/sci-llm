@@ -6,47 +6,9 @@ from pathlib import Path
 
 import llm_utils
 
-# NOTE: Assets are in the root directory of the project, change the path
-# if the project structure changes.
-# ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-# DATA_DIR = Path(__file__).parent.parent.parent / "data"
-
-SUPPORTED_DOMAINS: list[str] = ["supercon", "precedent-search"]
-
-DOMAIN2HF_DATASET_NAME: dict[str, str] = {
-    "supercon": "kilian-group/supercon-mini",
-}
-
 
 def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add base arguments to the argument parser."""
-    # Domain args
-    parser.add_argument(
-        "--domain",
-        type=str,
-        # required=True,
-        choices=SUPPORTED_DOMAINS,
-        help="Material science domain",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default="kilian-group/supercon-mini-v2",
-        help="Path to Ground Truth CSV or Hugging Face dataset name",
-    )
-    parser.add_argument(
-        "--task",
-        type=str,
-        default=None,
-        help="HuggingFace dataset configuration name, depending on the domain (e.g., 'tc', 'gap')",
-    )
-    parser.add_argument(
-        "--split",
-        type=str,
-        default="test",
-        help="Split of the dataset to use",
-    )
-
     # Paths args
     parser.add_argument(
         "--data_dir",
@@ -62,6 +24,33 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default="out/",
         help="Output directory (default: out)",
     )
+    parser.add_argument(
+        "--jobs_dir",
+        "-jd",
+        type=Path,
+        default=None,
+        help="Jobs directory for Harbor runs (default: jobs)",
+    )
+
+    # Dataset args
+    parser.add_argument(
+        "--hf_repo",
+        type=str,
+        default=None,
+        help="HuggingFace dataset name",
+    )
+    parser.add_argument(
+        "--hf_split",
+        type=str,
+        default=None,
+        help="HuggingFace dataset split",
+    )
+    parser.add_argument(
+        "--hf_revision",
+        type=str,
+        default=None,
+        help="HuggingFace dataset revision",
+    )
 
     # LLM args
     parser.add_argument(
@@ -73,6 +62,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model_name",
+        "-m",
         type=str,
         default="gemini-3-flash-preview",
         help="Model name (e.g., 'gemini-3-flash-preview').",
@@ -85,9 +75,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
 
     # Logging args
-    parser.add_argument(
-        "--log_level", type=int, default=logging.INFO, help="Logging level"
-    )
+    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
     return parser
 
 

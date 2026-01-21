@@ -22,7 +22,12 @@ class InferenceGenerationConfig(BaseModel):
     reasoning_effort: str | None = Field(default=None)
 
     # Supported by Gemini API
+    # Docs: https://ai.google.dev/api/generate-content#ThinkingConfig
     thinking_budget: int = Field(default=-1)
+
+    # Output format
+    # Docs: https://ai.google.dev/api/generate-content#generationconfig
+    output_format: Literal["text", "json"] = Field(default="text")
 
 
 class File(BaseModel):
@@ -52,9 +57,10 @@ class Conversation(BaseModel):
 class LLMChatResponse(BaseModel):
     """Response from an LLM chat completion."""
 
-    pred: str
+    pred: str | dict[str, Any]
     usage: dict[str, Any]
     error: str | None
+    thought: str | None
 
 
 class LLMChat(abc.ABC):
@@ -92,7 +98,32 @@ class LLMChat(abc.ABC):
 
         messages = self._convert_conv_to_api_format(conv)
         response = self._call_api(messages, inf_gen_config)
-        return self._parse_api_output(response)
+        return self._parse_api_output(response, inf_gen_config)
+
+    async def generate_response_async(
+        self,
+        conv: Conversation,
+        inf_gen_config: InferenceGenerationConfig,
+    ) -> LLMChatResponse:
+        """Generate a response from the LLM.
+
+        Args:
+            conv: The conversation history.
+            inf_gen_config: Inference generation configuration.
+
+        Returns:
+            The LLM's response.
+
+        """
+        # Upload all files first
+        for msg in conv.messages:
+            for content in msg.content:
+                if isinstance(content, File):
+                    self.upload_file(content)
+
+        messages = self._convert_conv_to_api_format(conv)
+        response = await self._call_api(messages, inf_gen_config, use_async=True)
+        return self._parse_api_output(response, inf_gen_config)
 
     @abc.abstractmethod
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
@@ -126,11 +157,14 @@ class LLMChat(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _parse_api_output(self, response: Any) -> LLMChatResponse:
+    def _parse_api_output(
+        self, response: Any, inf_gen_config: InferenceGenerationConfig
+    ) -> LLMChatResponse:
         """Parse the API response into a standardized format.
 
         Args:
             response: Raw API response.
+            inf_gen_config: Inference generation configuration.
 
         Returns:
             Parsed LLM chat response.

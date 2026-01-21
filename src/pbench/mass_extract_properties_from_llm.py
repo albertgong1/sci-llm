@@ -4,27 +4,34 @@
 This script processes all PDF papers and extracts comprehensive property data
 using an LLM with an unsupervised extraction prompt.
 
+The script expects to be run from a directory containing:
+- prompts/unsupervised_extraction_prompt.md (or custom prompt path)
+- data/Paper_DB/ (directory containing the PDF files to process)
+
 Usage:
 ```bash
-# Process all PDFs
-./src/pbench/mass_extract_properties_from_llm.py \
-    --domain supercon \
+# From examples/biosurfactants-extraction/ directory
+uv run pbench-extract \
     --server gemini \
-    --model_name gemini-2.5-flash \
-    -od out/
+    --model_name gemini-3-pro-preview \
+    -od out/ \
+    -pp prompts/unsupervised_extraction_prompt.md \
+    -dd data/ \
+    -log_level INFO
 ```
 
-For this example, the results will be saved in `out/supercon/unsupervised_llm_extraction/*.csv`.
+For this example, the results will be saved in `out/unsupervised_llm_extraction/*.csv`.
 """
 
 import argparse
+import asyncio
 import json
 import logging
 import re
 from pathlib import Path
 
 import pandas as pd
-from tqdm import tqdm
+from tqdm.asyncio import tqdm
 import fitz  # PyMuPDF
 
 import llm_utils
@@ -32,6 +39,9 @@ from llm_utils.common import Conversation, File, LLMChatResponse, Message
 import pbench
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of conditions to store in CSV
+MAX_CONDITIONS = 10
 
 
 def load_prompt(prompt_path: Path) -> str:
@@ -83,53 +93,6 @@ def parse_json_response(response_text: str) -> dict | None:
     return None
 
 
-def map_conditions(json_conditions: dict) -> dict:
-    """Map JSON conditions object to CSV condition columns.
-
-    Args:
-        json_conditions: Conditions dict from JSON
-
-    Returns:
-        Dict with CSV condition column names and values
-
-    """
-    csv_conditions = {
-        "conditions.field_orientation": "",
-        "conditions.current_direction": "",
-        "conditions.field": "",
-        "conditions.temperature": "",
-        "conditions.field_range": "",
-        "conditions.temperature_range": "",
-    }
-
-    if not json_conditions:
-        return csv_conditions
-
-    # Map orientation to field_orientation
-    if orientation := json_conditions.get("orientation", ""):
-        csv_conditions["conditions.field_orientation"] = orientation
-
-    # Map field
-    if field_val := json_conditions.get("field", ""):
-        csv_conditions["conditions.field"] = field_val
-        # Check if it's a range
-        if any(indicator in str(field_val) for indicator in ["–", "-", "to", "~"]):
-            csv_conditions["conditions.field_range"] = field_val
-            csv_conditions["conditions.field"] = ""
-
-    # Map temperature
-    if temp_val := json_conditions.get("temperature", ""):
-        csv_conditions["conditions.temperature"] = temp_val
-        # Check if it's a range
-        if any(
-            indicator in str(temp_val) for indicator in ["–", "-", "to", "~", "<", ">"]
-        ):
-            csv_conditions["conditions.temperature_range"] = temp_val
-            csv_conditions["conditions.temperature"] = ""
-
-    return csv_conditions
-
-
 def json_property_to_csv_row(prop: dict) -> pd.Series:
     """Convert a JSON property object to a CSV row as pandas Series.
 
@@ -137,55 +100,142 @@ def json_property_to_csv_row(prop: dict) -> pd.Series:
         prop: Property dict from JSON response
 
     Returns:
-        pandas Series with all 27 CSV columns
+        pandas Series with CSV columns
 
     """
-    # Map conditions
-    conditions = map_conditions(prop.get("conditions", {}))
+    # Get conditions and flatten them
+    conditions = prop.get("conditions") or prop.get("critical_matrix") or {}
+
+    # Create a dict to hold the flattened condition columns
+    condition_cols = {}
+    for i in range(1, MAX_CONDITIONS + 1):
+        condition_cols[f"condition{i}_name"] = ""
+        condition_cols[f"condition{i}_value"] = ""
+
+    # Fill in the conditions that exist
+    if isinstance(conditions, dict):
+        for idx, (cond_name, cond_value) in enumerate(conditions.items(), start=1):
+            if idx <= MAX_CONDITIONS:
+                condition_cols[f"condition{idx}_name"] = str(cond_name)
+                condition_cols[f"condition{idx}_value"] = str(cond_value)
 
     # Get location info
     location = prop.get("location", {})
 
     # Build Series
-    return pd.Series(
-        {
-            # "id": "", # NOTE: will be automatically assigned when writing to CSV
-            # "refno": refno, # NOTE: will be automatically assigned when writing to CSV
-            "material_or_system": prop.get("material_or_system", ""),
-            "sample_label": prop.get("sample_label", ""),
-            "property_name": prop.get("property_name", ""),
-            "category": prop.get("category", ""),
-            "value_string": prop.get("value_string", ""),
-            "value_number": "",
-            "units": "",
-            "method": prop.get("method", ""),
-            "notes": prop.get("notes", ""),
-            "location.page": location.get("page", ""),
-            "location.section": location.get("section", ""),
-            "location.source_type": location.get("source_type", ""),
-            "location.evidence": location.get("evidence", ""),
-            "location.figure_or_table": location.get("figure_or_table", ""),
-            "conditions.field_orientation": conditions["conditions.field_orientation"],
-            "conditions.current_direction": conditions["conditions.current_direction"],
-            "conditions.field": conditions["conditions.field"],
-            "conditions.temperature": conditions["conditions.temperature"],
-            "conditions.field_range": conditions["conditions.field_range"],
-            "conditions.temperature_range": conditions["conditions.temperature_range"],
-            # NOTE: values below will be populated later by the validator app
-            # "paper_pdf_path": "",
-            # "validated": False,
-            # "validator_name": "",
-            # "validation_date": "",
-            # "flagged": False,
-        }
+    row_data = {
+        # "id": "", # NOTE: will be automatically assigned when writing to CSV
+        # "refno": refno, # NOTE: will be automatically assigned when writing to CSV
+        "material_or_system": prop.get("material_or_system", ""),
+        "sample_label": prop.get("sample_label", ""),
+        "property_name": prop.get("property_name", ""),
+        "category": prop.get("category", ""),
+        "value_string": prop.get("value_string", ""),
+        "value_number": "",
+        "units": "",
+        "method": prop.get("method", ""),
+        "notes": prop.get("notes", ""),
+        "location.page": location.get("page", ""),
+        "location.section": location.get("section", ""),
+        "location.source_type": location.get("source_type", ""),
+        "location.evidence": location.get("evidence", ""),
+        "location.figure_or_table": location.get("figure_or_table", ""),
+    }
+
+    # Add the flattened condition columns
+    row_data.update(condition_cols)
+
+    # NOTE: values below will be populated later by the validator app
+    # "paper_pdf_path": "",
+    # "validated": False,
+    # "validator_name": "",
+    # "validation_date": "",
+    # "flagged": False,
+
+    return pd.Series(row_data)
+
+
+async def process_single_page(
+    page_num: int,
+    file: File,
+    prompt: str,
+    refno: str,
+    llm: llm_utils.LLMChat,
+    inf_gen_config: llm_utils.InferenceGenerationConfig,
+) -> list[dict]:
+    """Process a single page and extract properties.
+
+    Args:
+        page_num: Page number to process
+        file: File object for the paper
+        prompt: Extraction prompt text
+        refno: Reference number of the paper
+        llm: LLMChat instance
+        inf_gen_config: InferenceGenerationConfig instance
+
+    Returns:
+        List of property dicts (with page_num included for sorting later)
+
+    """
+    # Build conversation
+    page_prompt = f"""
+\n\n
+------FINAL INSTRUCTIONS------
+Now extract all properties in the research article that are on page number {page_num}.
+It is important to ONLY extract properties that are on page number {page_num}.
+DO NOT extract properties that are on other pages.
+--------------------------------
+    """
+    conv = Conversation(
+        messages=[
+            Message(role="user", content=[file, prompt, page_prompt]),
+        ]
     )
 
+    try:
+        # Get LLM response
+        response: LLMChatResponse = await llm.generate_response_async(
+            conv, inf_gen_config
+        )
 
-def process_paper(
+        # Check for errors
+        if response.error:
+            logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
+            return []
+
+        # Parse JSON from response
+        json_data = parse_json_response(response.pred)
+        if json_data is None:
+            logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
+            return []
+
+        # Check for properties array
+        if "properties" not in json_data:
+            logger.warning(f"No 'properties' key in JSON for {refno} page {page_num}")
+            return []
+
+        properties = json_data["properties"]
+        if not isinstance(properties, list):
+            logger.warning(f"'properties' is not a list for {refno} page {page_num}")
+            return []
+
+        # Add page_num to each property for later sorting
+        for prop in properties:
+            prop["_page_num"] = page_num
+
+        return properties
+
+    except Exception as e:
+        logger.error(f"Error processing {refno} page {page_num}: {e}")
+        return []
+
+
+async def process_paper(
     paper_path: Path,
     prompt: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
+    model_name: str,
 ) -> list[pd.Series]:
     """Process a single paper by prompting the LLM one page at a time to extract properties.
 
@@ -194,6 +244,7 @@ def process_paper(
         prompt: Extraction prompt text
         llm: LLMChat instance
         inf_gen_config: InferenceGenerationConfig instance
+        model_name: Name of the LLM model used for extraction
 
     Returns:
         List of pandas Series (one per extracted property)
@@ -211,115 +262,113 @@ def process_paper(
         doc.close()
     except Exception as e:
         logger.error(f"Failed to get number of pages from {paper_path}: {e}")
+        return []
 
+    # Create tasks for all pages
+    tasks = [
+        process_single_page(page_num, file, prompt, refno, llm, inf_gen_config)
+        for page_num in range(1, num_pages + 1)
+    ]
+
+    # Process all pages concurrently with progress bar
+    total_properties = 0
+    pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
+
+    page_results = []
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        page_results.append(result)
+        total_properties += len(result)
+        pbar.set_description(f"Processing {refno} ({total_properties} props)")
+        pbar.update(1)
+
+    pbar.close()
+
+    # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
     property_counter = 0
 
-    pbar = tqdm(
-        range(1, num_pages + 1),
-        total=num_pages,
-        desc=f"Processing {refno} pages",
-    )
-    for page_num in pbar:
-        # Build conversation
-        page_prompt = f"""
-\n\n
-------FINAL INSTRUCTIONS------
-Now extract all properties in the research article that are on page number {page_num}.
-It is important to ONLY extract properties that are on page number {page_num}.
-DO NOT extract properties that are on other pages.
---------------------------------
-        """
-        conv = Conversation(
-            messages=[
-                Message(role="user", content=[file, prompt, page_prompt]),
-            ]
-        )
+    for properties in page_results:
+        for prop in properties:
+            try:
+                # Remove the temporary page_num field before converting
+                prop.pop("_page_num", None)
+                row_series: pd.Series = json_property_to_csv_row(prop)
 
-        try:
-            # Get LLM response
-            response: LLMChatResponse = llm.generate_response(conv, inf_gen_config)
+                # Assign metadata
+                row_series["id"] = f"prop_{property_counter:03d}"
+                row_series["refno"] = refno
+                row_series["paper_pdf_path"] = str(paper_path)
+                row_series["model_name"] = model_name
+                row_series["validated"] = None
+                row_series["validator_name"] = ""
+                row_series["validation_date"] = ""
+                row_series["flagged"] = False
 
-            # Check for errors
-            if response.error:
-                logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
+                all_rows.append(row_series)
+                property_counter += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to convert property from {refno}: {e}")
                 continue
-
-            # Parse JSON from response
-            json_data = parse_json_response(response.pred)
-            if json_data is None:
-                logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
-                continue
-
-            # Check for properties array
-            if "properties" not in json_data:
-                logger.warning(
-                    f"No 'properties' key in JSON for {refno} page {page_num}"
-                )
-                continue
-
-            properties = json_data["properties"]
-            if not isinstance(properties, list):
-                logger.warning(
-                    f"'properties' is not a list for {refno} page {page_num}"
-                )
-                continue
-
-            logger.info(
-                f"Extracted {len(properties)} properties from {refno} page {page_num}"
-            )
-
-            # Convert each property to CSV row (pandas Series)
-            for prop in properties:
-                try:
-                    row_series: pd.Series = json_property_to_csv_row(prop)
-
-                    # Assign metadata
-                    row_series["id"] = f"prop_{property_counter:03d}"
-                    row_series["refno"] = refno
-                    row_series["paper_pdf_path"] = str(paper_path)
-                    row_series["validated"] = False
-                    row_series["validator_name"] = ""
-                    row_series["validation_date"] = ""
-                    row_series["flagged"] = False
-
-                    all_rows.append(row_series)
-                    property_counter += 1
-
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to convert property from {refno} page {page_num}: {e}"
-                    )
-                    continue
-
-        except Exception as e:
-            logger.error(f"Error processing {refno} page {page_num}: {e}")
-            continue
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
     return all_rows
 
 
-def main(args: argparse.Namespace) -> None:
+async def extract_properties(args: argparse.Namespace) -> None:
     """Main function to extract properties from all PDFs."""
-    # Load extraction prompt
-    prompt_path = (
-        pbench.ASSETS_DIR / args.domain / args.unsupervised_extraction_prompt_filename
-    )
+    # Load extraction prompt (relative to current working directory)
+    prompt_path = args.prompt_path
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
 
     logger.info(f"Loading prompt from {prompt_path}")
     prompt = load_prompt(prompt_path)
 
-    # Get list of PDFs
-    paper_dir = args.data_dir / args.domain / "Paper_DB"
+    # Get list of PDFs (relative to current working directory)
+    paper_dir = args.data_dir / "Paper_DB"
     if not paper_dir.exists():
         raise FileNotFoundError(f"Paper directory not found: {paper_dir}")
 
     pdf_files = sorted(paper_dir.glob("*.pdf"))
-    num_pdfs = len(pdf_files)
+
+    # Filter out excluded files if exclude list is provided
+    if args.exclude_list and args.exclude_list.exists():
+        logger.info(f"Loading exclude list from {args.exclude_list}")
+        with open(args.exclude_list, "r") as f:
+            excluded_filenames = {line.strip() for line in f if line.strip()}
+
+        original_count = len(pdf_files)
+        pdf_files = [pdf for pdf in pdf_files if pdf.name not in excluded_filenames]
+        excluded_count = original_count - len(pdf_files)
+
+        if excluded_count > 0:
+            logger.info(f"Excluded {excluded_count} PDF file(s) based on exclude list")
+
+    # Default ordering is by filename
+    refnos_ordering: list[str] = [pdf.stem for pdf in pdf_files]
+    if args.harbor_task_ordering_registry_path is not None:
+        logger.info(f"Loading harbor task ordering from {args.harbor_task_ordering_registry_path}")
+        with open(args.harbor_task_ordering_registry_path, "r") as f:
+            harbor_task_ordering = json.load(f)
+        
+        # Load the refnos from harbor_task_ordering[0]["tasks"][:]["name"]
+        refnos_ordering = [task["name"].strip().upper() for task in harbor_task_ordering[0]["tasks"]]
+
+    if args.max_num_papers is not None:
+        refnos_ordering = refnos_ordering[:args.max_num_papers]
+    
+    # Reorder the pdf_files based on the refnos_ordering
+    reordered_pdf_files = []
+    for refno in refnos_ordering:
+        for pdf in pdf_files:
+            if pdf.stem == refno:
+                reordered_pdf_files.append(pdf)
+                break
+
+    num_pdfs = len(reordered_pdf_files)
     logger.info(f"Found {num_pdfs} PDF files in {paper_dir}")
 
     if num_pdfs == 0:
@@ -335,15 +384,19 @@ def main(args: argparse.Namespace) -> None:
     )
 
     # Setup output directory
-    preds_dir = args.output_dir / args.domain / "unsupervised_llm_extraction"
+    preds_dir = args.output_dir / "unsupervised_llm_extraction"
     preds_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
 
     # Process each PDF
-    for pdf_path in tqdm(pdf_files, desc="Processing PDFs"):
+    for pdf_path in tqdm(reordered_pdf_files, desc="Processing PDFs"):
         refno = pdf_path.stem
+
+        # Skip if refno is specified and this isn't it
+        if args.refno is not None and refno != args.refno:
+            continue
 
         # Construct output path
         output_filename = (
@@ -359,7 +412,9 @@ def main(args: argparse.Namespace) -> None:
             continue
 
         # Process the paper
-        rows = process_paper(pdf_path, prompt, llm, inf_gen_config)
+        rows = await process_paper(
+            pdf_path, prompt, llm, inf_gen_config, args.model_name
+        )
 
         # Save to CSV
         if len(rows) > 0:
@@ -371,18 +426,51 @@ def main(args: argparse.Namespace) -> None:
             logger.warning(f"No properties extracted from {refno}")
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """CLI entry point for console script."""
     parser = argparse.ArgumentParser(
         description="Mass extract properties from PDF files using unsupervised LLM extraction"
     )
     parser = pbench.add_base_args(parser)
     parser.add_argument(
-        "--unsupervised_extraction_prompt_filename",
-        type=str,
-        default="unsupervised_extraction_prompt.md",
-        help="Filename of the unsupervised extraction prompt (default: unsupervised_extraction_prompt.md)",
+        "--prompt_path",
+        "-pp",
+        type=Path,
+        default=Path("prompts/unsupervised_extraction_prompt.md"),
+        help="Path to the unsupervised extraction prompt (default: prompts/unsupervised_extraction_prompt.md)",
     )
-
+    # parser.add_argument(
+    #     "--file_no",
+    #     "-fn",
+    #     type=int,
+    #     default=None,
+    #     help="Specific file number to process (1-indexed). If None, process all files",
+    # )
+    parser.add_argument(
+        "--refno",
+        type=str,
+        default=None,
+        help="Refno to process. If None, process all refnos",
+    )
+    parser.add_argument(
+        "--exclude_list",
+        "-el",
+        type=Path,
+        default=None,
+        help="Path to file containing list of PDF filenames to exclude (one per line)",
+    )
+    parser.add_argument(
+        "--harbor_task_ordering_registry_path",
+        type=Path,
+        default=None,
+        help="Path to the registry_data.json file that defines the ordering of the papers to process (default: None)",
+    )
+    parser.add_argument(
+        "--max_num_papers",
+        type=int,
+        default=None,
+        help="Maximum number of papers to process (default: None)",
+    )
     # LLM generation arguments
     parser.add_argument(
         "--max_output_tokens",
@@ -390,16 +478,12 @@ if __name__ == "__main__":
         default=65536,
         help="Maximum number of output tokens for LLM response (default: 65536)",
     )
-    parser.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Overwrite existing output files",
-    )
 
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
 
-    assert args.domain == "supercon", "Only supercon domain is supported for now"
+    asyncio.run(extract_properties(args))
 
-    main(args)
+
+if __name__ == "__main__":
+    main()

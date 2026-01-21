@@ -2,9 +2,19 @@
 
 import os
 from typing import Any
+import json
 
 from google import genai
 from google.genai import types as genai_types
+from google.genai.errors import ServerError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+import logging
 
 from llm_utils.common import (
     Conversation,
@@ -12,6 +22,18 @@ from llm_utils.common import (
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
+)
+
+
+logger = logging.getLogger(__name__)
+
+# Retry decorator for Gemini API calls
+_retry_decorator = retry(
+    retry=retry_if_exception_type(ServerError),
+    stop=stop_after_attempt(6),
+    wait=wait_exponential_jitter(initial=1, max=60),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
 )
 
 
@@ -82,25 +104,24 @@ class GeminiChat(LLMChat):
 
         return messages
 
-    def _call_api(
-        self,
-        messages: list[dict[str, Any]],
-        inf_gen_config: InferenceGenerationConfig,
-    ) -> Any:
-        """Call the Gemini API.
+    def _build_gen_kwargs(
+        self, messages: list[dict[str, Any]], inf_gen_config: InferenceGenerationConfig
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Build generation kwargs for the Gemini API.
 
         Args:
             messages: Messages in Gemini's format.
             inf_gen_config: Inference generation configuration.
 
         Returns:
-            Raw API response.
+            Tuple of (possibly modified messages, generation kwargs).
 
         """
         gen_kwargs: dict[str, Any] = {
             "max_output_tokens": inf_gen_config.max_output_tokens,
             "thinking_config": genai_types.ThinkingConfig(
-                thinking_budget=inf_gen_config.thinking_budget
+                thinking_budget=inf_gen_config.thinking_budget,
+                include_thoughts=True,
             ),
         }
         if inf_gen_config.temperature:
@@ -110,46 +131,125 @@ class GeminiChat(LLMChat):
         if inf_gen_config.stop_sequences:
             gen_kwargs["stop_sequences"] = inf_gen_config.stop_sequences
 
+        # See https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#generationconfig for all available response mime types
+        if inf_gen_config.output_format == "json":
+            gen_kwargs["response_mime_type"] = "application/json"
+        elif inf_gen_config.output_format == "text":
+            gen_kwargs["response_mime_type"] = "text/plain"
+        else:
+            raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
+
+        # Disable automatic function calling
+        gen_kwargs["automatic_function_calling"] = (
+            genai_types.AutomaticFunctionCallingConfig(disable=True)
+        )
+
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
         if messages and messages[0]["role"] == "system":
             gen_kwargs["system_instruction"] = messages[0]["parts"][0]
             messages = messages[1:]
 
-        # Gemini's chat expects history (all but last message) and current message
-        response = self.client.models.generate_content(
+        return messages, gen_kwargs
+
+    def _call_api(
+        self,
+        messages: list[dict[str, Any]],
+        inf_gen_config: InferenceGenerationConfig,
+        use_async: bool = False,
+    ) -> Any:
+        """Call the Gemini API with retry/backoff for transient errors.
+
+        Args:
+            messages: Messages in Gemini's format.
+            inf_gen_config: Inference generation configuration.
+            use_async: Whether to return an async coroutine.
+
+        Returns:
+            Raw API response or async coroutine.
+
+        """
+        messages, gen_kwargs = self._build_gen_kwargs(messages, inf_gen_config)
+
+        if use_async:
+            return self._call_api_async_with_retry(messages, gen_kwargs)
+        else:
+            return self._call_api_sync_with_retry(messages, gen_kwargs)
+
+    @_retry_decorator
+    def _call_api_sync_with_retry(
+        self,
+        messages: list[dict[str, Any]],
+        gen_kwargs: dict[str, Any],
+    ) -> Any:
+        """Call the Gemini API synchronously with retry/backoff."""
+        return self.client.models.generate_content(
             model=self.model_name,
             contents=messages,
             config=genai_types.GenerateContentConfig(**gen_kwargs),
         )
 
-        return response
+    @_retry_decorator
+    async def _call_api_async_with_retry(
+        self,
+        messages: list[dict[str, Any]],
+        gen_kwargs: dict[str, Any],
+    ) -> Any:
+        """Call the Gemini API asynchronously with retry/backoff."""
+        return await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=messages,
+            config=genai_types.GenerateContentConfig(**gen_kwargs),
+        )
 
-    def _parse_api_output(self, response: Any) -> LLMChatResponse:
+    def _parse_api_output(
+        self, response: Any, inf_gen_config: InferenceGenerationConfig
+    ) -> LLMChatResponse:
         """Parse Gemini's response.
 
         Args:
             response: Raw Gemini API response.
+            inf_gen_config: Inference generation configuration.
 
         Returns:
             Parsed LLM chat response.
 
         """
+        # See https://ai.google.dev/gemini-api/docs/thinking#summaries for instructions
+        # on how to parse thoughts from the response.
+        thought = None
+        for part in response.candidates[0].content.parts:
+            if not part.text:
+                continue
+            if part.thought:
+                thought = part.text
+                break
         try:
-            pred = response.text
+            if inf_gen_config.output_format == "json":
+                pred = json.loads(response.text)
+            elif inf_gen_config.output_format == "text":
+                pred = response.text
+            else:
+                raise ValueError(
+                    f"Invalid output format: {inf_gen_config.output_format}"
+                )
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "cached_tokens": response.usage_metadata.cached_content_token_count
+                if response.usage_metadata.cached_content_token_count
+                else 0,
                 "completion_tokens": response.usage_metadata.candidates_token_count,
                 "thinking_tokens": response.usage_metadata.thoughts_token_count,
                 "total_tokens": response.usage_metadata.total_token_count,
             }
-            return LLMChatResponse(pred=pred, usage=usage, error=None)
+            return LLMChatResponse(pred=pred, usage=usage, error=None, thought=thought)
         except Exception as e:
             # Handle cases where Gemini refuses to generate
             return LLMChatResponse(
                 pred="",
                 usage={},
                 error=str(e),
+                thought=None,
             )
 
     def upload_file(self, file: File) -> None:

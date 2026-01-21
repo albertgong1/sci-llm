@@ -31,6 +31,7 @@ Each row contains the following information:
             "property_name": "...",
             "category": "...",
             "value_string": "...",
+            "value_unit": "...",
             "qualifier": "...",
             "value_detail": "...",
             "conditions": {
@@ -82,6 +83,15 @@ from joblib import Parallel, delayed
 import huggingface_hub
 
 import pbench
+
+from utils import (
+    ANALM,
+    CRYSTAL_SYMMETRY,
+    GAPMETH,
+    SHAPE,
+    METHOD,
+    TC_MEASUREMENT_METHOD,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +177,18 @@ def process_row(row: pd.Series) -> pd.Series:
         if pd.notna(df_units.loc[col, "unit"]):
             unit_value = row[df_units.loc[col, "unit"]]
             value_string = f"{value} {unit_value}"
+        elif col == "shape":  # shape
+            unit_value = None
+            value_string = SHAPE.get(int(value), "")
+        elif col == "str1":  # crystal symmetry
+            unit_value = None
+            value_string = CRYSTAL_SYMMETRY.get(int(value), "")
+        elif col == "method":  # preparation method
+            unit_value = None
+            value_string = METHOD.get(int(value), "")
         else:
-            value_string = str(value) if pd.notna(value) else None
+            unit_value = None
+            value_string = str(value) if pd.notna(value) else ""
 
         # Build conditions dict
         conditions = {}
@@ -176,11 +196,15 @@ def process_row(row: pd.Series) -> pd.Series:
         temp_col = df_units.loc[col, "conditions.temperature"]
         if pd.notna(temp_col) and temp_col in row.index and pd.notna(row[temp_col]):
             conditions["temperature"] = str(row[temp_col])
+        else:
+            conditions["temperature"] = ""
 
         # Get field condition
         field_col = df_units.loc[col, "conditions.field"]
         if pd.notna(field_col) and field_col in row.index and pd.notna(row[field_col]):
             conditions["field"] = str(row[field_col])
+        else:
+            conditions["field"] = ""
 
         # Build location dict
         location = {}
@@ -201,7 +225,15 @@ def process_row(row: pd.Series) -> pd.Series:
             and method_col in row.index
             and pd.notna(row[method_col])
         ):
-            method = str(row[method_col])
+            if method_col == "analm":  # *method of analysis for structure
+                method = ANALM.get(int(row[method_col]), "")
+            elif method_col == "gapmeth":  # method of measuring energy gap
+                method = GAPMETH.get(int(row[method_col]), "")
+            elif method_col == "tcmeth":  # TC measurement method
+                # import pdb; pdb.set_trace()
+                method = TC_MEASUREMENT_METHOD.get(int(row[method_col]), "")
+            else:
+                method = str(row[method_col])
 
         properties.append(
             {
@@ -213,6 +245,7 @@ def process_row(row: pd.Series) -> pd.Series:
                 "property_name": db_to_property_name_lookup.get(col, col),
                 "category": None,
                 "value_string": value_string,
+                "value_unit": unit_value,
                 "qualifier": None,
                 "value_detail": None,
                 "conditions": conditions if conditions else None,
@@ -247,17 +280,42 @@ if args.filter_pdf:
     logger.info(f"{len(df)} rows have paper PDF")
 
 logger.info("Saving dataset to CSV...")
-save_path = args.output_dir / "dataset.csv"
+save_path = args.output_dir / f"{args.split}.csv"
 save_path.parent.mkdir(parents=True, exist_ok=True)
 df.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
+if False:
+    # FOR DEBUGGING PURPOSES ONLY:
+    # save exploded version of the dataset for easier inspection
+    df_exploded = df.explode("properties").reset_index(drop=True)
+    # expand the properties dict into separate columns
+    properties_df = pd.json_normalize(df_exploded["properties"])
+    # add back the refno column
+    properties_df.insert(0, "refno", df_exploded["refno"].values)
+    # rename columns for clarity
+    properties_df = properties_df.rename(
+        columns={"value_string": "property_value", "value_unit": "property_unit"}
+    )
+    # create reverse lookup from property name to db label
+    property_name_to_db = {v: k for k, v in db_to_property_name_lookup.items()}
+    # merge db label from glossary and insert before property_name
+    db_label_values = properties_df["property_name"].map(property_name_to_db)
+    property_name_idx = properties_df.columns.get_loc("property_name")
+    properties_df.insert(property_name_idx, "db_label", db_label_values)
+    # import pdb; pdb.set_trace()
+    # save properties_df to csv
+    exploded_save_path = args.output_dir / f"{args.split}_exploded.csv"
+    logger.info(f"Saving exploded dataset to {exploded_save_path}...")
+    properties_df.to_csv(exploded_save_path, index=False)
+    exit(0)
+
 dataset = Dataset.from_pandas(df)
-dataset.save_to_disk(args.output_dir / "dataset")
-logger.info(f"Dataset saved to {args.output_dir / 'dataset'}")
+dataset.save_to_disk(args.output_dir / f"{args.split}")
+logger.info(f"Dataset saved to {args.output_dir / f'{args.split}'}")
 
 # Load the dataset from disk and print the first row
-loaded_dataset = Dataset.load_from_disk(args.output_dir / "dataset")
+loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.split}")
 logger.info("Loading first row from saved dataset:")
 first_row = loaded_dataset[0]
 print("\n" + "=" * 80)
@@ -275,7 +333,9 @@ if args.repo_name is not None:
     logger.info(f"Pushing dataset to HuggingFace Hub: {args.repo_name}")
     logger.info(f"Uploading {len(df)} rows...")
     dataset = Dataset.from_pandas(df)
-    dataset.push_to_hub(args.repo_name, private=True, split="test")
+    # Note: If schema changes, you may need to delete existing data first:
+    # huggingface_hub.HfApi().delete_folder(repo_id=args.repo_name, path_in_repo="data", repo_type="dataset")
+    dataset.push_to_hub(args.repo_name, private=False, split=args.split)
     logger.info(f"✓ All {len(df)} rows pushed to {args.repo_name}")
 
     # Tag the dataset so that we can easily refer to different versions of the dataset

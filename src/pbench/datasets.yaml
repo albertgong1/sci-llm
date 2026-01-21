@@ -1,0 +1,9 @@
+datasets:
+  supercon:
+    name: kilian-group/supercon-extraction
+    revision: v0.1.0
+    split: lite
+  biosurfactants:
+    name: kilian-group/biosurfactants-mini
+    revision: v0.0.0
+    split: test

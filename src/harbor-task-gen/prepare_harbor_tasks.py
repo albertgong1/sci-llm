@@ -1,4 +1,4 @@
-r"""Compile Harbor tasks for SuperCon property extraction from a folder of PDFs.
+r"""Compile Harbor tasks for property extraction from a folder of PDFs.
 
 This "task compiler" turns a (PDF, ground-truth) dataset into Harbor task directories,
 each with:
@@ -6,28 +6,28 @@ each with:
   - `instruction.md`: a single prompt/instruction file shared across tasks via a template
   - `tests/`: verifier that scores predictions using rubric tolerances
   - `solution/`: an oracle solution used by Harbor's built-in `oracle` agent
+  - `registry.json`: a local task registry for Harbor to discover and load tasks
 
-The source of truth for the benchmark is the Hugging Face dataset
-`kilian-group/supercon-mini-v2`, grouped by `refno` (one Harbor task per paper).
+The ground truth source is specified via --gt-hf-repo, --gt-hf-split, and optionally
+--gt-hf-revision (defaults to main).
 
 Optional: pass `--upload-hf` to upload the generated tasks to a Hugging Face repo
-and write a `registry.json` so Harbor can pull tasks directly from the Hub.
+so Harbor can pull tasks directly from the Hub.
 
 By default this script writes tasks under
-`examples/harbor-workspace/out/harbor/supercon-mini-v2/<task>/<template>/` so the
+`examples/harbor-workspace/out/harbor/<dataset>/<template>/` so the
 repository stays clean until you build.
 
 Example (from repo root):
-    # Default template is `ground-template`.
-    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force
-    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template/job.yaml -a oracle
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py --task tc --force \
+      --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision v0.0.0
+    uv run python src/harbor-task-gen/run_harbor.py jobs start \
+      --registry out/harbor/supercon-extraction/tc/ground-template/registry.json -a oracle
 
     # To use the guided template:
-    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \\
-      --task tc --template ground-template-easy --force
-    uv run python src/harbor-task-gen/run_harbor.py jobs start \\
-      -c out/harbor/supercon-mini-v2/ground-template-easy/job.yaml -a oracle
+    uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+      --task tc --template ground-template-easy --force \
+      --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ from typing import Any, Iterable, Mapping, cast
 from datasets import load_dataset
 from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
+from slugify import slugify
 
 
 def repo_root() -> Path:
@@ -128,17 +129,6 @@ def _format_template(template: str, values: Mapping[str, Any]) -> str:
 
     rendered = re.sub(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", replace, protected)
     return rendered.replace(_LBRACE_SENTINEL, "{").replace(_RBRACE_SENTINEL, "}")
-
-
-def slugify(value: str) -> str:
-    """Normalize strings for file-safe task IDs."""
-    return (
-        value.lower()
-        .replace(" ", "-")
-        .replace("/", "-")
-        .replace("(", "")
-        .replace(")", "")
-    )
 
 
 def load_rubric_mapping(rubric_path: Path) -> dict[str, str]:
@@ -263,6 +253,39 @@ datasets:
 """
     job_path.parent.mkdir(parents=True, exist_ok=True)
     job_path.write_text(job_yaml)
+
+
+def write_local_registry(
+    task_dirs: list[Path],
+    registry_path: Path,
+    *,
+    dataset_name: str,
+    dataset_version: str = "local",
+    description: str = "Locally generated Harbor tasks.",
+) -> None:
+    """Write a local registry.json for the generated tasks.
+
+    This registry can be used by Harbor to discover and load tasks from the local
+    filesystem without requiring HuggingFace upload.
+    """
+    tasks = []
+    for task_dir in task_dirs:
+        tasks.append(
+            {
+                "name": task_dir.name,
+                "path": task_dir.as_posix(),
+            }
+        )
+    registry = [
+        {
+            "name": dataset_name,
+            "version": dataset_version,
+            "description": description,
+            "tasks": tasks,
+        }
+    ]
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(json.dumps(registry, indent=2))
 
 
 def build_task(
@@ -407,6 +430,24 @@ def main() -> None:
         description="Generate Harbor tasks for the superconductor extraction benchmark."
     )
     parser.add_argument(
+        "--gt-hf-repo",
+        type=str,
+        required=True,
+        help="Hugging Face repo name for ground truth dataset (e.g., kilian-group/supercon-extraction).",
+    )
+    parser.add_argument(
+        "--gt-hf-split",
+        type=str,
+        required=True,
+        help="Split of the ground truth HF dataset (e.g., full, test).",
+    )
+    parser.add_argument(
+        "--gt-hf-revision",
+        type=str,
+        default="main",
+        help="Revision/version of the ground truth HF dataset (e.g., v0.0.0, main). Defaults to main.",
+    )
+    parser.add_argument(
         "--workspace",
         type=Path,
         default=None,
@@ -539,10 +580,17 @@ def main() -> None:
         raise SystemExit(f"--workspace must be a directory: {resolved_workspace}")
     resolved_workspace.mkdir(parents=True, exist_ok=True)
 
+    # Load dataset configuration from CLI args
+    dataset_name = args.gt_hf_repo
+    dataset_split = args.gt_hf_split
+    dataset_revision = args.gt_hf_revision
+
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
     if args.output_dir is None:
-        args.output_dir = resolved_workspace / "out" / "harbor" / "supercon-mini-v2"
+        # Use the dataset name (last part) for output directory
+        dataset_short_name = dataset_name.split("/")[-1]
+        args.output_dir = resolved_workspace / "out" / "harbor" / dataset_short_name
     if not args.pdf_dir.is_absolute():
         args.pdf_dir = resolved_workspace / args.pdf_dir
     if not args.output_dir.is_absolute():
@@ -575,13 +623,15 @@ def main() -> None:
             )
     tasks_dir.mkdir(parents=True, exist_ok=True)
 
-    rubric_path = resolved_workspace / "rubric.csv"
+    rubric_path = resolved_workspace / "scoring" / "rubric.csv"
     rubric_mapping = load_rubric_mapping(rubric_path)
     definitions = load_definitions(rubric_path)
 
-    dataset = load_dataset(
-        "kilian-group/supercon-mini-v2", split="test", revision="v2.0.1"
+    # Load dataset from configuration
+    print(
+        f"Loading dataset: {dataset_name} (revision: {dataset_revision}, split: {dataset_split})"
     )
+    dataset = load_dataset(dataset_name, split=dataset_split, revision=dataset_revision)
     property_filter = resolve_property_filter(args.task)
     grouped = flatten_dataset(
         cast(Iterable[dict[str, Any]], dataset),
@@ -640,10 +690,31 @@ def main() -> None:
             job_rel = job_path
         print(f"Wrote job config -> {job_rel}")
 
+    # -- Write local registry.json --
+    # NOTE: the local registry JSON is consistent with the HF upload registry JSON,
+    # just with local task paths.
+    generated_task_dirs = _collect_task_dirs(tasks_dir)
+    if generated_task_dirs:
+        registry_path = task_root / "registry.json"
+        dataset_short_name = dataset_name.split("/")[-1]
+        write_local_registry(
+            generated_task_dirs,
+            registry_path,
+            dataset_name=dataset_short_name,
+            dataset_version=dataset_revision,
+            description=f"Harbor tasks for {dataset_name} ({task_label}).",
+        )
+        try:
+            registry_rel = registry_path.relative_to(resolved_workspace)
+        except ValueError:
+            registry_rel = registry_path
+        print(f"Wrote registry -> {registry_rel}")
+
     if args.upload_hf:
+        # import pdb; pdb.set_trace()
         _upload_tasks_after_build(
             args=args,
-            tasks_root=tasks_dir,
+            tasks_root=task_root,
         )
 
 
@@ -737,7 +808,6 @@ def upload_tasks_to_hf(
     tasks_root: Path,
     repo_id: str,
     repo_type: str = "dataset",
-    path_in_repo: str = "tasks",
     registry_path: str = "registry.json",
     dataset_name: str | None = None,
     dataset_version: str = "head",
@@ -750,16 +820,9 @@ def upload_tasks_to_hf(
 
     Returns a small summary dict for logging.
     """
-    resolved_root = _resolve_tasks_root(tasks_root).resolve()
-    if not resolved_root.exists():
-        raise FileNotFoundError(f"Tasks root not found: {resolved_root}")
-
-    task_dirs = _collect_task_dirs(resolved_root)
-    if not task_dirs:
-        raise SystemExit(f"No valid Harbor task folders found under {resolved_root}.")
+    task_dirs = _collect_task_dirs(tasks_root / "tasks")
 
     dataset_name = dataset_name or repo_id
-    path_in_repo = str(path_in_repo).strip("/")
     registry_path = str(registry_path).strip("/")
 
     hf_token = token or _infer_hf_token()
@@ -769,7 +832,7 @@ def upload_tasks_to_hf(
         api.create_repo(
             repo_id=str(repo_id),
             repo_type=str(repo_type),
-            private=True if private is None else private,
+            private=False if private is None else private,
             exist_ok=True,
         )
     else:
@@ -778,20 +841,19 @@ def upload_tasks_to_hf(
         except Exception as exc:
             raise SystemExit(f"Repo not found or not accessible: {repo_id}") from exc
 
-    api.upload_folder(
+    # NOTE: upload_large_folder does not support path_in_repo or commit_message.
+    # If path_in_repo is needed, local folder structure must match the desired repo path.
+    api.upload_large_folder(
         repo_id=str(repo_id),
         repo_type=str(repo_type),
-        folder_path=str(resolved_root),
-        path_in_repo=path_in_repo or None,
-        commit_message=f"Upload Harbor tasks from {resolved_root.name}",
-        token=hf_token,
+        folder_path=str(tasks_root),
     )
 
     registry = _build_registry(
         task_dirs=task_dirs,
         repo_id=str(repo_id),
         repo_type=str(repo_type),
-        path_in_repo=path_in_repo or ".",
+        path_in_repo="tasks",
         dataset_name=dataset_name,
         dataset_version=str(dataset_version),
         description=str(description),
@@ -810,7 +872,7 @@ def upload_tasks_to_hf(
         "task_count": str(len(task_dirs)),
         "registry_url": _hf_resolve_url(str(repo_id), str(repo_type), registry_path),
         "dataset_name": f"{dataset_name}@{dataset_version}",
-        "path_in_repo": path_in_repo or "/",
+        "path_in_repo": "/",
     }
 
 
@@ -843,7 +905,6 @@ def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> 
         tasks_root=tasks_root,
         repo_id=str(repo_id),
         repo_type=str(args.hf_repo_type),
-        path_in_repo=str(args.hf_path_in_repo),
         registry_path=str(args.hf_registry_path),
         dataset_name=args.hf_dataset_name or str(repo_id),
         dataset_version=str(args.hf_dataset_version),

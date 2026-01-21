@@ -1,0 +1,311 @@
+db_label,count,property_name,unique property_unit,data_type,category,rubric,prompt,claude,SI,description
+name,31879,common formula of materials,#N/A,String,Chemical,pymatgen,#N/A,,,common formula of materials
+t2,17115,transition temperature (mid point),K,Float,Electronic,0.1% SI,What is the SI unit for transition temperature (mid point)? Equivalent units are: K,Loading...,K,transition temperature (mid point)
+tc,26321,Tc (of this sample) recommended,"K, k",Float,Electronic,0.1% SI,"What is the SI unit for Tc (of this sample) recommended? Equivalent units are: K, k",Loading...,K,Tc (of this sample) recommended
+str3,24685,common name of structure,#N/A,String,Structural,exact_match,#N/A,,,*common name of structure
+tcn,4637,lowest temperature for measurement (not superconducting),K,Float,Environmental,0.1% SI,What is the SI unit for lowest temperature for measurement (not superconducting)? Equivalent units are: K,"The SI (International System of Units) unit for measuring temperature is the kelvin (K).
+
+For measuring the lowest temperatures (not including extreme conditions like in superconductivity research), the kelvin remains the standard unit. The kelvin scale starts at absolute zero (0 K), which is approximately -273.15°C or -459.67°F. This is theoretically the lowest possible temperature in the universe, where molecular motion effectively stops.
+
+So, the SI unit you're asking about is the kelvin (K).",K,lowest temperature for measurement (not superconducting)
+lata,13102,lattice constant a,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant a? Equivalent units are: A, nm",Loading...,m,lattice constant a
+gamma,2492,coefficient of electronic specific heat,"mj/mol.K2, erg/cc.K2, mJ/mol.K2, mJ/gat.K2, J/K2.Mol-C, mJ/gmol.K2, J/mol.K2, mj/f.u.K2, mJ/mol.K2., mj/K2.m-Re, mj/mol. K2, mJ/K2fu, uJ/K2.g, mJ/Ymol.K2, mJ/Mol.K2, erg/cm3.K2, mJ/K2mol, mJ/molK2, mJ/Pr mol, mJ/K2mole, J/K2gat, my/md,K2, mJ/Kmol, mJ/Ni.K2, mJ/m-Co.K2, mJmol-1K-2, mJ/g.K2, mJ/f.u.K2, mj/mole.K2, uJ/g.K2, mj/cm3.K2, MJ/MOLE.K2",Float,Electronic,0.1% SI,"What is the SI unit for coefficient of electronic specific heat? Equivalent units are: mj/mol.K2, erg/cc.K2, mJ/mol.K2, mJ/gat.K2, J/K2.Mol-C, mJ/gmol.K2, J/mol.K2, mj/f.u.K2, mJ/mol.K2., mj/K2.m-Re, mj/mol. K2, mJ/K2fu, uJ/K2.g, mJ/Ymol.K2, mJ/Mol.K2, erg/cm3.K2, mJ/K2mol, mJ/molK2, mJ/Pr mol, mJ/K2mole, J/K2gat, my/md,K2, mJ/Kmol, mJ/Ni.K2, mJ/m-Co.K2, mJmol-1K-2, mJ/g.K2, mJ/f.u.K2, mj/mole.K2, uJ/g.K2, mj/cm3.K2, MJ/MOLE.K2","The SI unit for the coefficient of electronic specific heat is J/(mol·K²), which is joules per mole per kelvin squared.
+
+From your list of equivalent units, ""J/mol·K²"" is the standard SI unit. Many of the others are variations or non-standard representations of the same concept:
+
+- ""mJ/mol·K²"" uses millijoules (1 mJ = 10⁻³ J)
+- ""J/K²·Mol-C"" is equivalent but with different formatting
+- ""mJmol⁻¹K⁻²"" is the same unit with different notation
+- ""erg/cm³·K²"" is a CGS unit (not SI)
+
+The standard SI unit remains J/(mol·K²).",J/mol.K^2,coefficient of electronic specific heat
+debyet,1843,Debye temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Debye temperature? Equivalent units are: K,"The SI unit for Debye temperature is kelvin (K).
+
+The Debye temperature is a characteristic parameter in solid-state physics that represents the temperature at which essentially all vibrational modes in a crystal are excited. It's typically denoted as θD and is always expressed in kelvins in the scientific literature.
+
+There are no equivalent units for Debye temperature besides kelvin, as it is fundamentally a temperature measurement.",K,Debye temperature
+hc1zero,442,Hc1 at 0 K for poly crystal,"Oe, mT, T, A, gauss, micro-T",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for poly crystal? Equivalent units are: Oe, mT, T, A, gauss, micro-T",Loading...,T,Hc1 at 0 K for poly crystal
+carrier,326,carrier density at 300 K,"E+19 /cm3, n/cm3, E+21/cc, E+22 /cm3, E+20 /cm3, E+19/cc, E+22/cm3, n/m3, E+21 /cm3, /eV.cm3, E+21/cm3, cm-2, hole/Cu, /cm3, E+18/cm3, /CuO2, cm(-3), n/f.u, n/m^3, cm3C-1",Double,Electronic,0.1% SI,"What is the SI unit for carrier density at 300 K? Equivalent units are: E+19 /cm3, n/cm3, E+21/cc, E+22 /cm3, E+20 /cm3, E+19/cc, E+22/cm3, n/m3, E+21 /cm3, /eV.cm3, E+21/cm3, cm-2, hole/Cu, /cm3, E+18/cm3, /CuO2, cm(-3), n/f.u, n/m^3, cm3C-1","The SI unit for carrier density is ""per cubic meter"" or ""m^-3"", which corresponds to ""n/m³"" or ""n/m^3"" in your list of equivalent units.
+
+Carrier density measures the number of charge carriers (electrons or holes) per unit volume, and since the meter is the SI unit for length, cubic meter is the SI unit for volume, making m^-3 the proper SI unit for this quantity.
+
+Some of the other units in your list are common non-SI units used in various contexts:
+- /cm³ (per cubic centimeter)
+- E+19/cm³ (meaning 10^19 per cubic centimeter)
+- cm^-3 (equivalent to /cm³)
+
+But only n/m³ represents the proper SI unit.",m^-3,carrier density at 300K
+rawmat,7910,raw materials,#N/A,String,Chemical,pymatgen,#N/A,,,raw materials
+shape,15923,shape,#N/A,Integer,Structural,exact_match,#N/A,,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+hc2zero,1756,Hc2 at 0 K for poly crystal,"Oe, kG, kOe, T, E+3 A/m, mT, KOe, KG, micro-T, gauss",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for poly crystal? Equivalent units are: Oe, kG, kOe, T, E+3 A/m, mT, KOe, KG, micro-T, gauss",Loading...,T,Hc2 at 0 K for poly crystal
+dhc2dt,1164,-slope in Hc2 vs T at Tc for poly crystal,"Oe/K, G/K, kOe/K, T/K, mT/K, kG/K, kG/T, kG, K/kOe",Float,Electronic,0.1% SI,"What is the SI unit for -slope in Hc2 vs T at Tc for poly crystal? Equivalent units are: Oe/K, G/K, kOe/K, T/K, mT/K, kG/K, kG/T, kG, K/kOe","# SI Unit for -dHc2/dT at Tc for Polycrystal
+
+The SI unit for the negative slope of the upper critical field (Hc2) with respect to temperature (T) at the critical temperature (Tc) for a polycrystalline superconductor would be:
+
+**Tesla per kelvin (T/K)**
+
+## Explanation:
+- In the SI system, magnetic field strength is measured in tesla (T)
+- Temperature is measured in kelvin (K)
+- Therefore, the slope of Hc2 vs T has units of T/K
+
+## Converting from Other Units:
+From your list of equivalent units:
+- 1 T/K = 10,000 G/K = 10 kG/K
+- 1 T/K = 10,000 Oe/K = 10 kOe/K
+- 1 T/K = 1,000 mT/K
+
+The units ""kG/T"", ""kG"", and ""K/kOe"" are not directly equivalent to -dHc2/dT:
+- kG/T is a dimensionless ratio
+- kG is a unit of magnetic field alone, not a slope
+- K/kOe is the inverse of the slope (dT/dHc2) rather than dHc2/dT",T/K,
+curiet,1199,Curie temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Curie temperature? Equivalent units are: K,"The SI unit for Curie temperature is kelvin (K).
+
+The Curie temperature (also called the Curie point) is the temperature above which a ferromagnetic material loses its permanent magnetic properties and becomes paramagnetic. Since it is a temperature, it is measured in the SI base unit for temperature, which is kelvin (K).
+
+While you may sometimes see Curie temperature expressed in degrees Celsius (°C), the proper SI unit is kelvin.",K,Curie temperature
+neelt,1490,Neel temperature,K,Float,Electronic,0.1% SI,What is the SI unit for Neel temperature? Equivalent units are: K,Loading...,K,Neel temperature
+latc,11745,lattice constant c,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant c? Equivalent units are: A, nm","The SI unit for the lattice constant c is the meter (m).
+
+However, in crystallography, the lattice constant is typically reported in:
+- Ångström (Å), which equals 10^-10 m
+- Nanometer (nm), which equals 10^-9 m
+
+The relationship between these units is:
+1 Å = 0.1 nm = 10^-10 m
+
+Both Å and nm are commonly used in crystallography literature due to their convenient size for expressing atomic-scale dimensions, but the meter remains the fundamental SI unit.",m,lattice constant c
+gapene,996,"normarized energy gap at 0 K , 2delta(0)/kTc","meV, kTc, K, cm(-1), cm-1, MeV, MEV, k<B>T",Float,Electronic,0.1% SI,"What is the SI unit for normarized energy gap at 0 K , 2delta(0)/kTc? Equivalent units are: meV, kTc, K, cm(-1), cm-1, MeV, MEV, k<B>T",Loading...,,"normarized energy gap at 0 K , 2delta(0)/kTc"
+dtcdp,1038,slope at P = 0 in Tc vs P plot,"K/GPa, K/kbar, K/KBAR, K/Gpa, T/GPa, K/GP, K/kBar, k/kbar, K/Kbar, mK/MPa, K/GPA, GPa",Float,,0.1% SI,"What is the SI unit for slope at P = 0 in Tc vs P plot? Equivalent units are: K/GPa, K/kbar, K/KBAR, K/Gpa, T/GPa, K/GP, K/kBar, k/kbar, K/Kbar, mK/MPa, K/GPA, GPa",Loading...,K/Pa,slope at P=0 in Tc vs P plot
+phc2t,47,Hc2 at given temperature for single crystal H//ab-plane,"kOe, T, Oe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for single crystal H//ab-plane? Equivalent units are: kOe, T, Oe",Loading...,T,Hc2 at given temperature for single crystal H//ab-plane
+nhc2t,42,Hc2 at given temperature for single crystal H//c-axis,"kOe, T, Oe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for single crystal H//c-axis? Equivalent units are: kOe, T, Oe",Loading...,T,Hc2 at given temperature for single crystal H//c-axis
+spaceg,3667,space group,#N/A,String,Structural,space_group,#N/A,,,space group
+latb,3512,lattice constant b,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for lattice constant b? Equivalent units are: A, nm","The SI unit for lattice constant b is the meter (m).
+
+However, in crystallography and materials science, it's much more practical to use smaller units due to the atomic-scale dimensions involved. The equivalent units you mentioned are commonly used:
+
+1. Ångström (Å): 1 Å = 10^-10 m
+2. Nanometer (nm): 1 nm = 10^-9 m = 10 Å
+
+Lattice constants are typically reported in either Ångströms or nanometers in scientific literature, with Ångströms being historically more common in crystallography and nanometers being more aligned with the SI system of units.",m,lattice constant b
+tp300,1120,thermopower at 300 K,"uV/K, micro.V/K, mv/K, mic.V/K, mV/K, microV/K, uV/K-1, V/K, microV/P",Float,Electronic,0.1% SI,"What is the SI unit for thermopower at 300 K? Equivalent units are: uV/K, micro.V/K, mv/K, mic.V/K, mV/K, microV/K, uV/K-1, V/K, microV/P",Loading...,V/K,thermopower at 300K
+gap,488,"energy gap at 0 K , delta(0)","meV, kTc, K, cm(-1), cm-1, mV, micro-eV, MeV, MEV, k<B>T",Float,Electronic,0.1% SI,"What is the SI unit for energy gap at 0 K , delta(0)? Equivalent units are: meV, kTc, K, cm(-1), cm-1, mV, micro-eV, MeV, MEV, k<B>T",Loading...,J,"energy gap at 0 K , delta(0)"
+cohere,837,coherence length at 0 K for poly crystal,"A, nm, micron, um, mm",Float,Electronic,0.1% SI,"What is the SI unit for coherence length at 0 K for poly crystal? Equivalent units are: A, nm, micron, um, mm",Loading...,m,coherence length at 0 K for poly crystal
+penet,767,penetration depth at 0 K for poly crystal,"A, nm, um, micrometer, micron.m, microm",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for poly crystal? Equivalent units are: A, nm, um, micrometer, micron.m, microm",Loading...,m,penetration depth at 0 K for poly crystal
+tcwidth,1352,transition width for resistive transition,K,Float,Electronic,0.1% SI,What is the SI unit for transition width for resistive transition? Equivalent units are: K,Loading...,K,transition width for resistive transition
+t1,4051,transition temperature (R = 0),"K, k",Float,Electronic,0.1% SI,"What is the SI unit for transition temperature (R = 0)? Equivalent units are: K, k","The SI unit for transition temperature (R = 0) is the kelvin (K).
+
+The kelvin is the base SI unit of temperature, named after physicist William Thomson, 1st Baron Kelvin. It's defined by setting the fixed numerical value of the Boltzmann constant (k) to 1.380649 × 10^-23 J/K.
+
+Note that ""k"" (lowercase) is not an equivalent unit for temperature - it typically represents the Boltzmann constant, which has units of J/K (joules per kelvin).",K,transition temperature (R=0)
+t3,4606,transition temperature (R = 100%),K,Float,Electronic,0.1% SI,What is the SI unit for transition temperature (R = 100%)? Equivalent units are: K,Loading...,K,transition temperature (R=100%)
+rh300,533,Hall coefficient at 300 K,"E-4 cm3/C, m3/C, cm3/C, e-3 cm3/C, Ohm.cm, E-8 m3/C, E-3 cm3/C, E-10 m3/C, 10-3cm3/C, E-9m3/C, mm3/C, m3C-1(20K), cm3C-1",Double,Electronic,0.1% SI,"What is the SI unit for Hall coefficient at 300 K? Equivalent units are: E-4 cm3/C, m3/C, cm3/C, e-3 cm3/C, Ohm.cm, E-8 m3/C, E-3 cm3/C, E-10 m3/C, 10-3cm3/C, E-9m3/C, mm3/C, m3C-1(20K), cm3C-1",Loading...,m^3/C,Hall coefficient at 300K
+rhn,145,"Hall coefficient for single, H//c-axis",#N/A,Double,Electronic,0.1% SI,#N/A,,m^3/C,"Hall coefficient for single, H//c-axis"
+dens,360,density (gcm-3),#N/A,Float,Chemical,0.1% SI,#N/A,,g/cm^3,Density
+tcsus,5608,Tc from susceptibility measurement,K,Float,Electronic,0.1% SI,What is the SI unit for Tc from susceptibility measurement? Equivalent units are: K,Loading...,K,Tc from susceptibility measurement
+hc1t,116,Hc1 at given temperature for poly crystal,"Oe, mT, T",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at given temperature for poly crystal? Equivalent units are: Oe, mT, T",Loading...,T,Hc1 at given temperature for poly crystal
+hc2t,126,Hc2 at given temperature for poly crystal,"T, Oe, mT, kOe",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at given temperature for poly crystal? Equivalent units are: T, Oe, mT, kOe",Loading...,T,Hc2 at given temperature for poly crystal
+spjump,129,specific heat jump at Tc (delta-C),"mj/mol.K, J/MOLE.K, mJ/mol.K, mJ/mol.K2, dC/r*Tc, J/kg.K, mJ/cm3.K, mJ/mole.K, J/mol.K, Jmol-1K-2, mJ/molK2, mJ/K.mol, MJ/GAT.K, J/mol.K2, gamma*Tc",Float,Electronic,0.1% SI,"What is the SI unit for specific heat jump at Tc (delta-C)? Equivalent units are: mj/mol.K, J/MOLE.K, mJ/mol.K, mJ/mol.K2, dC/r*Tc, J/kg.K, mJ/cm3.K, mJ/mole.K, J/mol.K, Jmol-1K-2, mJ/molK2, mJ/K.mol, MJ/GAT.K, J/mol.K2, gamma*Tc",Loading...,J/mol.K,specific heat jump at Tc (delta-C)
+resn,1026,resistivity at normal-T for poly crystal,"uOhm.cm, mOhm.cm, uOhm.m, m.ohm.cm, mohm.cm, uOhmcm, uOh.cm, microohm, micro-ohm, ohm, nOhm.cm, Ohm.cm, ohm.cm, mohmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for poly crystal? Equivalent units are: uOhm.cm, mOhm.cm, uOhm.m, m.ohm.cm, mohm.cm, uOhmcm, uOh.cm, microohm, micro-ohm, ohm, nOhm.cm, Ohm.cm, ohm.cm, mohmcm, m-ohmcm, mOHM, ohmcm, mOHMcm","The SI unit for resistivity is ohm-meter (Ω⋅m or ohm⋅m).
+
+From your list of equivalent units, many are variations of the same unit with different prefixes or formatting. For polycrystalline materials at normal temperature, resistivity is commonly expressed in:
+
+- μΩ⋅m (microohm-meter)
+- μΩ⋅cm (microohm-centimeter)
+- mΩ⋅cm (milliohm-centimeter)
+
+However, the proper SI unit remains ohm-meter (Ω⋅m). The other units can be converted to this standard unit as needed.
+
+Note that 1 μΩ⋅cm = 10⁻⁸ Ω⋅m and 1 mΩ⋅cm = 10⁻⁵ Ω⋅m.",ohm.m,resistivity at normal-T for poly crystal
+moment,798,magnetic moment per formula,"uB/Ce, myu-B/Eu, myu-B/mole, My-B/Nb, M/mol, emu mol-1, /ND, myu-B/f.u, myu-B/mol, uB/Ru, uB/mol, myu-B/Ce, uB, myu-B/Pu, my-B/U, my-B/Np, Myu-B/mol, My-B/Eu, my-B/Eu, my-B/f.u, my-B, My-B/f.u, myuB/mol, uB/Ho, uB/Er, uB/Tm, my-B/mol, myu-B/Er, My-B/mol, per Ru, uB/Pu, myu-B/fu, myu-B/Tm, nyu-B/Pr, Myu-B/Pr, My-B/Ce, Myu-B, uB/Pr, myu-B/R, Myu-B/f.u, myu-B/Yb, Myu-B/Fe, myu-B/Fe, per mol, per R-ion, per f.u, per Gd, myu-B, myu-B/Co, /Sm, /Gd, micro.B/Mo, myuB/Tm, myu-B/Pr, per Ho, per Eu, uB/f.u, myu-B/Y, myu-B/Gd, myu-B/Nd, uB/Cu, Bohr magne, myuB/Np, myu-B/V, nyu-B/mol, Myu-B/f.u., mB/Pr, Myu-B/Mo, uB/Ir, myu-B/U, my-B/Cr, myu-B/Cr, /GD, /CELL, /PR ION, /PR, /Pr, m/Zn",Float,Electronic,0.1% SI,"What is the SI unit for magnetic moment per formula? Equivalent units are: uB/Ce, myu-B/Eu, myu-B/mole, My-B/Nb, M/mol, emu mol-1, /ND, myu-B/f.u, myu-B/mol, uB/Ru, uB/mol, myu-B/Ce, uB, myu-B/Pu, my-B/U, my-B/Np, Myu-B/mol, My-B/Eu, my-B/Eu, my-B/f.u, my-B, My-B/f.u, myuB/mol, uB/Ho, uB/Er, uB/Tm, my-B/mol, myu-B/Er, My-B/mol, per Ru, uB/Pu, myu-B/fu, myu-B/Tm, nyu-B/Pr, Myu-B/Pr, My-B/Ce, Myu-B, uB/Pr, myu-B/R, Myu-B/f.u, myu-B/Yb, Myu-B/Fe, myu-B/Fe, per mol, per R-ion, per f.u, per Gd, myu-B, myu-B/Co, /Sm, /Gd, micro.B/Mo, myuB/Tm, myu-B/Pr, per Ho, per Eu, uB/f.u, myu-B/Y, myu-B/Gd, myu-B/Nd, uB/Cu, Bohr magne, myuB/Np, myu-B/V, nyu-B/mol, Myu-B/f.u., mB/Pr, Myu-B/Mo, uB/Ir, myu-B/U, my-B/Cr, myu-B/Cr, /GD, /CELL, /PR ION, /PR, /Pr, m/Zn",Loading...,A.m^2/mol,magnetic moment per formula
+str1,6781,"*crystal structure, symmetry",#N/A,Integer,Structural,exact_match,#N/A,,,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+vols,1038,volume fraction of Meissner effect(%),#N/A,Float,Electronic,0.1% SI,#N/A,,,"volume fraction of Meissner effect, unit=%"
+kaizero,346,temperature independent term in susceptibility,"emu/mol-Yb, emu/mol, emu.K/Ru, emu/mol-La, eum/mol, emu/mole, cm3/mol, emu/g, emu/m.Oe, emu/mol-Si, emu/cm3.Oe, cm3/g, emu/mol Nd, cm3/mole, emu/mol.K, emu/g.Oe, emu/mol-Cr, myu-B/kOe, emu/mol-Ce, emu/mol.G, emu/fu, emu/Oe.g, cm3.K/mol",Double,Electronic,0.1% SI,"What is the SI unit for temperature independent term in susceptibility? Equivalent units are: emu/mol-Yb, emu/mol, emu.K/Ru, emu/mol-La, eum/mol, emu/mole, cm3/mol, emu/g, emu/m.Oe, emu/mol-Si, emu/cm3.Oe, cm3/g, emu/mol Nd, cm3/mole, emu/mol.K, emu/g.Oe, emu/mol-Cr, myu-B/kOe, emu/mol-Ce, emu/mol.G, emu/fu, emu/Oe.g, cm3.K/mol",Loading...,emu/mol,temperature independent term in susceptibility
+curiec,214,Curie constant,"emu.K/mol, cm3/mol, muB/f.u., emu.K/Ru, emu/mol, emu.K/Yb, emu/mol.Oe, K, emu.K/g, emu/K/mol, EMU/mol, emh.K/mol, EMU.K/G.OE, EMU.K/G, emu/mol.K, emu.K/mole, K.cm3/mol, emu,K/mol, emu.K/G.g, emu.K/cc, emuK/g, ergK/Oe2g, emu/g, emu.K/g.Oe, comment, cm3K/mol, emu.K/Ce, emu/g.K, K/mol.G, emuK/mol, EMU/K.OE, EMU/G, EMU.K/MOLE, emu.K/Oe.g, cm3.K/mol",Double,Electronic,0.1% SI,"What is the SI unit for Curie constant? Equivalent units are: emu.K/mol, cm3/mol, muB/f.u., emu.K/Ru, emu/mol, emu.K/Yb, emu/mol.Oe, K, emu.K/g, emu/K/mol, EMU/mol, emh.K/mol, EMU.K/G.OE, EMU.K/G, emu/mol.K, emu.K/mole, K.cm3/mol, emu,K/mol, emu.K/G.g, emu.K/cc, emuK/g, ergK/Oe2g, emu/g, emu.K/g.Oe, comment, cm3K/mol, emu.K/Ce, emu/g.K, K/mol.G, emuK/mol, EMU/K.OE, EMU/G, EMU.K/MOLE, emu.K/Oe.g, cm3.K/mol",Loading...,K.m^3/mol,Curie constant
+resrt,1651,resistivity at RT for poly crystal,"mOhm.cm, uOhm.m, m.ohm.cm, ohmcm, uOhm.cm, Ohm.cm, ohm.cm, uOhmcm, mOhm,cm, kOhm.cm, mic.ohm.cm, mic.ohm.m, mohmcm, mOhmcm, m-ohmcm, mOHM, uohmcm, mOrm.cm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at RT for poly crystal? Equivalent units are: mOhm.cm, uOhm.m, m.ohm.cm, ohmcm, uOhm.cm, Ohm.cm, ohm.cm, uOhmcm, mOhm,cm, kOhm.cm, mic.ohm.cm, mic.ohm.m, mohmcm, mOhmcm, m-ohmcm, mOHM, uohmcm, mOrm.cm","The SI unit for resistivity is ohm-meter (Ω⋅m).
+
+Looking at your list of equivalent units, I can identify several variations that represent the same physical quantity using different prefixes or formatting:
+
+- μΩ⋅m (micro-ohm meter) is 10^-6 Ω⋅m
+- mΩ⋅cm (milliohm centimeter) is 10^-5 Ω⋅m
+- μΩ⋅cm (micro-ohm centimeter) is 10^-8 Ω⋅m
+- Ω⋅cm (ohm centimeter) is 10^-2 Ω⋅m
+- kΩ⋅cm (kilo-ohm centimeter) is 10^1 Ω⋅m
+
+For polycrystalline materials at room temperature (RT), resistivity is typically measured in either Ω⋅m (the SI unit) or μΩ⋅m, μΩ⋅cm, or mΩ⋅cm depending on the specific material's conductivity range.",ohm.m,resistivity at RT for poly crystal
+tblno,543,international table number,#N/A,Integer,Structural,exact_match,#N/A,,,international table number
+abresn,225,resistivity at normal-T for single crystal for J//ab-plane,"mOhm.cm, UOhm.cm, uOhm.cm, Ohm.cm, mOh..cm, ohm, mOhm,cm, m.ohm.cm, mohmmm, uohmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, microohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for single crystal for J//ab-plane? Equivalent units are: mOhm.cm, UOhm.cm, uOhm.cm, Ohm.cm, mOh..cm, ohm, mOhm,cm, m.ohm.cm, mohmmm, uohmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, microohmcm",Loading...,ohm.m,resistivity at normal-T for single crystal for J//ab plane
+isotope,387,"alpha in Tc = A * M^(-alpha), isotope effect",#N/A,Float,Electronic,0.1% SI,#N/A,,,"alpha in Tc=A*M^(-alpha), isotope effect"
+isoel,349,isotope element,#N/A,String,Chemical,pymatgen,#N/A,,,isotope element
+method,7437,*preparation method,#N/A,Integer,Chemical,exact_match,#N/A,,,*preparation method (see the end of this table)
+jche,47,"Jc at 4.2 K, H = 0 T",meV,Double,Electronic,0.1% SI,"What is the SI unit for Jc at 4.2 K, H = 0 T? Equivalent units are: meV",Loading...,ohm.m,"Jc at 4.2K, H=0 T"
+subst,13,substrate,#N/A,String,Environmental,pymatgen,#N/A,,,substrate
+ppenet,401,penetration depth at 0 K for single crystal for H //ab-plane,"A, nm, um, micron.m",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for single crystal for H //ab-plane? Equivalent units are: A, nm, um, micron.m",Loading...,m,penetration depth at 0 K for single crystal for H //ab plane
+phc2zero,377,Hc2 at 0 K for single crystal for H //ab-plane,"T, kOe, KOe, Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for single crystal for H //ab-plane? Equivalent units are: T, kOe, KOe, Oe, mT","The SI unit for the upper critical magnetic field (Hc2) at 0 K for a single crystal with the field oriented parallel to the ab-plane would be tesla (T).
+
+Among the units you listed:
+- T (tesla) is the SI unit for magnetic field strength
+- Oe (oersted), kOe (kiloersted), and KOe (also kiloersted) are CGS units
+- mT (millitesla) is an SI-derived unit (1/1000 of a tesla)
+
+The conversion between these units is:
+1 T = 10,000 Oe = 10 kOe = 1,000 mT
+
+So while Hc2 values might be reported in any of these units in the scientific literature, tesla (T) is the proper SI unit.",T,Hc2 at 0 K for single crystal for H //ab plane
+nhc2zero,460,Hc2 at 0 K for single crystal for H //c-axis,"T, kOe, KOe, Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc2 at 0 K for single crystal for H //c-axis? Equivalent units are: T, kOe, KOe, Oe, mT","The SI unit for the upper critical field Hc2 at 0 K for a single crystal with the magnetic field applied parallel to the c-axis (H//c-axis) would be tesla (T).
+
+Of the options you've listed:
+- T (tesla) is the SI unit for magnetic field
+- kOe or KOe (kilooersted) is a non-SI unit (1 kOe = 0.1 T)
+- Oe (oersted) is a non-SI unit (1 Oe = 0.0001 T)
+- mT (millitesla) is an SI-derived unit (1 mT = 0.001 T)
+
+So among these options, tesla (T) is the proper SI unit for the upper critical field measurement.",T,Hc2 at 0 K for single crystal for H //c-axis
+target,25,target material,#N/A,String,Chemical,pymatgen,#N/A,,,target material
+reshe,169,resistivity at 4.2 K for poly crystal,"mOhm.cm, uOhm.cm, Ohm.cm, moOhm.cm, uOhm.cn, mic.ohm.cm, m.ohm.cm, m-ohmcm, ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for poly crystal? Equivalent units are: mOhm.cm, uOhm.cm, Ohm.cm, moOhm.cm, uOhm.cn, mic.ohm.cm, m.ohm.cm, m-ohmcm, ohmcm, mohmcm","The SI unit for resistivity is ohm-meter (Ω·m).
+
+Among the options you've provided, none are precisely the SI unit. However, Ω·cm (ohm-centimeter) is commonly used in practice, especially when discussing materials at cryogenic temperatures like 4.2 K.
+
+Converting between these units:
+- 1 Ω·m = 100 Ω·cm
+- 1 mΩ·cm = 10^-3 Ω·cm = 10^-5 Ω·m
+- 1 μΩ·cm = 10^-6 Ω·cm = 10^-8 Ω·m
+
+From your list, the closest to proper notation would be ""Ohm.cm"" (Ω·cm), though it's not the official SI unit.",ohm.m,resistivity at 4.2K for poly crystal
+isorat,219,exchange ratio of isotope(%),#N/A,String,Chemical,0.1% SI,#N/A,,,exchange ratio of isotope(%)
+dtc,189,DTC = Tc - Tc0 for isotope element,#N/A,Float,Electronic,0.1% SI,#N/A,,K,DTC=Tc-Tc0 for isotope element
+abresrt,334,resistivity at RT for single crystal for J//ab-plane,"mOhm.cm, mOhm, uOh.cm, uOhm.cm, Ohm.cm, nOhm.cm, m.ohm.cm, mOhm,cm, mic.ohm.cm, ohm.cm, mohmmm, mOhmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, uohmcm, Ohmcm",Float,,0.1% SI,"What is the SI unit for resistivity at RT for single crystal for J//ab-plane? Equivalent units are: mOhm.cm, mOhm, uOh.cm, uOhm.cm, Ohm.cm, nOhm.cm, m.ohm.cm, mOhm,cm, mic.ohm.cm, ohm.cm, mohmmm, mOhmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, uohmcm, Ohmcm",Loading...,,resistivity at RT for single crystal for J//ab plane
+tp300p,13,thermopower at 300 K for parallel to ab-plane,"uV/K, microW/mK2",Float,Electronic,0.1% SI,"What is the SI unit for thermopower at 300 K for parallel to ab-plane? Equivalent units are: uV/K, microW/mK2",Loading...,ohm.m,thermopower at 300K for parallel to ab-plane
+dadp,23,pressure dependence of LATA,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Electronic,0.1% SI,"What is the SI unit for pressure dependence of LATA? Equivalent units are: k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Loading...,V/K,pressure dependence of LATA
+dcdp,22,pressure dependence of LATC,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Structural,0.1% SI,"What is the SI unit for pressure dependence of LATC? Equivalent units are: k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Loading...,1/Pa,pressure dependence of LATC
+ncohere,283,coherence length at 0 K for single crystal for H ���ab-plane,"A, nm",Float,Structural,0.1% SI,"What is the SI unit for coherence length at 0 K for single crystal for H ���ab-plane? Equivalent units are: A, nm","The SI unit for coherence length at 0 K for a single crystal in the H ∥ ab-plane would be **meter (m)**.
+
+Since coherence length is a measure of distance over which superconducting order parameter remains relatively constant, its fundamental dimension is length.
+
+In superconductivity research, this is commonly expressed in:
+- Nanometers (nm), which equals 10^-9 meters
+- Angstroms (Å), which equals 10^-10 meters
+
+Both of these units (nm and Å) are acceptable alternatives that are frequently used in scientific literature when discussing superconducting coherence lengths, but the base SI unit remains the meter.",1/Pa,coherence length at 0 K for single crystal for H ⊥ab plane
+abreshe,45,resistivity at 4.2 K for single crystal for J//ab-plane,"uOhm.cm, mOhm.cm, microohmcm, mic.ohm.cm, m.ohm.cm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for single crystal for J//ab-plane? Equivalent units are: uOhm.cm, mOhm.cm, microohmcm, mic.ohm.cm, m.ohm.cm, mohmcm",Loading...,m,resistivity at 4.2K for single crystal for J//ab plane
+creshe,10,resistivity at 4.2 K for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 4.2 K for single crystal for J//c-axis? Equivalent units are: uOhm.cm, mOhm.cm, m.ohm.cm, mohmcm",Loading...,ohm.m,resistivity at 4.2K for single crystal for J//c-axis
+npenet,134,penetration depth at 0 K for single crystal for H���ab-plane,"micron m, A, um, micron.m, nm, micron-m, micron. M, microm",Float,Electronic,0.1% SI,"What is the SI unit for penetration depth at 0 K for single crystal for H���ab-plane? Equivalent units are: micron m, A, um, micron.m, nm, micron-m, micron. M, microm","The SI unit for penetration depth at 0 K for a single crystal for H⊥ab-plane would be meters (m).
+
+Of the equivalent units you listed:
+- micron or μm (micrometer) = 10^-6 m
+- Å (Angstrom) = 10^-10 m
+- nm (nanometer) = 10^-9 m
+
+Some of the notations in your list appear to be variations or typographical representations of the same units:
+- ""micron m"", ""micron.m"", ""micron-m"", ""microm"" seem to be attempts to write ""micrometer"" or ""μm""
+- ""micron. M"" appears to be a typographical variation
+
+In scientific literature dealing with superconductors, the penetration depth (often denoted as λ) is typically reported in nanometers (nm) or micrometers (μm) because these are convenient scales for the phenomenon, but the fundamental SI unit remains the meter.",ohm.m,penetration depth at 0 K for single crystal for H⊥ab plane
+pdhc2dt,312,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,,0.1% SI,"What is the SI unit for -slope in Hc2 vs T at Tc for single crystal for H //ab-plane? Equivalent units are: T/K, kOe/K, Oe/K, KOe/K, K/kOe",Loading...,m,-slope in Hc2 vs T at Tc for single crystal for H //ab plane
+ndhc2dt,326,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,Electronic,0.1% SI,"What is the SI unit for -slope in Hc2 vs T at Tc for single crystal for H //c-axis? Equivalent units are: T/K, kOe/K, Oe/K, KOe/K, K/kOe","The SI unit for the negative slope of $H_{c2}$ versus $T$ at $T_c$ (where $H_{c2}$ is the upper critical field and $T$ is temperature) for a single crystal with magnetic field parallel to the c-axis would be tesla per kelvin (T/K).
+
+Among the options you've provided:
+- T/K is the correct SI unit
+- kOe/K (kiloOersted per kelvin) is a cgs unit equivalent
+- Oe/K (Oersted per kelvin) is a cgs unit
+- KOe/K appears to be a typo of kOe/K
+- K/kOe is the inverse of the slope (and not in SI units)
+
+The conversion between these units would be:
+1 T = 10 kOe = 10,000 Oe
+
+So the slope expressed in T/K can be converted to kOe/K by multiplying by 10.",T/K,-slope in Hc2 vs T at Tc for single crystal for H //c-axis
+pcohere,435,coherence length at 0 K for single crystal for H //ab-plane,"A, nm",Float,Electronic,0.1% SI,"What is the SI unit for coherence length at 0 K for single crystal for H //ab-plane? Equivalent units are: A, nm",Loading...,T/K,coherence length at 0 K for single crystal for H //ab plane
+phc1zero,77,Hc1 at 0 K for single crystal for H //ab-plane,"Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for single crystal for H //ab-plane? Equivalent units are: Oe, mT",Loading...,A,Hc1 at 0 K for single crystal for H //ab plane
+nhc1zero,94,Hc1 at 0 K for single crystal for H //c-axis,"Oe, mT, A",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at 0 K for single crystal for H //c-axis? Equivalent units are: Oe, mT, A","The SI unit for the first critical magnetic field (Hc1) at 0 K for a single crystal with the magnetic field aligned parallel to the c-axis (H//c-axis) is:
+
+**A/m (amperes per meter)**
+
+This is the standard SI unit for magnetic field strength (H).
+
+The equivalent units you mentioned can be converted as follows:
+
+- Oe (oersted): 1 A/m = 4π × 10^-3 Oe (or approximately 0.01256 Oe)
+- mT (millitesla): This is actually a unit of magnetic flux density (B), not field strength (H). In vacuum, 1 A/m corresponds to 4π × 10^-7 T = 1.256 × 10^-6 T = 0.001256 mT
+- A (ampere): This is incomplete as a magnetic field unit. You likely meant A/m.
+
+In superconductivity research, while A/m is the proper SI unit, many researchers still use Oe or gauss (G) due to historical conventions in the field.",T,Hc1 at 0 K for single crystal for H //c-axis
+thc300,88,thermal conductivity at 300 K,"W/m.K, W/K.m, mW/cm.K, W/K.M, Wm-1K-1",Float,Electronic,0.1% SI,"What is the SI unit for thermal conductivity at 300 K? Equivalent units are: W/m.K, W/K.m, mW/cm.K, W/K.M, Wm-1K-1","The SI unit for thermal conductivity at 300 K is watts per meter-kelvin (W/m·K) or equivalently, W·m⁻¹·K⁻¹.
+
+Among the options you've listed, the following are equivalent to the SI unit:
+- W/m·K
+- W·m⁻¹·K⁻¹
+
+Note that W/K·m is technically the same unit, just with a different order of writing the denominator terms.
+
+The unit mW/cm·K is not an SI unit but rather a derived unit that would need to be converted to W/m·K.
+
+The unit W/K·M appears to have a capital M, which is not standard notation (M typically represents mega or 10⁶, while m represents meter).",T,thermal conductivity at 300K
+jc77,54,"Jc at T = 77 K, H = 0 T",#N/A,Double,Electronic,0.1% SI,#N/A,,W/m.K,"Jc at T=77K,H=0T"
+ye300,55,Young's modulus at 300 K,GPa,Double,Electronic,0.1% SI,What is the SI unit for Young's modulus at 300 K? Equivalent units are: GPa,Loading...,ohm.m,Young's modulus at 300K
+g300,54,shear modulus at 300 K,GPa,Float,,0.1% SI,What is the SI unit for shear modulus at 300 K? Equivalent units are: GPa,"The SI unit for shear modulus is the pascal (Pa). At 300 K or any temperature, the fundamental unit remains the pascal.
+
+Since you mentioned equivalent units as GPa (gigapascals), I can confirm that:
+
+1 GPa = 10^9 Pa
+
+For practical engineering and materials science applications, shear modulus values are indeed commonly expressed in GPa because typical values for solid materials fall in the range of a few to hundreds of GPa. For example:
+- Steel: ~80 GPa
+- Aluminum: ~25-35 GPa
+- Copper: ~45 GPa
+
+However, the base SI unit remains the pascal (Pa).",Pa,shear modulus at 300K
+po300,42,Poisson ratio at 300 K,#N/A,Float,#N/A,0.1% SI,#N/A,,Pa,Poisson ratio at 300K
+hv300,20,hardness at 300 K,"GPa, kg/mm2",Float,#N/A,0.1% SI,"What is the SI unit for hardness at 300 K? Equivalent units are: GPa, kg/mm2","The SI (International System of Units) doesn't actually have a specific base unit for hardness. Hardness is not a fundamental physical property like mass or length, but rather a composite property that measures a material's resistance to various kinds of deformation.
+
+Different hardness testing methods (Vickers, Brinell, Rockwell, etc.) use different scales and units. When expressing hardness in SI-compatible units:
+
+- For indentation hardness, pascals (Pa) or more commonly gigapascals (GPa) are used, which are pressure units (N/m²)
+- The kg/mm² unit you mentioned is a non-SI unit that is sometimes used (particularly in older literature)
+
+The temperature specification of 300 K doesn't change the unit itself, though hardness values can certainly vary with temperature for many materials.
+
+So while GPa would be the closest to an ""SI unit"" for hardness, there isn't a singular official SI unit designated specifically for hardness.",,hardness at 300K
+cresrt,117,resistivity at RT for single crystal for J//c-axis,"mOhm, uOh.cm, mOhm.cm, m.ohm.cm, uOhm.cm, mic.ohm.cm, mohmmm, ohmcm, mOHM, 10-4ohmcm, Ohmcm, mohmcm",Float,,0.1% SI,"What is the SI unit for resistivity at RT for single crystal for J//c-axis? Equivalent units are: mOhm, uOh.cm, mOhm.cm, m.ohm.cm, uOhm.cm, mic.ohm.cm, mohmmm, ohmcm, mOHM, 10-4ohmcm, Ohmcm, mohmcm",Loading...,,resistivity at RT for single crystal for J//c-axis
+res77,283,resistivity at 77 K for poly crystal,"uOhm.cm, m.ohm.cm, ohm.cm, Ohm.m, mOhm.cm, mic.ohm.cm, mohmcm, mOhmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for poly crystal? Equivalent units are: uOhm.cm, m.ohm.cm, ohm.cm, Ohm.m, mOhm.cm, mic.ohm.cm, mohmcm, mOhmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Loading...,ohm.m,resistivity at 77K for poly crystal
+sv300,26,sound velocity at 300 K,m/s,Double,Electronic,0.1% SI,What is the SI unit for sound velocity at 300 K? Equivalent units are: m/s,Loading...,ohm.m,sound velocity at 300K
+ghe,7,shear modulus at 4.2 K,GPa,Float,,0.1% SI,What is the SI unit for shear modulus at 4.2 K? Equivalent units are: GPa,Loading...,m/s,shear modulus at 4.2K
+nhc1t,20,Hc1 at given temperature for single crystal H//c-axis,"mT, Oe",Float,#N/A,0.1% SI,"What is the SI unit for Hc1 at given temperature for single crystal H//c-axis? Equivalent units are: mT, Oe",Loading...,Pa,Hc1 at given temperature for single crystal H//c-axis
+cresn,64,resistivity at normal-T for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmmm, mOHM, ohmcm, 10-4ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at normal-T for single crystal for J//c-axis? Equivalent units are: uOhm.cm, mOhm.cm, m.ohm.cm, mohmmm, mOHM, ohmcm, 10-4ohmcm, mohmcm","The SI unit for resistivity at normal temperature for a single crystal with current flow parallel to the c-axis is the ohm meter (Ω⋅m).
+
+From the equivalent units you listed, here are their relationships to the SI unit:
+
+- μΩ⋅cm (micro-ohm centimeter) = 10⁻⁸ Ω⋅m
+- mΩ⋅cm (milli-ohm centimeter) = 10⁻⁵ Ω⋅m
+- m⋅ohm⋅cm = 10⁻⁵ Ω⋅m (same as mΩ⋅cm)
+- mohmmm (milli-ohm millimeter) = 10⁻⁶ Ω⋅m
+- mOHM (when used for resistivity with implied dimensions) = context dependent
+- ohmcm (ohm centimeter) = 10⁻² Ω⋅m
+- 10⁻⁴ohmcm = 10⁻⁶ Ω⋅m
+- mohmcm (milli-ohm centimeter) = 10⁻⁵ Ω⋅m
+
+In scientific publications, resistivity values are often reported in μΩ⋅cm or mΩ⋅cm for materials with relatively low resistivity, but the proper SI unit is always Ω⋅m.",T,resistivity at normal-T for single crystal for J//c-axis
+yehe,6,Young's modulus at 4.2 K,GPa,Double,Electronic,0.1% SI,What is the SI unit for Young's modulus at 4.2 K? Equivalent units are: GPa,Loading...,ohm.m,Young's modulus at 4.2K
+pohe,6,Poisson ratio at 4.2 K,#N/A,Float,#N/A,0.1% SI,#N/A,,Pa,Poisson ratio at 4.2K
+dadt,12,temperature dependence of LATA,"(dl/dT)/l, K^(-1), A/Ma, A/GPa, A/T, E-6%",Float,#N/A,0.1% SI,"What is the SI unit for temperature dependence of LATA? Equivalent units are: (dl/dT)/l, K^(-1), A/Ma, A/GPa, A/T, E-6%",Loading...,,temperature dependence of LATA
+dcdt,11,temperature dependence of LATC,"(dl/dT)/l, A/Ma, A/GPa, A/T, E-6%",Float,Electronic,0.1% SI,"What is the SI unit for temperature dependence of LATC? Equivalent units are: (dl/dT)/l, A/Ma, A/GPa, A/T, E-6%",Loading...,m/Pa,temperature dependence of LATC
+dbdp,8,pressure dependence of LATB,"E-3 /GPa, %/GPa, (dL/L)/GPa",Float,Electronic,0.1% SI,"What is the SI unit for pressure dependence of LATB? Equivalent units are: E-3 /GPa, %/GPa, (dL/L)/GPa",Loading...,m/Pa,pressure dependence of LATB
+thc300n,7,thermal conductivity at 300 K for heat flow//c-axis,W/m.K,Float,Structural,0.1% SI,What is the SI unit for thermal conductivity at 300 K for heat flow//c-axis? Equivalent units are: W/m.K,Loading...,1/Pa,thermal conductivity at 300K for heat flow//c-axis
+thc300p,8,thermal conductivity at 300 K for heat flow//ab-plane,"W/m.K, W/K.m",Float,Electronic,0.1% SI,"What is the SI unit for thermal conductivity at 300 K for heat flow//ab-plane? Equivalent units are: W/m.K, W/K.m",Loading...,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+rh300p,8,"Hall coefficient at 300 K for single, H//ab-plane","cm3/C, m3/C",Double,Electronic,0.1% SI,"What is the SI unit for Hall coefficient at 300 K for single, H//ab-plane? Equivalent units are: cm3/C, m3/C",Loading...,W/m.K,"Hall coefficient at 300K for single, H//ab-plane"
+svhe,2,sound velocity at 4.2 K,#N/A,Double,Electronic,0.1% SI,#N/A,,m^3/C,sound velocity at 4.2K
+rh300n,25,"Hall coefficient at 300 K for single, H//c-axis","m3/C, mic. Ohm c, cm3/C",Double,#N/A,0.1% SI,"What is the SI unit for Hall coefficient at 300 K for single, H//c-axis? Equivalent units are: m3/C, mic. Ohm c, cm3/C",Loading...,m/s,"Hall coefficient at 300K for single, H//c-axis"
+phc1t,16,Hc1 at given temperature for single crystal H//ab-plane,"Oe, mT",Float,Electronic,0.1% SI,"What is the SI unit for Hc1 at given temperature for single crystal H//ab-plane? Equivalent units are: Oe, mT",Loading...,m^3/C,Hc1 at given temperature for single crystal H//ab-plane
+abres77,157,resistivity at 77 K for single crystal for J//ab-plane,"mic.ohm.cm, m.ohm.cm, ohm.cm, m-ohmcm, mohmcm, 10-4ohmcm, uohmcm, uOhm.cm, Ohmcm, mOhm.cm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for single crystal for J//ab-plane? Equivalent units are: mic.ohm.cm, m.ohm.cm, ohm.cm, m-ohmcm, mohmcm, 10-4ohmcm, uohmcm, uOhm.cm, Ohmcm, mOhm.cm",Loading...,T,resistivity at 77K for single crystal for J//ab plane
+cres77,42,resistivity at 77 K for single crystal for J//c-axis,"mic.ohm.cm, m.ohm.cm, 10-4ohmcm, Ohmcm, mohmcm",Float,Electronic,0.1% SI,"What is the SI unit for resistivity at 77 K for single crystal for J//c-axis? Equivalent units are: mic.ohm.cm, m.ohm.cm, 10-4ohmcm, Ohmcm, mohmcm","The SI unit for resistivity is ohm-meter (Ω·m).
+
+When discussing the resistivity at 77 K for a single crystal with current density along the c-axis (J//c-axis), the measurement would still be expressed in Ω·m in SI units.
+
+From the equivalent units you've listed, here's how they relate to the SI unit:
+- μΩ·cm (mic.ohm.cm) = 10^-8 Ω·m
+- mΩ·cm (m.ohm.cm or mohmcm) = 10^-5 Ω·m
+- 10^-4 Ω·cm = 10^-6 Ω·m
+- Ω·cm (Ohmcm) = 10^-2 Ω·m
+
+So the SI unit for resistivity, regardless of temperature or crystal orientation, is ohm-meter (Ω·m).",ohm.m,resistivity at 77K for single crystal for J//c-axis
+dbdt,5,temperature dependence of LATB,A/GPa,Float,Electronic,0.1% SI,What is the SI unit for temperature dependence of LATB? Equivalent units are: A/GPa,Loading...,ohm.m,temperature dependence of LATB

@@ -1,19 +1,15 @@
 """Helper functions"""
 
 import re
-from pathlib import Path
 from pymatgen.core import Composition
+import logging
+import pandas as pd
 
-# Load normalized space groups
-import json
+from .space_groups_normalized import (
+    SPACE_GROUPS,
+)
 
-# Assuming this file is in the same directory as this script (examples/extraction)
-# and assets is a subdirectory (examples/extraction/assets)
-ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-SPACE_GROUPS_PATH = ASSETS_DIR / "hard" / "space_groups_normalized.json"
-
-with open(SPACE_GROUPS_PATH, "r") as f:
-    SPACE_GROUPS = json.load(f)
+logger = logging.getLogger(__name__)
 
 
 _SUPERSCRIPT_MAP = str.maketrans(
@@ -55,8 +51,25 @@ def normalize_unicode(text: str) -> str:
     return s
 
 
-def parse_numeric_candidates(value: str) -> list[float]:
-    """Extract numeric candidates from a free-form value string (units allowed)."""
+def parse_numeric_candidates(value: str) -> list[tuple[float, str | None]]:
+    """Extract numeric candidates with units from a free-form value string.
+
+    Returns:
+        List of (value, unit) tuples. Unit is None if no unit found after the number.
+
+    Examples:
+        >>> parse_numeric_candidates("0.6570 nm")
+        [(0.657, 'nm')]
+        >>> parse_numeric_candidates("1.2 x 10^3 K")
+        [(1200.0, 'K')]
+        >>> parse_numeric_candidates("12.34")
+        [(12.34, None)]
+        >>> parse_numeric_candidates("100 mJ/mol.K2")
+        [(100.0, 'mJ/mol.K2')]
+        >>> parse_numeric_candidates("-3.774 E-3 cm3/C")
+        [(-0.003774, 'cm3/C')]
+
+    """
     if value is None:
         return []
 
@@ -66,38 +79,59 @@ def parse_numeric_candidates(value: str) -> list[float]:
 
     value_str = re.sub(r"\(\d+\)", "", value_str)
 
-    candidates: list[float] = []
+    candidates: list[tuple[float, str | None, int]] = []  # (value, unit, end_position)
+    sci_notation_positions: set[tuple[int, int]] = (
+        set()
+    )  # Track positions matched by sci notation
 
-    # Scientific notation: 1.2 x 10^3
+    # Scientific notation: 1.2 x 10^3 or 1.2 E-3 with optional unit
     sci_pattern = re.compile(
-        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:x|×)\s*10(?:\s*\^)?\s*(?P<exp>[-+]?\d+)",
+        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:(?:x|×)\s*10(?:\s*\^)?|[eE])\s*(?P<exp>[-+]?\d+)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?",
         re.IGNORECASE,
     )
     for match in sci_pattern.finditer(value_str):
         try:
             base = float(match.group("base"))
             exp = int(match.group("exp"))
-            candidates.append(base * (10**exp))
+            unit = match.group("unit")
+            candidates.append((base * (10**exp), unit, match.end()))
+            # Track the full range covered by this scientific notation match
+            sci_notation_positions.add((match.start(), match.end()))
         except Exception:
             continue
 
-    # Standard float/int: 12.34, .5, 1e5
-    num_pattern = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+    # Standard float/int with optional unit: 12.34 nm, .5 K, 1e5 Pa
+    num_pattern = re.compile(
+        r"(?P<num>[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?"
+    )
     for match in num_pattern.finditer(value_str):
         try:
-            candidates.append(float(match.group(0)))
+            # Skip if this match overlaps with a scientific notation match
+            match_start = match.start()
+            match_end = match.end()
+            overlaps = any(
+                not (match_end <= sci_start or match_start >= sci_end)
+                for sci_start, sci_end in sci_notation_positions
+            )
+            if overlaps:
+                continue
+
+            num = float(match.group("num"))
+            unit = match.group("unit")
+            candidates.append((num, unit, match.end()))
         except Exception:
             continue
 
-    # Deduplicate preserving order
+    # Deduplicate preserving order, using position to avoid duplicates from overlapping patterns
     seen: set[str] = set()
-    unique: list[float] = []
-    for num in candidates:
-        key = f"{num:.12g}"
+    unique: list[tuple[float, str | None]] = []
+    for num, unit, end_pos in candidates:
+        # Create key from both number and position to handle same number with different units
+        key = f"{num:.12g}_{unit}_{end_pos}"
         if key in seen:
             continue
         seen.add(key)
-        unique.append(num)
+        unique.append((num, unit))
 
     return unique
 
@@ -126,29 +160,116 @@ def scorer_pymatgen(pred: str, answer: str) -> bool:
         return False
 
 
-def scorer_si(pred: float, answer: float, rel_tol: float = 0.001) -> bool:
+def scorer_si(
+    pred_num: float,
+    pred_unit: str | None,
+    answer_num: float,
+    answer_unit: str | None,
+    rel_tol: float = 0.001,
+    conversion_df: pd.DataFrame | None = None,
+) -> bool:
     """Check if pred is within 0.1% of answer.
 
     Args:
-        pred: The predicted value.
-        answer: The reference/ground truth value.
+        pred_num: The predicted numerical value.
+        pred_unit: The predicted unit (or None if no unit).
+        answer_num: The reference/ground truth numerical value.
+        answer_unit: The reference/ground truth unit (or None if no unit).
         rel_tol: Relative tolerance (default 0.001 = 0.1%).
+        conversion_df: DataFrame for unit conversion with columns:
+            - property_unit: unit name (used as index)
+            - conversion_factor: factor to convert to SI units
+            - comments: notes about the conversion
 
     Returns:
         True if pred is within rel_tol of answer.
 
     Examples:
-        >>> scorer_si(100.0, 100.05)
+        >>> scorer_si(100.0, "K", 100.05, "K")
         True
-        >>> scorer_si(100.0, 100.2)
+        >>> scorer_si(100.0, "K", 100.2, "K")
         False
-        >>> scorer_si(0.0, 0.0)
+        >>> scorer_si(0.0, None, 0.0, None)
         True
 
     """
-    if answer == 0:
-        return pred == 0
-    return abs(pred - answer) / abs(answer) <= rel_tol
+    logger.debug(
+        f"Scoring SI: pred={pred_num} {pred_unit}, answer={answer_num} {answer_unit}, rel_tol={rel_tol}"
+    )
+    # Normalize units for comparison (strip whitespace)
+    pred_unit_norm = pred_unit.strip() if pred_unit else None
+    answer_unit_norm = answer_unit.strip() if answer_unit else None
+
+    # If units are the same (after normalization), no conversion needed
+    if pred_unit_norm == answer_unit_norm:
+        if answer_num == 0:
+            return pred_num == 0
+        return abs(pred_num - answer_num) / abs(answer_num) <= rel_tol
+
+    # Units are different - attempt conversion if conversion_df is provided
+    if conversion_df is not None and pred_unit_norm and answer_unit_norm:
+        # Set index to property_unit for easy lookup if not already indexed
+        if "property_unit" in conversion_df.columns:
+            conversion_lookup = conversion_df.set_index("property_unit")
+        else:
+            conversion_lookup = conversion_df
+
+        # Get conversion factors for both units
+        pred_factor = None
+        answer_factor = None
+        pred_comment = None
+        answer_comment = None
+
+        try:
+            if pred_unit_norm in conversion_lookup.index:
+                pred_factor = conversion_lookup.loc[pred_unit_norm, "conversion_factor"]
+                if "comments" in conversion_lookup.columns:
+                    pred_comment = conversion_lookup.loc[pred_unit_norm, "comments"]
+        except Exception:
+            pass
+
+        try:
+            if answer_unit_norm in conversion_lookup.index:
+                answer_factor = conversion_lookup.loc[
+                    answer_unit_norm, "conversion_factor"
+                ]
+                if "comments" in conversion_lookup.columns:
+                    answer_comment = conversion_lookup.loc[answer_unit_norm, "comments"]
+        except Exception:
+            pass
+
+        # Check if both conversion factors are non-NaN
+        if pd.notna(pred_factor) and pd.notna(answer_factor):
+            # Convert both values to SI units
+            pred_si = pred_num * float(pred_factor)
+            answer_si = answer_num * float(answer_factor)
+
+            # Apply scoring rule on SI values
+            if answer_si == 0:
+                return pred_si == 0
+            return abs(pred_si - answer_si) / abs(answer_si) <= rel_tol
+
+        # If one or both conversion factors are NaN, log warning and use usual scoring
+        if pd.isna(pred_factor) and pred_unit_norm in conversion_lookup.index:
+            comment = (
+                pred_comment
+                if pd.notna(pred_comment)
+                else "No conversion factor available"
+            )
+            logger.warning(f"Cannot convert unit '{pred_unit_norm}' to SI: {comment}")
+
+        if pd.isna(answer_factor) and answer_unit_norm in conversion_lookup.index:
+            comment = (
+                answer_comment
+                if pd.notna(answer_comment)
+                else "No conversion factor available"
+            )
+            logger.warning(f"Cannot convert unit '{answer_unit_norm}' to SI: {comment}")
+
+    # Fallback: use usual scoring rule without unit conversion
+    if answer_num == 0:
+        return pred_num == 0
+    return abs(pred_num - answer_num) / abs(answer_num) <= rel_tol
 
 
 def scorer_space_group(pred: str, answer: str) -> bool:
@@ -158,9 +279,15 @@ def scorer_space_group(pred: str, answer: str) -> bool:
     1. Clean input (keep only {letters, numbers, /, -} and lowercase).
     2. Map to ID.
     3. Compare IDs.
+
+    Args:
+        pred: Predicted space group string.
+        answer: Ground truth space group string.
+
+    Returns:
+        True if IDs match, False otherwise.
+
     """
-    if not SPACE_GROUPS:
-        return False
 
     def get_norm_and_id(val: str) -> tuple[str, str | None]:
         if not isinstance(val, str):
@@ -188,7 +315,7 @@ def scorer_space_group(pred: str, answer: str) -> bool:
     return pred_id == answer_id
 
 
-def scorer_categorical(
+def scorer_exact_match(
     pred: str, answer: str, mapping: dict[str, str] | None = None
 ) -> bool:
     """Scores categorical ("method of X") properties.
@@ -197,25 +324,19 @@ def scorer_categorical(
     1. Exact match (after normalization)
     2. Substring match (one canonical category contains the other)
     """
-    pred_str = str(pred).strip()
-    answer_str = str(answer).strip()
+    assert isinstance(pred, str), "pred must be a string"
+    assert isinstance(answer, str), "answer must be a string"
 
-    if mapping:
-        # Normalize to canonical category if available in the map
-        pred_norm = mapping.get(pred_str, pred_str)
-        answer_norm = mapping.get(answer_str, answer_str)
-    else:
-        # If not in map, keep original string
-        pred_norm = pred_str
-        answer_norm = answer_str
+    pred_str = pred.strip()
+    answer_str = answer.strip()
 
     # 1. Exact Match
-    if pred_norm == answer_norm:
+    if pred_str == answer_str:
         return True
 
     # 2. Relaxed Substring Match (Case-insensitive)
-    p_lower = pred_norm.lower()
-    a_lower = answer_norm.lower()
+    p_lower = pred_str.lower()
+    a_lower = answer_str.lower()
 
     if p_lower in a_lower or a_lower in p_lower:
         return True
@@ -227,7 +348,8 @@ def score_value(
     pred_value: str,
     answer_value: str,
     rubric: str,
-    mapping: dict[str, str] | None = None,
+    mapping: dict[str, str] | None = None,  # not used
+    conversion_df: pd.DataFrame | None = None,
 ) -> float:
     """Master scoring function (0.0 to 1.0).
 
@@ -235,33 +357,53 @@ def score_value(
         pred_value: The predicted string.
         answer_value: The ground truth string.
         rubric: "0.1% SI", "pymatgen", or "categorical".
-        mapping: Optional mapping for categorical clustering.
+        mapping: Optional mapping for categorical scoring.
+        conversion_df: Optional DataFrame for unit conversion.
 
     """
-    if rubric == "0.1% SI":
-        # Check if ANY predicted candidate matches the first answer candidate
-        answer_nums = parse_numeric_candidates(answer_value)
-        if not answer_nums:
+    assert isinstance(pred_value, str), "pred_value must be a string"
+    assert isinstance(answer_value, str), "answer_value must be a string"
+    assert isinstance(rubric, str), "rubric must be a string"
+
+    logger.debug(
+        f"Scoring pred_value='{pred_value}' vs answer_value='{answer_value}' using rubric='{rubric}'"
+    )
+    match rubric:
+        case "0.1% SI":
+            # Check if ANY predicted candidate matches the first answer candidate
+            answer_nums = parse_numeric_candidates(
+                answer_value
+            )  # return (number, units) tuples
+            if not answer_nums:
+                return 0.0
+            # Strict: The ground truth should be unambiguous, so we take the first number found.
+            if len(answer_nums) > 1:
+                logger.warning(
+                    f"Multiple numeric candidates found in answer_value '{answer_value}'. Using the first one: {answer_nums[0][0]}"
+                )
+            answer_num, answer_unit = answer_nums[0]
+            for pred_num, pred_unit in parse_numeric_candidates(pred_value):
+                if scorer_si(
+                    pred_num,
+                    pred_unit,
+                    answer_num,
+                    answer_unit,
+                    conversion_df=conversion_df,
+                ):
+                    return 1.0
             return 0.0
-        # Strict: The ground truth should be unambiguous, so we take the first number found.
-        answer_num = answer_nums[0]
-        for num in parse_numeric_candidates(pred_value):
-            if scorer_si(num, answer_num):
-                return 1.0
-        return 0.0
 
-    elif rubric == "pymatgen":
-        # Clean inputs before pymatgen parsing if needed?
-        # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
-        # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
-        pv = normalize_unicode(pred_value).strip()
-        av = normalize_unicode(answer_value).strip()
-        return 1.0 if scorer_pymatgen(pv, av) else 0.0
+        case "pymatgen":
+            # Clean inputs before pymatgen parsing if needed?
+            # For now, just pass raw strings as scorer_pymatgen handles robust Composition checks?
+            # Actually scorer_pymatgen is basic. Let's make it robust against raw inputs by normalizing unicode.
+            pv = normalize_unicode(pred_value).strip()
+            av = normalize_unicode(answer_value).strip()
+            return 1.0 if scorer_pymatgen(pv, av) else 0.0
 
-    else:
-        # Default to categorical
-        return (
-            1.0
-            if scorer_categorical(pred_value, answer_value, mapping=mapping)
-            else 0.0
-        )
+        case "space_group":
+            return 1.0 if scorer_space_group(pred_value, answer_value) else 0.0
+
+        case _:
+            # Default to exact match
+            return 1.0 if scorer_exact_match(pred_value, answer_value) else 0.0
