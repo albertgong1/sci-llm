@@ -1,11 +1,16 @@
 """Script to format token usage for the property matching step."""
-
+import sys
+from pathlib import Path
 from argparse import ArgumentParser
 import pandas as pd
 from tabulate import tabulate
-import yaml
-
 import pbench
+
+# Add src to path so we can import llm_utils
+# Resolves to: .../sci-llm/src
+sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
+
+from llm_utils import MODEL_PRICING
 
 parser = ArgumentParser(description="Format property match tokens")
 parser = pbench.add_base_args(parser)
@@ -45,12 +50,6 @@ df_token_usage = (
 # print as table using the tabulate library with 'github' format
 print(tabulate(df_token_usage, headers="keys", tablefmt="github", showindex=False))
 
-# Load pricing data
-pricing_file = "model_pricing.yaml"
-with open(pricing_file, "r") as f:
-    pricing_map = yaml.safe_load(f)
-
-
 # Calculate cost per request for each model
 def calculate_cost(row: pd.Series) -> float | None:
     """Calculate dollar cost per request based on token usage.
@@ -62,15 +61,15 @@ def calculate_cost(row: pd.Series) -> float | None:
     """
     model = row["model"]
 
-    if model not in pricing_map:
+    if model not in MODEL_PRICING:
         return None
 
-    prices = pricing_map[model]
+    prices = MODEL_PRICING[model]
     if prices is None or not isinstance(prices, dict):
         return None
 
     input_price = prices.get("input")  # USD per 1M tokens
-    cache_price = prices.get("context_cache_read")  # USD per 1M tokens
+    cache_price = prices.get("context_cache_read") or prices.get("cached_input")  # USD per 1M tokens
     output_price = prices.get("output")  # USD per 1M tokens
 
     if input_price is None or output_price is None:
