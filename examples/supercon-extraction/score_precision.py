@@ -16,11 +16,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tabulate import tabulate
 import pandas as pd
+import logging
 
 # pbench imports
 import pbench
 from pbench_eval.metrics import compute_precision_per_material_property
-import logging
+from utils import RUBRIC_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +58,18 @@ for csv_file in csv_files:
 
 df_matches = pd.concat(dfs, ignore_index=True)
 df_matches = df_matches[df_matches["judge"] == model_name]
+if False:
+    df_matches = df_matches[
+        (df_matches["agent"] == "gemini-cli")
+        & (df_matches["model"] == "gemini/gemini-3-pro-preview")
+    ]
 logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
 
 # Load rubric
-rubric_path = Path("scoring") / "rubric_2.csv"
-logger.info(f"Loading rubric from {rubric_path}")
-df_rubric = pd.read_csv(rubric_path)
+logger.info(f"Loading rubric from {RUBRIC_PATH}")
+df_rubric = pd.read_csv(RUBRIC_PATH)
 logger.info(f"Loaded {len(df_rubric)} rows from rubric")
 
 # Join matches with rubric to get scoring method
@@ -88,9 +93,25 @@ if missing_rubric > 0:
 
 df_results = compute_precision_per_material_property(df, conversion_df=conversion_df)
 
+for (agent, model, refno), group in df_results.groupby(
+    ["agent", "model", "refno"], dropna=False
+):
+    # save results to csv
+    scores_dir = args.output_dir / "scores" / agent / model
+    scores_dir.mkdir(parents=True, exist_ok=True)
+    output_csv_path = (
+        args.output_dir / "scores" / agent / model / f"precision_results_{refno}.csv"
+    )
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.debug(
+        f"Saving precision results for {agent} {model} {refno} to {output_csv_path}"
+    )
+    # import pdb; pdb.set_trace()
+    group.to_csv(output_csv_path, index=False)
+
 counta = lambda x: (x > 0).sum()  # noqa: E731
 acc_by_refno = (
-    df_results.groupby(["model", "refno"], dropna=False)
+    df_results.groupby(["agent", "model", "refno"], dropna=False)
     .agg(
         precision_score=pd.NamedAgg(column="precision_score", aggfunc="mean"),
         matches=pd.NamedAgg(column="num_property_material_matches", aggfunc=counta),
@@ -99,7 +120,7 @@ acc_by_refno = (
 )
 mean_sem = lambda x: f"{x.mean():.2f} ± {x.sem():.2f}"  # noqa: E731
 acc = (
-    acc_by_refno.groupby("model")
+    acc_by_refno.groupby(["agent", "model"])
     .agg(
         avg_precision=pd.NamedAgg(column="precision_score", aggfunc=mean_sem),
         avg_matches=pd.NamedAgg(column="matches", aggfunc="sum"),
