@@ -3,6 +3,7 @@
 import abc
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
 
@@ -245,3 +246,47 @@ def parse_json_response(response_text: str | dict[str, Any]) -> dict[str, Any]:
         pass
     
     raise ValueError(f"Failed to parse JSON response: {response_text}")
+
+
+def aggregate_usage(usage_list: list[dict]) -> dict:
+    """Recursively sum the values of the usage dict.
+
+    Uses the first non-empty dict as reference schema for keys.
+
+    NOTE: assumes that each usage dict in the list shares a common schema.
+    Otherwise, value errors may occur.
+
+    NOTE: assumes that the usage values are summable.
+
+    Args:
+        usage_list: List of usage dict objects.
+
+    Returns:
+        The aggregated usage dict.
+
+    """
+    if len(usage_list) == 0:
+        return {}
+
+    # Find the first non-empty dict in usage_list and assign it to result
+    # Use that dict as reference schema for the aggregated usage dict
+    result = {}
+    for usage in usage_list:
+        if usage:
+            result = deepcopy(usage)
+            break
+
+    for key in result.keys():
+        if isinstance(result[key], dict):
+            # result[key] is a dict, nested within the usage dict
+            # Since usage lists share a common schema, we can assume that
+            # the nested dicts are of the same schema
+            # Recursively sum the values of the nested dicts
+            # Use .get method to default to empty dict if key not present
+            result[key] = aggregate_usage([usage.get(key, {}) for usage in usage_list])
+        else:
+            # Assume that the values are summable (default 0 if key not present)
+            # key may exist in usage dict but have a None value, so convert that to 0
+            # Otherwise sum() will complain that it cannot sum None with integer
+            result[key] = sum([usage.get(key, 0) or 0 for usage in usage_list])
+    return result
