@@ -9,6 +9,7 @@ from llm_utils.common import (
     LLMChat,
     LLMChatResponse,
     Message,
+    aggregate_usage,
 )
 
 # Load model pricing configuration from YAML
@@ -22,6 +23,7 @@ __all__ = [
     "LLMChat",
     "LLMChatResponse",
     "Message",
+    "aggregate_usage",
     "get_llm",
     "MODEL_PRICING",
     "calculate_cost",
