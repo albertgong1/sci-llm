@@ -20,7 +20,7 @@ uv run pbench-extract \
     -log_level INFO
 ```
 
-For this example, the results will be saved in `out/unsupervised_llm_extraction/*.csv`.
+For this example, the results will be saved in `out/preds/*.csv`.
 """
 
 import argparse
@@ -265,58 +265,88 @@ async def process_paper(
         logger.error(f"Failed to get number of pages from {paper_path}: {e}")
         return [], {}
 
-    # Create tasks for all pages
-    tasks = [
-        process_single_page(page_num, file, prompt, refno, llm, inf_gen_config)
-        for page_num in range(1, num_pages + 1)
-    ]
+    if False:
+        # Create tasks for all pages
+        tasks = [
+            process_single_page(page_num, file, prompt, refno, llm, inf_gen_config)
+            for page_num in range(1, num_pages + 1)
+        ]
 
-    # Process all pages concurrently with progress bar
-    total_properties = 0
-    pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
+        # Process all pages concurrently with progress bar
+        total_properties = 0
+        pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
 
-    page_results: list[tuple[list[dict], dict]] = []
-    for coro in asyncio.as_completed(tasks):
-        result = await coro
-        page_results.append(result)
-        total_properties += len(result[0])  # result[0] is the properties list
-        pbar.set_description(f"Processing {refno} ({total_properties} props)")
-        pbar.update(1)
+        page_results: list[tuple[list[dict], dict]] = []
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            page_results.append(result)
+            total_properties += len(result[0])  # result[0] is the properties list
+            pbar.set_description(f"Processing {refno} ({total_properties} props)")
+            pbar.update(1)
 
-    pbar.close()
+        pbar.close()
+    else:
+        conv = Conversation(
+            messages=[
+                Message(role="user", content=[file, prompt]),
+            ]
+        )
+
+        properties = []
+        usage = {}
+        try:
+            # Get LLM response
+            response: LLMChatResponse = await llm.generate_response_async(
+                conv, inf_gen_config
+            )
+            usage = response.usage
+            # Check for errors
+            if response.error:
+                logger.warning(f"LLM error for {refno}: {response.error}")
+            # Parse JSON from response
+            json_data = parse_json_response(response.pred)
+            if json_data is None:
+                logger.warning(f"Failed to parse JSON from {refno}")
+            # Check for properties array
+            if "properties" not in json_data:
+                logger.warning(f"No 'properties' key in JSON for {refno}")
+            properties = json_data["properties"]
+            if not isinstance(properties, list):
+                logger.warning(f"'properties' is not a list for {refno}")
+        except Exception as e:
+            logger.error(f"Error processing {refno}: {e}")
 
     # Aggregate usage across all pages
-    usage_list = [result[1] for result in page_results]
-    aggregated_usage = llm_utils.aggregate_usage(usage_list)
+    aggregated_usage = usage
 
     # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
     property_counter = 0
 
-    for properties, _ in page_results:
-        for prop in properties:
-            try:
-                # Remove the temporary page_num field before converting
-                prop.pop("_page_num", None)
-                row_series: pd.Series = json_property_to_csv_row(prop)
+    # for properties, _ in page_results:
+    for prop in properties:
+        try:
+            # Remove the temporary page_num field before converting
+            prop.pop("_page_num", None)
+            row_series: pd.Series = json_property_to_csv_row(prop)
 
-                # Assign metadata
-                row_series["id"] = f"prop_{property_counter:03d}"
-                row_series["refno"] = refno
-                row_series["paper_pdf_path"] = str(paper_path)
-                row_series["agent"] = "zeroshot"
-                row_series["model"] = model_name
-                row_series["validated"] = None
-                row_series["validator_name"] = ""
-                row_series["validation_date"] = ""
-                row_series["flagged"] = False
+            # Assign metadata
+            row_series["id"] = f"prop_{property_counter:03d}"
+            row_series["refno"] = refno
+            row_series["paper_pdf_path"] = str(paper_path)
+            row_series["agent"] = "zeroshot"
+            row_series["model"] = model_name
+            row_series["validated"] = None
+            row_series["validator_name"] = ""
+            row_series["validation_date"] = ""
+            row_series["flagged"] = False
 
-                all_rows.append(row_series)
-                property_counter += 1
+            all_rows.append(row_series)
+            property_counter += 1
 
-            except Exception as e:
-                logger.warning(f"Failed to convert property from {refno}: {e}")
-                continue
+        except Exception as e:
+            logger.warning(f"Failed to convert property from {refno}: {e}")
+            continue
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
@@ -394,7 +424,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
     )
 
     # Setup output directory
-    preds_dir = args.output_dir / "unsupervised_llm_extraction"
+    preds_dir = args.output_dir / "preds"
     preds_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize model name for filename
