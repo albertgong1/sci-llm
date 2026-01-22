@@ -8,6 +8,7 @@ import pandas as pd
 from .space_groups_normalized import (
     SPACE_GROUPS,
 )
+from .normalize_material import classify_and_normalize, strip_formula
 
 logger = logging.getLogger(__name__)
 
@@ -151,13 +152,50 @@ def normalize_formula(formula: str) -> str:
 
 
 def scorer_pymatgen(pred: str, answer: str) -> bool:
-    """Check if pred is a valid pymatgen composition and is close to answer."""
-    try:
-        pred_comp = Composition(pred)
-        answer_comp = Composition(answer)
-        return pred_comp.almost_equals(answer_comp)
-    except Exception:
+    """Check if pred is a valid pymatgen composition and is close to answer.
+
+    Normalization rules:
+    1. Strip anything that doesn't look like a chemical formula. For example, "YBa2Cu3O7 thin films" should first be converted to "YBa2Cu3O7".
+    2. Convert generic formula to stoichiometric by removing variables (e.g., "YBa2Cu3O7-z" -> "YBa2Cu3O7").
+    3. Use pymatgen's Composition to parse and compare.
+
+    Args:
+        pred: The predicted composition string.
+        answer: The reference/ground truth composition string.
+
+    Returns:
+        True if pred and answer represent the same composition, False otherwise.
+
+    """
+    assert isinstance(pred, str), "pred must be a string"
+    assert isinstance(answer, str), "answer must be a string"
+    # Strip non-formula text and extract variable values
+    # e.g., "La2-xSrxCuO4 (x=0.15) thin films" -> ("La2-xSrxCuO4", {'x': 0.15})
+    pred, pred_vars = strip_formula(pred)
+    answer, answer_vars = strip_formula(answer)
+
+    pred_formula, pred_formula_type, pred_notes = classify_and_normalize(
+        pred, pred_vars
+    )
+    answer_formula, answer_formula_type, answer_notes = classify_and_normalize(
+        answer, answer_vars
+    )
+
+    # Check for formulas that can't be parsed by pymatgen
+    unparseable_types = {"INVALID", "PARAMETER_FORMULA", "PARTIAL_NORMALIZATION"}
+    if (
+        pred_formula_type in unparseable_types
+        or answer_formula_type in unparseable_types
+    ):
+        logger.warning(
+            f"Unparseable formula detected pred: '{pred}' ({pred_formula_type}, notes: {pred_notes}), "
+            f"answer: '{answer}' ({answer_formula_type}, notes: {answer_notes})"
+        )
         return False
+
+    pred_comp = Composition(pred_formula)
+    answer_comp = Composition(answer_formula)
+    return pred_comp.almost_equals(answer_comp)
 
 
 def scorer_si(

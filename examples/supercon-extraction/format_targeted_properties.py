@@ -16,8 +16,9 @@ and so on for all categories in the CSV file.
 """
 
 import pandas as pd
+from utils import RUBRIC_PATH
 
-df = pd.read_csv("scoring/rubric_3.csv")
+df = pd.read_csv(RUBRIC_PATH)
 
 for category, group in df.groupby("category"):
     property_names = group["property_name"].tolist()

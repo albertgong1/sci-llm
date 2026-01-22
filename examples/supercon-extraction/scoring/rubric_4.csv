@@ -1,0 +1,98 @@
+db_label,count,property_name,unique property_unit,data_type,category,rubric,SI,description
+name,31879,common formula of materials,#N/A,String,Material,pymatgen,,common formula of materials
+tc,26321,Tc (of this sample) recommended,"K, k",Float,Superconductivity,0.1% SI,K,Tc (of this sample) recommended
+str3,24685,common name of structure,#N/A,String,Structure,categorical,K,*common name of structure
+t2,17115,transition temperature (mid point),K,Float,Superconductivity,exact_match,,transition temperature (mid point)
+shape,15923,shape,#N/A,Integer,Material,exact_match,,"*sample form (1: single phase(bulk),2: multi phase (bulk),3: single crystal(bulk) ,4:film,5:film(single))"
+lata,13102,lattice constant a,"A, nm",Float,Structure,0.1% SI,m,lattice constant a
+latc,11745,lattice constant c,"A, nm",Float,Structure,0.1% SI,m,lattice constant c
+rawmat,7910,raw materials,#N/A,String,Preparation,pymatgen,m^3/C,raw materials
+method,7437,*preparation method,#N/A,Integer,Preparation,0.1% SI,T,*preparation method (see the end of this table)
+str1,6781,"*crystal structure, symmetry",#N/A,Integer,Structure,0.1% SI,T/K,"*crystal structure, symmetry ( 1=cubic,2=tetragonal,3=orthorhombic,4=monoclinic,5=triclinic,6=trigonal,7=hexagonal)"
+tcsus,5608,Tc from susceptibility measurement,K,Float,Superconductivity,0.1% SI,A.m^2/mol,Tc from susceptibility measurement
+tcn,4637,lowest temperature for measurement (not superconducting),K,Float,Superconductivity,0.1% SI,K,lowest temperature for measurement (not superconducting)
+t3,4606,transition temperature (R = 100%),K,Float,Superconductivity,0.1% SI,K/Pa,transition temperature (R=100%)
+t1,4051,transition temperature (R = 0),"K, k",Float,Superconductivity,0.1% SI,K,transition temperature (R=0)
+spaceg,3667,space group,#N/A,String,Structure,categorical,ohm.m,space group
+latb,3512,lattice constant b,"A, nm",Float,Structure,space_group,,lattice constant b
+gamma,2492,coefficient of electronic specific heat,"mj/mol.K2, erg/cc.K2, mJ/mol.K2, mJ/gat.K2, J/K2.Mol-C, mJ/gmol.K2, J/mol.K2, mj/f.u.K2, mJ/mol.K2., mj/K2.m-Re, mj/mol. K2, mJ/K2fu, uJ/K2.g, mJ/Ymol.K2, mJ/Mol.K2, erg/cm3.K2, mJ/K2mol, mJ/molK2, mJ/Pr mol, mJ/K2mole, J/K2gat, my/md,K2, mJ/Kmol, mJ/Ni.K2, mJ/m-Co.K2, mJmol-1K-2, mJ/g.K2, mJ/f.u.K2, mj/mole.K2, uJ/g.K2, mj/cm3.K2, MJ/MOLE.K2",Float,Thermal property,0.1% SI,J/mol.K^2,coefficient of electronic specific heat
+debyet,1843,Debye temperature,K,Float,Thermal property,0.1% SI,K,Debye temperature
+hc2zero,1756,Hc2 at 0 K for poly crystal,"Oe, kG, kOe, T, E+3 A/m, mT, KOe, KG, micro-T, gauss",Float,Superconductivity,0.1% SI,m,Hc2 at 0 K for poly crystal
+resrt,1651,resistivity at RT for poly crystal,"mOhm.cm, uOhm.m, m.ohm.cm, ohmcm, uOhm.cm, Ohm.cm, ohm.cm, uOhmcm, mOhm,cm, kOhm.cm, mic.ohm.cm, mic.ohm.m, mohmcm, mOhmcm, m-ohmcm, mOHM, uohmcm, mOrm.cm",Float,Normal state property,0.1% SI,g/cm^3,resistivity at RT for poly crystal
+neelt,1490,Neel temperature,K,Float,Magnetic property,0.1% SI,K,Neel temperature
+tcwidth,1352,transition width for resistive transition,K,Float,Superconductivity,0.1% SI,T/K,transition width for resistive transition
+curiet,1199,Curie temperature,K,Float,Magnetic property,0.1% SI,K,Curie temperature
+dhc2dt,1164,-slope in Hc2 vs T at Tc for poly crystal,"Oe/K, G/K, kOe/K, T/K, mT/K, kG/K, kG/T, kG, K/kOe",Float,Superconductivity,0.1% SI,,
+tp300,1120,thermopower at 300 K,"uV/K, micro.V/K, mv/K, mic.V/K, mV/K, microV/K, uV/K-1, V/K, microV/P",Float,Thermal property,0.1% SI,K,thermopower at 300K
+dtcdp,1038,slope at P = 0 in Tc vs P plot,"K/GPa, K/kbar, K/KBAR, K/Gpa, T/GPa, K/GP, K/kBar, k/kbar, K/Kbar, mK/MPa, K/GPA, GPa",Float,Superconductivity,0.1% SI,K,slope at P=0 in Tc vs P plot
+vols,1038,volume fraction of Meissner effect(%),#N/A,Float,Superconductivity,0.1% SI,K.m^3/mol,"volume fraction of Meissner effect, unit=%"
+resn,1026,resistivity at normal-T for poly crystal,"uOhm.cm, mOhm.cm, uOhm.m, m.ohm.cm, mohm.cm, uOhmcm, uOh.cm, microohm, micro-ohm, ohm, nOhm.cm, Ohm.cm, ohm.cm, mohmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Normal state property,0.1% SI,Pa,resistivity at normal-T for poly crystal
+gapene,996,"normarized energy gap at 0 K , 2delta(0)/kTc","meV, kTc, K, cm(-1), cm-1, MeV, MEV, k<B>T",Float,Superconductivity,0.1% SI,,"normarized energy gap at 0 K , 2delta(0)/kTc"
+cohere,837,coherence length at 0 K for poly crystal,"A, nm, micron, um, mm",Float,Superconductivity,0.1% SI,T,coherence length at 0 K for poly crystal
+moment,798,magnetic moment per formula,"uB/Ce, myu-B/Eu, myu-B/mole, My-B/Nb, M/mol, emu mol-1, /ND, myu-B/f.u, myu-B/mol, uB/Ru, uB/mol, myu-B/Ce, uB, myu-B/Pu, my-B/U, my-B/Np, Myu-B/mol, My-B/Eu, my-B/Eu, my-B/f.u, my-B, My-B/f.u, myuB/mol, uB/Ho, uB/Er, uB/Tm, my-B/mol, myu-B/Er, My-B/mol, per Ru, uB/Pu, myu-B/fu, myu-B/Tm, nyu-B/Pr, Myu-B/Pr, My-B/Ce, Myu-B, uB/Pr, myu-B/R, Myu-B/f.u, myu-B/Yb, Myu-B/Fe, myu-B/Fe, per mol, per R-ion, per f.u, per Gd, myu-B, myu-B/Co, /Sm, /Gd, micro.B/Mo, myuB/Tm, myu-B/Pr, per Ho, per Eu, uB/f.u, myu-B/Y, myu-B/Gd, myu-B/Nd, uB/Cu, Bohr magne, myuB/Np, myu-B/V, nyu-B/mol, Myu-B/f.u., mB/Pr, Myu-B/Mo, uB/Ir, myu-B/U, my-B/Cr, myu-B/Cr, /GD, /CELL, /PR ION, /PR, /Pr, m/Zn",Float,Magnetic property,0.1% SI,,magnetic moment per formula
+penet,767,penetration depth at 0 K for poly crystal,"A, nm, um, micrometer, micron.m, microm",Float,Superconductivity,0.1% SI,T,penetration depth at 0 K for poly crystal
+tblno,543,international table number,#N/A,Integer,Structure,categorical,J/mol.K,international table number
+rh300,533,Hall coefficient at 300 K,"E-4 cm3/C, m3/C, cm3/C, e-3 cm3/C, Ohm.cm, E-8 m3/C, E-3 cm3/C, E-10 m3/C, 10-3cm3/C, E-9m3/C, mm3/C, m3C-1(20K), cm3C-1",Double,Normal state property,0.1% SI,m,Hall coefficient at 300K
+gap,488,"energy gap at 0 K , delta(0)","meV, kTc, K, cm(-1), cm-1, mV, micro-eV, MeV, MEV, k<B>T",Float,Superconductivity,0.1% SI,T/K,"energy gap at 0 K , delta(0)"
+nhc2zero,460,Hc2 at 0 K for single crystal for H //c-axis,"T, kOe, KOe, Oe, mT",Float,Superconductivity,0.1% SI,ohm.m,Hc2 at 0 K for single crystal for H //c-axis
+hc1zero,442,Hc1 at 0 K for poly crystal,"Oe, mT, T, A, gauss, micro-T",Float,Superconductivity,0.1% SI,1/Pa,Hc1 at 0 K for poly crystal
+pcohere,435,coherence length at 0 K for single crystal for H //ab-plane,"A, nm",Float,Superconductivity,0.1% SI,ohm.m,coherence length at 0 K for single crystal for H //ab plane
+ppenet,401,penetration depth at 0 K for single crystal for H //ab-plane,"A, nm, um, micron.m",Float,Superconductivity,0.1% SI,m^3/C,penetration depth at 0 K for single crystal for H //ab plane
+isotope,387,"alpha in Tc = A * M^(-alpha), isotope effect",#N/A,Float,Superconductivity,0.1% SI,W/m.K,"alpha in Tc=A*M^(-alpha), isotope effect"
+phc2zero,377,Hc2 at 0 K for single crystal for H //ab-plane,"T, kOe, KOe, Oe, mT",Float,Superconductivity,pymatgen,,Hc2 at 0 K for single crystal for H //ab plane
+dens,360,density (gcm-3),#N/A,Float,Mechanical property,0.1% SI,,Density
+isoel,349,isotope element,#N/A,String,Superconductivity,0.1% SI,ohm.m,isotope element
+kaizero,346,temperature independent term in susceptibility,"emu/mol-Yb, emu/mol, emu.K/Ru, emu/mol-La, eum/mol, emu/mole, cm3/mol, emu/g, emu/m.Oe, emu/mol-Si, emu/cm3.Oe, cm3/g, emu/mol Nd, cm3/mole, emu/mol.K, emu/g.Oe, emu/mol-Cr, myu-B/kOe, emu/mol-Ce, emu/mol.G, emu/fu, emu/Oe.g, cm3.K/mol",Double,Magnetic property,exact_match,,temperature independent term in susceptibility
+abresrt,334,resistivity at RT for single crystal for J//ab-plane,"mOhm.cm, mOhm, uOh.cm, uOhm.cm, Ohm.cm, nOhm.cm, m.ohm.cm, mOhm,cm, mic.ohm.cm, ohm.cm, mohmmm, mOhmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, uohmcm, Ohmcm",Float,Normal state property,0.1% SI,T,resistivity at RT for single crystal for J//ab plane
+carrier,326,carrier density at 300 K,"E+19 /cm3, n/cm3, E+21/cc, E+22 /cm3, E+20 /cm3, E+19/cc, E+22/cm3, n/m3, E+21 /cm3, /eV.cm3, E+21/cm3, cm-2, hole/Cu, /cm3, E+18/cm3, /CuO2, cm(-3), n/f.u, n/m^3, cm3C-1",Double,Normal state property,0.1% SI,,carrier density at 300K
+ndhc2dt,326,-slope in Hc2 vs T at Tc for single crystal for H //c-axis,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,Superconductivity,0.1% SI,T,-slope in Hc2 vs T at Tc for single crystal for H //c-axis
+pdhc2dt,312,-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,"T/K, kOe/K, Oe/K, KOe/K, K/kOe",Float,Superconductivity,0.1% SI,Pa,-slope in Hc2 vs T at Tc for single crystal for H //ab plane
+ncohere,283,coherence length at 0 K for single crystal for H ⊥ab-plane,"A, nm",Float,Superconductivity,0.1% SI,ohm.m,coherence length at 0 K for single crystal for H ⊥ab plane
+res77,283,resistivity at 77 K for poly crystal,"uOhm.cm, m.ohm.cm, ohm.cm, Ohm.m, mOhm.cm, mic.ohm.cm, mohmcm, mOhmcm, m-ohmcm, mOHM, ohmcm, mOHMcm",Float,Normal state property,0.1% SI,,resistivity at 77K for poly crystal
+abresn,225,resistivity at normal-T for single crystal for J//ab-plane,"mOhm.cm, UOhm.cm, uOhm.cm, Ohm.cm, mOh..cm, ohm, mOhm,cm, m.ohm.cm, mohmmm, uohmcm, m-ohmcm, mohmcm, mOHM, ohmcm, 10-4ohmcm, microohmcm",Float,Normal state property,exact_match,,resistivity at normal-T for single crystal for J//ab plane
+isorat,219,exchange ratio of isotope(%),#N/A,String,Superconductivity,0.1% SI,m,exchange ratio of isotope(%)
+curiec,214,Curie constant,"emu.K/mol, cm3/mol, muB/f.u., emu.K/Ru, emu/mol, emu.K/Yb, emu/mol.Oe, K, emu.K/g, emu/K/mol, EMU/mol, emh.K/mol, EMU.K/G.OE, EMU.K/G, emu/mol.K, emu.K/mole, K.cm3/mol, emu,K/mol, emu.K/G.g, emu.K/cc, emuK/g, ergK/Oe2g, emu/g, emu.K/g.Oe, comment, cm3K/mol, emu.K/Ce, emu/g.K, K/mol.G, emuK/mol, EMU/K.OE, EMU/G, EMU.K/MOLE, emu.K/Oe.g, cm3.K/mol",Double,Magnetic property,0.1% SI,m,Curie constant
+dtc,189,DTC = Tc - Tc0 for isotope element,#N/A,Float,Superconductivity,0.1% SI,T,DTC=Tc-Tc0 for isotope element
+reshe,169,resistivity at 4.2 K for poly crystal,"mOhm.cm, uOhm.cm, Ohm.cm, moOhm.cm, uOhm.cn, mic.ohm.cm, m.ohm.cm, m-ohmcm, ohmcm, mohmcm",Float,Normal state property,0.1% SI,Pa,resistivity at 4.2K for poly crystal
+abres77,157,resistivity at 77 K for single crystal for J//ab-plane,"mic.ohm.cm, m.ohm.cm, ohm.cm, m-ohmcm, mohmcm, 10-4ohmcm, uohmcm, uOhm.cm, Ohmcm, mOhm.cm",Float,Normal state property,0.1% SI,ohm.m,resistivity at 77K for single crystal for J//ab plane
+rhn,145,"Hall coefficient for single, H//c-axis",#N/A,Double,Normal state property,0.1% SI,,"Hall coefficient for single, H//c-axis"
+npenet,134,penetration depth at 0 K for single crystal for H⊥ab-plane,"micron m, A, um, micron.m, nm, micron-m, micron. M, microm",Float,Superconductivity,0.1% SI,m^3/C,penetration depth at 0 K for single crystal for H⊥ab plane
+spjump,129,specific heat jump at Tc (delta-C),"mj/mol.K, J/MOLE.K, mJ/mol.K, mJ/mol.K2, dC/r*Tc, J/kg.K, mJ/cm3.K, mJ/mole.K, J/mol.K, Jmol-1K-2, mJ/molK2, mJ/K.mol, MJ/GAT.K, J/mol.K2, gamma*Tc",Float,Thermal property,exact_match,,specific heat jump at Tc (delta-C)
+hc2t,126,Hc2 at given temperature for poly crystal,"T, Oe, mT, kOe",Float,Superconductivity,0.1% SI,K,Hc2 at given temperature for poly crystal
+cresrt,117,resistivity at RT for single crystal for J//c-axis,"mOhm, uOh.cm, mOhm.cm, m.ohm.cm, uOhm.cm, mic.ohm.cm, mohmmm, ohmcm, mOHM, 10-4ohmcm, Ohmcm, mohmcm",Float,Normal state property,0.1% SI,1/Pa,resistivity at RT for single crystal for J//c-axis
+hc1t,116,Hc1 at given temperature for poly crystal,"Oe, mT, T",Float,Superconductivity,0.1% SI,V/K,Hc1 at given temperature for poly crystal
+nhc1zero,94,Hc1 at 0 K for single crystal for H //c-axis,"Oe, mT, A",Float,Superconductivity,0.1% SI,ohm.m,Hc1 at 0 K for single crystal for H //c-axis
+thc300,88,thermal conductivity at 300 K,"W/m.K, W/K.m, mW/cm.K, W/K.M, Wm-1K-1",Float,Thermal property,0.1% SI,T,thermal conductivity at 300K
+phc1zero,77,Hc1 at 0 K for single crystal for H //ab-plane,"Oe, mT",Float,Superconductivity,0.1% SI,ohm.m,Hc1 at 0 K for single crystal for H //ab plane
+cresn,64,resistivity at normal-T for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmmm, mOHM, ohmcm, 10-4ohmcm, mohmcm",Float,Normal state property,0.1% SI,ohm.m,resistivity at normal-T for single crystal for J//c-axis
+ye300,55,Young's modulus at 300 K ,GPa,Double,Mechanical property,0.1% SI,ohm.m,Young's modulus at 300K
+jc77,54,"Jc at T = 77 K, H = 0 T",#N/A,Double,Superconductivity,0.1% SI,K,"Jc at T=77K,H=0T"
+g300,54,shear modulus at 300 K ,GPa,Float,Mechanical property,0.1% SI,ohm.m,shear modulus at 300K
+phc2t,47,Hc2 at given temperature for single crystal H//ab-plane,"kOe, T, Oe",Float,Superconductivity,0.1% SI,emu/mol,Hc2 at given temperature for single crystal H//ab-plane
+jche,47,"Jc at 4.2 K, H = 0 T",meV,Double,Superconductivity,0.1% SI,V/K,"Jc at 4.2K, H=0 T"
+abreshe,45,resistivity at 4.2 K for single crystal for J//ab-plane,"uOhm.cm, mOhm.cm, microohmcm, mic.ohm.cm, m.ohm.cm, mohmcm",Float,Normal state property,0.1% SI,m,resistivity at 4.2K for single crystal for J//ab plane
+nhc2t,42,Hc2 at given temperature for single crystal H//c-axis,"kOe, T, Oe",Float,Superconductivity,0.1% SI,m,Hc2 at given temperature for single crystal H//c-axis
+po300,42,Poisson ratio at 300 K ,#N/A,Float,Mechanical property,0.1% SI,1/Pa,Poisson ratio at 300K
+cres77,42,resistivity at 77 K for single crystal for J//c-axis,"mic.ohm.cm, m.ohm.cm, 10-4ohmcm, Ohmcm, mohmcm",Float,Normal state property,0.1% SI,m^3/C,resistivity at 77K for single crystal for J//c-axis
+sv300,26,sound velocity at 300 K ,m/s,Double,Mechanical property,0.1% SI,T,sound velocity at 300K
+target,25,target material,#N/A,String,Preparation,0.1% SI,T,target material
+rh300n,25,"Hall coefficient at 300 K for single, H//c-axis","m3/C, mic. Ohm c, cm3/C",Double,Normal state property,0.1% SI,m/Pa,"Hall coefficient at 300K for single, H//c-axis"
+dadp,23,pressure dependence of LATA,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Structure,0.1% SI,m/s,pressure dependence of LATA
+dcdp,22,pressure dependence of LATC,"k0/GPa, (GPa)^(-1), E-3 /GPa, A/GPa, /GPa, %/GPa, (dL/L)/GPa",Float,Structure,0.1% SI,J,pressure dependence of LATC
+hv300,20,hardness at 300 K ,"GPa, kg/mm2",Float,Mechanical property,0.1% SI,ohm.m,hardness at 300K
+nhc1t,20,Hc1 at given temperature for single crystal H//c-axis,"mT, Oe",Float,Superconductivity,0.1% SI,Pa,Hc1 at given temperature for single crystal H//c-axis
+phc1t,16,Hc1 at given temperature for single crystal H//ab-plane,"Oe, mT",Float,Superconductivity,0.1% SI,,Hc1 at given temperature for single crystal H//ab-plane
+subst,13,substrate,#N/A,String,Preparation,pymatgen,m^-3,substrate
+tp300p,13,thermopower at 300 K for parallel to ab-plane,"uV/K, microW/mK2",Float,Thermal property,0.1% SI,T,thermopower at 300K for parallel to ab-plane
+dadt,12,temperature dependence of LATA,"(dl/dT)/l, K^(-1), A/Ma, A/GPa, A/T, E-6%",Float,Structure,0.1% SI,,temperature dependence of LATA
+dcdt,11,temperature dependence of LATC,"(dl/dT)/l, A/Ma, A/GPa, A/T, E-6%",Float,Structure,0.1% SI,m/Pa,temperature dependence of LATC
+creshe,10,resistivity at 4.2 K for single crystal for J//c-axis,"uOhm.cm, mOhm.cm, m.ohm.cm, mohmcm",Float,Normal state property,0.1% SI,T,resistivity at 4.2K for single crystal for J//c-axis
+dbdp,8,pressure dependence of LATB,"E-3 /GPa, %/GPa, (dL/L)/GPa",Float,Structure,0.1% SI,A,pressure dependence of LATB
+thc300p,8,thermal conductivity at 300 K for heat flow//ab-plane,"W/m.K, W/K.m",Float,Thermal property,0.1% SI,W/m.K,thermal conductivity at 300K for heat flow//ab-plane
+rh300p,8,"Hall coefficient at 300 K for single, H//ab-plane","cm3/C, m3/C",Double,Normal state property,0.1% SI,W/m.K,"Hall coefficient at 300K for single, H//ab-plane"
+ghe,7,shear modulus at 4.2 K ,GPa,Float,Mechanical property,0.1% SI,,shear modulus at 4.2K
+thc300n,7,thermal conductivity at 300 K for heat flow//c-axis,W/m.K,Float,Thermal property,0.1% SI,ohm.m,thermal conductivity at 300K for heat flow//c-axis
+yehe,6,Young's modulus at 4.2 K ,GPa,Double,Mechanical property,0.1% SI,ohm.m,Young's modulus at 4.2K
+pohe,6,Poisson ratio at 4.2 K ,#N/A,Float,Mechanical property,0.1% SI,T,Poisson ratio at 4.2K
+dbdt,5,temperature dependence of LATB,A/GPa,Float,Structure,0.1% SI,m/s,temperature dependence of LATB
+svhe,2,sound velocity at 4.2 K ,#N/A,Double,Mechanical property,0.1% SI,,sound velocity at 4.2K
