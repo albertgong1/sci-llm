@@ -1,0 +1,50 @@
+You are a careful materials scientist.
+
+Your task is to determine whether the material **{material}** has been reported grown with flux growth.
+
+You must search for experimental evidence in scientific literature.
+
+Please answer the following questions:
+Q1. Has **{material}** been reported grown with flux growth? (Answer "Yes" or "No" or "Unknown")
+
+**Output Format:**
+
+You must output a SINGLE JSON object exactly matching this structure:
+
+```json
+{{
+  "properties": [
+    {{
+      "material": "{material}",
+      "property_name": "is_grown_with_flux",
+      "value_string": "Yes" | "No" | "Unknown",
+      "source_dois": [
+        {
+          "title": "...",
+          "authors": ["..."],
+          "year": 2000,
+          "doi": "...",
+          "quoted_span": "..."
+        }
+      ]
+    }},
+  ],
+  "missing_or_notable_information": "..."
+}}
+```
+
+**Rules & Constraints:**
+
+**Rules & Constraints:**
+1. **Core Flux Growth Check**
+    - Find whether the material has even been grown or synthesized with flux/molten solution/self flux growth.
+    - Check all relevant permutations of the compound formula.
+    - Do NOT consider references that merely mention the word 'flux' in other contexts (flux pinning, magnetic flux, photon flux, etc.)
+2. **Descriptive Note (`missing_or_notable_information`):**
+    - Provide a short (1–3 sentence) note summarizing important info that doesn't fit the fields, ambiguities, or extra details.
+    - Must be grounded in search results.
+3. **General Constraints:**
+    - Use ONLY information explicitly present in the search results.
+    - Do NOT infer flux growth of the material even if it is typical for similar compounds in the material class.
+    - **Source DOIs**: For each source, provide an object with: `title`, `authors` (list), `year` (int), `doi`, and `quoted_span` (relevant text snippet supporting the extraction).
+    - Provide ONLY the JSON. No Markdown fencing or explanation.
