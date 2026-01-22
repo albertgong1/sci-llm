@@ -299,7 +299,8 @@ async def process_paper(
                 row_series["id"] = f"prop_{property_counter:03d}"
                 row_series["refno"] = refno
                 row_series["paper_pdf_path"] = str(paper_path)
-                row_series["model_name"] = model_name
+                row_series["agent"] = "zeroshot"
+                row_series["model"] = model_name
                 row_series["validated"] = None
                 row_series["validator_name"] = ""
                 row_series["validation_date"] = ""
@@ -350,16 +351,20 @@ async def extract_properties(args: argparse.Namespace) -> None:
     # Default ordering is by filename
     refnos_ordering: list[str] = [pdf.stem for pdf in pdf_files]
     if args.harbor_task_ordering_registry_path is not None:
-        logger.info(f"Loading harbor task ordering from {args.harbor_task_ordering_registry_path}")
+        logger.info(
+            f"Loading harbor task ordering from {args.harbor_task_ordering_registry_path}"
+        )
         with open(args.harbor_task_ordering_registry_path, "r") as f:
             harbor_task_ordering = json.load(f)
-        
+
         # Load the refnos from harbor_task_ordering[0]["tasks"][:]["name"]
-        refnos_ordering = [task["name"].strip().upper() for task in harbor_task_ordering[0]["tasks"]]
+        refnos_ordering = [
+            task["name"].strip().upper() for task in harbor_task_ordering[0]["tasks"]
+        ]
 
     if args.max_num_papers is not None:
-        refnos_ordering = refnos_ordering[:args.max_num_papers]
-    
+        refnos_ordering = refnos_ordering[: args.max_num_papers]
+
     # Reorder the pdf_files based on the refnos_ordering
     reordered_pdf_files = []
     for refno in refnos_ordering:

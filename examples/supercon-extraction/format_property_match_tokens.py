@@ -1,6 +1,5 @@
 """Script to format token usage for the property matching step."""
-import sys
-from pathlib import Path
+
 from argparse import ArgumentParser
 import pandas as pd
 from tabulate import tabulate
@@ -8,9 +7,9 @@ import pbench
 
 # Add src to path so we can import llm_utils
 # Resolves to: .../sci-llm/src
-sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
+# sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
 
-from llm_utils import MODEL_PRICING
+from llm_utils import calculate_cost
 
 parser = ArgumentParser(description="Format property match tokens")
 parser = pbench.add_base_args(parser)
@@ -50,47 +49,17 @@ df_token_usage = (
 # print as table using the tabulate library with 'github' format
 print(tabulate(df_token_usage, headers="keys", tablefmt="github", showindex=False))
 
-# Calculate cost per request for each model
-def calculate_cost(row: pd.Series) -> float | None:
-    """Calculate dollar cost per request based on token usage.
-
-    Mapping:
-    - prompt_tokens -> input pricing (per 1M tokens)
-    - completion_tokens -> output pricing (per 1M tokens)
-    - thinking_tokens -> output pricing (per 1M tokens)
-    """
-    model = row["model"]
-
-    if model not in MODEL_PRICING:
-        return None
-
-    prices = MODEL_PRICING[model]
-    if prices is None or not isinstance(prices, dict):
-        return None
-
-    input_price = prices.get("input")  # USD per 1M tokens
-    cache_price = prices.get("context_cache_read") or prices.get("cached_input")  # USD per 1M tokens
-    output_price = prices.get("output")  # USD per 1M tokens
-
-    if input_price is None or output_price is None:
-        return None
-
-    # Calculate cost (divide by 1M since prices are per 1M tokens)
-    prompt_cost = (
-        (row["usage.prompt_tokens"] - row["usage.cached_tokens"])
-        * input_price
-        / 1_000_000
-    )
-    cache_cost = row["usage.cached_tokens"] * cache_price / 1_000_000
-    thinking_cost = row["usage.thinking_tokens"] * output_price / 1_000_000
-    completion_cost = row["usage.completion_tokens"] * output_price / 1_000_000
-
-    total_cost = prompt_cost + cache_cost + thinking_cost + completion_cost
-    return total_cost
-
-
 # Add cost column to df
-df["cost_usd"] = df.apply(calculate_cost, axis=1)
+df["cost_usd"] = df.apply(
+    lambda row: calculate_cost(
+        model=row["model"],
+        prompt_tokens=row["usage.prompt_tokens"],
+        completion_tokens=row["usage.completion_tokens"],
+        cached_tokens=row["usage.cached_tokens"],
+        thinking_tokens=row["usage.thinking_tokens"],
+    ),
+    axis=1,
+)
 
 # Compute cost statistics by model
 mean_sem_cost = lambda x: f"${x.mean():.6f} ± ${x.sem():.6f}"  # noqa: E731

@@ -61,36 +61,35 @@ else:
 
 embeddings_dir = args.output_dir / "pred_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
-
-for (agent, model), group in df.groupby(["agent", "model"]):
-    for refno in group["refno"].unique():
-        save_path = (
-            embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
+for (agent, model, refno), group in df.groupby(
+    ["agent", "model", "refno"], dropna=False
+):
+    save_path = embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
+    if save_path.exists() and not force:
+        logger.info(
+            f"Embeddings already exist for {agent=} {model=} {refno=}, skipping..."
         )
-        if save_path.exists() and not force:
-            logger.info(
-                f"Embeddings already exist for {agent=} {model=} {refno=}, skipping..."
-            )
-            continue
+        continue
 
-        print(f"Generating embeddings for {agent=} {model=} {refno=}...")
-        preds_df = group[group["refno"] == refno]
-        property_names = preds_df["property_name"].dropna().tolist()
-        # get unique property names
-        unique_property_names = list(set(property_names))
-        # generate embeddings
-        embeddings = generate_embeddings(unique_property_names)
-        # save embeddings to parquet
-        assert len(preds_df["refno"].unique()) == 1, "Expected only one refno per file"
-        refno = preds_df["refno"].unique()[0]
-        embeddings_df = pd.DataFrame(
-            {
-                "refno": [refno] * len(unique_property_names),
-                "property_name": unique_property_names,
-                "embedding": embeddings,
-                "agent": [agent] * len(unique_property_names),
-                "model": [model] * len(unique_property_names),
-            }
-        )
-        embeddings_df.to_parquet(save_path)
-        print(f"Saved embeddings to {save_path} with {len(embeddings_df)} rows")
+    print(f"Generating embeddings for {agent=} {model=} {refno=}...")
+    # import pdb; pdb.set_trace()
+    preds_df = group[group["refno"] == refno]
+    property_names = preds_df["property_name"].dropna().tolist()
+    # get unique property names
+    unique_property_names = list(set(property_names))
+    # generate embeddings
+    embeddings = generate_embeddings(unique_property_names)
+    # save embeddings to parquet
+    assert len(preds_df["refno"].unique()) == 1, "Expected only one refno per file"
+    refno = preds_df["refno"].unique()[0]
+    embeddings_df = pd.DataFrame(
+        {
+            "refno": [refno] * len(unique_property_names),
+            "property_name": unique_property_names,
+            "embedding": embeddings,
+            "agent": [agent] * len(unique_property_names),
+            "model": [model] * len(unique_property_names),
+        }
+    )
+    embeddings_df.to_parquet(save_path)
+    print(f"Saved embeddings to {save_path} with {len(embeddings_df)} rows")

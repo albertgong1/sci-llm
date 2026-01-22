@@ -1,7 +1,9 @@
-# SuperCon Property Extraction (Harbor)
+# Harbor Task Generation (Harbor)
 
-> Harbor tasks can be run with `gemini-cli` or `claude-code` agents. Make sure the repo
-> root `.env` has your API keys.
+> Domain-agnostic task generation + Harbor runner. Use any dataset that follows the
+> `refno` + `properties` list schema and any template under your workspace.
+> Harbor tasks can be run with `gemini-cli`, `claude-code`, `openhands`, etc. Make
+> sure the repo root `.env` has your API keys.
 
 Workspace assets (templates, PDFs, outputs) live under
 `examples/harbor-workspace/`. All commands below default to that workspace; pass
@@ -28,7 +30,17 @@ Claude Code also supports `CLAUDE_CODE_OAUTH_TOKEN=...`.
 
 PDF corpus lives at `examples/harbor-workspace/data/Paper_DB/<refno>.pdf` (15 PDFs).
 
-## Build Harbor Tasks (supercon-mini-v2)
+## Domains and Datasets
+The domain is defined by the dataset + template. The dataset must contain rows with:
+- `refno`: PDF id (matches `<refno>.pdf`)
+- `properties`: list of dicts with `property_name`, `material_or_system`, `value_string`
+
+For example:
+- Superconductor extraction uses `kilian-group/supercon-mini-v2`
+- Biosurfactants extraction uses a different template and dataset
+- Precedent search uses a different template and scoring logic
+
+## Build Harbor Tasks (example: supercon-mini-v2)
 
 Templates live in `examples/harbor-workspace/`:
 - `ground-template` (default free-form)
@@ -37,6 +49,7 @@ Templates live in `examples/harbor-workspace/`:
 Build tasks for all properties with the default template (no task alias needed):
 ```bash
 uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --gt-hf-repo kilian-group/supercon-mini-v2 --gt-hf-split full \
   --write-job-config --force
 ```
 Outputs go to `examples/harbor-workspace/out/harbor/supercon-mini-v2/ground-template/`
@@ -55,6 +68,20 @@ Build a single paper while iterating:
 ```bash
 uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
   --refno PR05001178 --write-job-config --force
+```
+
+Build tasks without scoring (PDF-only, no dataset):
+```bash
+uv run python src/harbor-task-gen/prepare_harbor_tasks.py \
+  --no-score --write-job-config --force
+```
+This writes tasks under `out/harbor/no-score/<template>/`. Run with verification
+disabled (or use the generated job.yaml, which disables verification):
+```bash
+uv run python src/harbor-task-gen/run_harbor.py jobs start \
+  -c out/harbor/no-score/ground-template/job.yaml \
+  -a gemini-cli -m gemini/gemini-2.5-flash \
+  --disable-verification
 ```
 
 ## Publish Tasks to HF (optional)
@@ -293,3 +320,82 @@ The verifier entrypoint (`tests/test.sh`) copies `/app/output/` into
 `/logs/verifier/app_output/` **even when the verifier fails**, so agent-written artifacts
 survive Harbor's container cleanup. Rebuild tasks with `prepare_harbor_tasks.py --force`
 to apply template changes.
+
+## Flag Reference
+
+### prepare_harbor_tasks.py
+- `--gt-hf-repo`: HF dataset repo id (required unless `--no-score`).
+- `--gt-hf-split`: HF dataset split (required unless `--no-score`).
+- `--gt-hf-revision`: HF dataset revision (default: `main`).
+- `--no-score`: Build tasks from PDFs only; skip verifier/solution; use `--disable-verification` at run time.
+- `--workspace`: Workspace root (default: `examples/harbor-workspace`).
+- `--template`: Template folder under workspace (default: `ground-template`).
+- `--task`: Task alias to filter properties (e.g., `tc`); affects output path.
+- `--pdf-dir`: Directory containing `<refno>.pdf` (default: `<workspace>/data/Paper_DB`).
+- `--output-dir`: Output root (default: `<workspace>/out/harbor/<dataset>`).
+- `--limit`: Cap number of tasks built.
+- `--refno`: Only build specific refno(s) (repeatable).
+- `--force`: Delete/rebuild existing output directory.
+- `--write-job-config`: Emit `job.yaml` pointing at generated tasks.
+- `--upload-hf`: Upload tasks to HF and write registry.json.
+- `--hf-repo-id`: HF repo id (e.g., `ORG/supercon-harbor-tasks`).
+- `--hf-repo-type`: HF repo type (`dataset`, `model`, `space`; default: `dataset`).
+- `--hf-path-in-repo`: Path inside the repo for tasks (default: `tasks`).
+- `--hf-registry-path`: Registry JSON path inside repo (default: `registry.json`).
+- `--hf-dataset-name`: Dataset name stored in registry.json (default: repo id).
+- `--hf-dataset-version`: Dataset version stored in registry.json (default: `head`).
+- `--hf-description`: Dataset description stored in registry.json.
+- `--hf-private`: Create repo as private if it does not exist.
+- `--hf-public`: Create repo as public if it does not exist.
+- `--hf-create/--no-hf-create`: Toggle repo creation (default: create).
+- `--hf-no-input`: Disable interactive HF prompts.
+- `--hf-tasks-root`: Override tasks root to upload (default: generated tasks dir).
+
+### run_harbor.py wrapper flags (pass-through to Harbor otherwise)
+- `--workspace`: Workspace root (default: `examples/harbor-workspace`).
+- `--modal`: Shortcut for `--env modal` (jobs) / `--environment-type modal` (trials) and Modal defaults.
+- `--agent-setup-timeout-sec`: Override Harbor agent setup timeout (seconds).
+- `--hf-tasks-repo`: HF tasks repo id (enables HF task rewrite).
+- `--hf-repo-type`: HF repo type for tasks (`dataset`, `model`, `space`).
+- `--hf-tasks-dataset`: Dataset name in registry.json (default: repo id).
+- `--hf-tasks-version`: Dataset version in registry.json (default: `head`).
+- `--hf-registry-url`: Explicit registry.json URL (raw HF URL).
+- `--hf-registry-path`: Path to registry.json inside repo (default: `registry.json`).
+- `--hf-task`: Task id to run from HF (trials only).
+- `--hf-task-path`: Full path to a task inside the repo (trials only).
+- `--hf-tasks-path`: Root tasks folder inside repo (default: `tasks`).
+- `--hf-task-commit`: Git commit/revision for HF tasks (optional).
+- `--compile-run`: Compile latest run after Harbor finishes.
+- `--compile-out-dir`: Output root for bundles (default: `<workspace>/out/harbor-runs`).
+- `--compile-name`: Override bundle name (default: run dir name).
+- `--compile-force`: Overwrite bundle directory if it exists.
+- `--push-run-to-hf`: Upload compiled bundle to HF after Harbor finishes.
+- `--hf-runs-repo`: HF repo id for run bundles (required with `--push-run-to-hf`).
+- `--hf-runs-repo-type`: Repo type for bundles (`dataset`, `model`, `space`).
+- `--hf-runs-path-in-repo`: Destination path inside the repo (default: `runs/<run-name>`).
+- `--hf-runs-private`: Create repo as private if missing.
+- `--hf-runs-public`: Create repo as public if missing.
+- `--hf-runs-write-root-readme`: Create README.md at repo root if missing.
+- `--hf-runs-force-root-readme`: Overwrite repo root README.md.
+
+### run_harbor.py utilities
+`compile-run` (standalone command):
+- `--workspace`: Workspace root.
+- `--run-dir`: Run directory (jobs/<name> or trials/<name>); default: latest.
+- `--out-dir`: Bundle output root (default: `<workspace>/out/harbor-runs`).
+- `--name`: Override bundle folder name.
+- `--force`: Overwrite bundle directory if it exists.
+
+`push-run-to-hf` (standalone command):
+- `--workspace`: Workspace root.
+- `--repo-id`: HF repo id (required).
+- `--repo-type`: Repo type (`dataset`, `model`, `space`).
+- `--run-dir`: Run directory (default: latest).
+- `--bundle-dir`: Already compiled bundle; skips compile.
+- `--out-dir`: Bundle output root (default: `<workspace>/out/harbor-runs`).
+- `--path-in-repo`: Destination path inside repo (default: `runs/<run-name>`).
+- `--private`: Create repo as private if missing.
+- `--public`: Create repo as public if missing.
+- `--write-root-readme`: Create README.md at repo root if missing.
+- `--force-root-readme`: Overwrite repo root README.md.
+- `--force`: Overwrite local bundle directory if it exists.

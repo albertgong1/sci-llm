@@ -1,3 +1,5 @@
+{paper_at_command}
+
 You are a careful condensed-matter physicist and materials scientist.
 
 Your task is to determine whether the material **{material}** has been reported to be superconducting, and to extract detailed properties about its phase behavior and related materials.

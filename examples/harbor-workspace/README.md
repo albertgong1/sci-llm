@@ -12,6 +12,7 @@ PDFs, rubrics, and all run outputs live here. The library code lives in
 - `jobs/`: Harbor job runs (created by Harbor)
 - `trials/`: Harbor trial runs (created by Harbor)
 - `collect_harbor_results.py`: optional helper to convert trial verifier outputs
+- `score_harbor_results.py`: offline scoring helper for no-score runs
 
 ## Using the library
 All CLI helpers default to this workspace. From the repo root:
@@ -22,6 +23,16 @@ uv run python src/harbor-task-gen/run_harbor.py jobs start \
   -a gemini-cli -m gemini/gemini-2.5-flash --modal --n-concurrent 4
 ```
 To use a different workspace, pass `--workspace /path/to/workspace` to the scripts.
+
+## Scoring later (no-score runs)
+If you built tasks with `--no-score`, Harbor will skip verification. After the run,
+rebuild expected.json from the dataset and score locally:
+```bash
+uv run python examples/harbor-workspace/score_harbor_results.py \
+  --gt-hf-repo kilian-group/supercon-mini-v2 --gt-hf-split full
+```
+This writes `expected.json`, `reward.txt`, and `details.json` under each trial's
+`verifier/` folder so `collect_harbor_results.py` can consume the outputs.
 
 ## Cleaning the workspace
 Remove generated outputs (jobs/trials/out/logs) while keeping templates and data:

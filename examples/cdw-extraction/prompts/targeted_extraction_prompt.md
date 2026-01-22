@@ -1,3 +1,5 @@
+{paper_at_command}
+
 # Charge Density Wave Property Extraction Task
 
 You are a STRICT PHYSICAL PROPERTY EXTRACTION ENGINE.
@@ -192,7 +194,7 @@ Every property MUST include:
 - location.source_type (text, figure, caption, table)
 - location.evidence (exact quote --- IT MUST EXACTLY MATCH THE PAPER)
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT (WRITE TO {predictions_path})
 
 Return a SINGLE valid JSON payload containing an array of properties. Below is the full schema.
 

@@ -9,6 +9,7 @@ from json import JSONDecoder
 from pathlib import Path
 from typing import Any
 import pandas as pd
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,8 @@ HF_DATASET_NAME = "kilian-group/supercon-extraction"
 HF_DATASET_REVISION = "main"  # "v0.0.0"
 HF_DATASET_SPLIT = "full"
 GT_EMBEDDINGS_PATH = Path("scoring/gt_property_name_gemini-embedding-001.json")
+
+RUBRIC_PATH = Path("scoring") / "rubric_4.csv"
 
 # Crystal structure symmetry mapping
 CRYSTAL_SYMMETRY: dict[int, str] = {
@@ -240,6 +243,49 @@ def _load_trial_predictions(
     return None
 
 
+def count_trials_per_agent_model(jobs_dir: Path) -> pd.DataFrame:
+    """Count the number of trials per agent/model combination in a Harbor jobs directory.
+
+    Args:
+        jobs_dir: Path to the Harbor jobs directory containing batch subdirectories
+
+    Returns:
+        DataFrame with columns: agent, model, num_trials
+
+    """
+    jobs_dir = jobs_dir.resolve()
+    if not jobs_dir.exists():
+        raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
+
+    counts: dict[tuple[str | None, str | None], int] = {}
+    for batch_dir in sorted(jobs_dir.iterdir()):
+        if not batch_dir.is_dir():
+            continue
+        # get the agent and model name from the batch_dir config.json
+        agent, model = None, None
+        config_path = batch_dir / "config.json"
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text())
+                if config.get("agents"):
+                    agent = config["agents"][0].get("name")
+                    model = config["agents"][0].get("model_name")
+            except Exception:
+                pass
+
+        key = (agent, model)
+        for trial_dir in sorted(batch_dir.iterdir()):
+            if not trial_dir.is_dir():
+                continue
+            counts[key] = counts.get(key, 0) + 1
+
+    rows = [
+        {"agent": agent, "model": model, "num_trials": count}
+        for (agent, model), count in counts.items()
+    ]
+    return pd.DataFrame(rows)
+
+
 def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     """Load predictions from all trials in a Harbor jobs directory.
 
@@ -271,6 +317,7 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
 
     dfs = []
+    refnos = []
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
@@ -295,9 +342,14 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             if predictions is None:
                 logger.warning(f"No valid predictions found in trial: {trial_dir}")
                 continue
-            if "properties" not in str(predictions):
+            if "properties" not in predictions:
                 logger.warning(
                     f"'properties' key not found in predictions for trial: {trial_dir}"
+                )
+                continue
+            if len(predictions["properties"]) == 0:
+                logger.warning(
+                    f"No properties found in predictions for trial: {trial_dir}"
                 )
                 continue
             # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
@@ -318,7 +370,36 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             df_properties = pd.json_normalize(df["properties"])
             df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
             dfs.append(df)
+            refnos.append(refno)
     if not dfs:
         raise ValueError(f"No valid trials found in jobs directory: {jobs_dir}")
     df = pd.concat(dfs, ignore_index=True)
     return df
+
+
+def sem(x: list, n: int) -> float:
+    """Standard error of the mean.
+
+    Args:
+        x: List of sample values
+        n: Total number of samples (including missing)
+
+    Returns:
+        Standard error of the mean
+
+    """
+    return np.std(np.concatenate((x, np.zeros(n - len(x)))), ddof=1) / (n**0.5)
+
+
+def mean_sem_with_n(x: list, n: int) -> str:
+    """Format mean ± SEM as a string.
+
+    Args:
+        x: List of sample values
+        n: Total number of samples (including missing)
+
+    Returns:
+        Formatted string "mean ± sem"
+
+    """
+    return f"{sum(x) / n:.2f} ± {sem(x, n):.2f}"
