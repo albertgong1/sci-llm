@@ -31,6 +31,13 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         default=None,
         help="Jobs directory for Harbor runs (default: jobs)",
     )
+    parser.add_argument(
+        "--preds_dirname",
+        "-pd",
+        type=str,
+        default="preds",
+        help="Directory name for predictions (default: preds)",
+    )
 
     # Dataset args
     parser.add_argument(
