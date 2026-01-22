@@ -243,6 +243,49 @@ def _load_trial_predictions(
     return None
 
 
+def count_trials_per_agent_model(jobs_dir: Path) -> pd.DataFrame:
+    """Count the number of trials per agent/model combination in a Harbor jobs directory.
+
+    Args:
+        jobs_dir: Path to the Harbor jobs directory containing batch subdirectories
+
+    Returns:
+        DataFrame with columns: agent, model, num_trials
+
+    """
+    jobs_dir = jobs_dir.resolve()
+    if not jobs_dir.exists():
+        raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
+
+    counts: dict[tuple[str | None, str | None], int] = {}
+    for batch_dir in sorted(jobs_dir.iterdir()):
+        if not batch_dir.is_dir():
+            continue
+        # get the agent and model name from the batch_dir config.json
+        agent, model = None, None
+        config_path = batch_dir / "config.json"
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text())
+                if config.get("agents"):
+                    agent = config["agents"][0].get("name")
+                    model = config["agents"][0].get("model_name")
+            except Exception:
+                pass
+
+        key = (agent, model)
+        for trial_dir in sorted(batch_dir.iterdir()):
+            if not trial_dir.is_dir():
+                continue
+            counts[key] = counts.get(key, 0) + 1
+
+    rows = [
+        {"agent": agent, "model": model, "num_trials": count}
+        for (agent, model), count in counts.items()
+    ]
+    return pd.DataFrame(rows)
+
+
 def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     """Load predictions from all trials in a Harbor jobs directory.
 
@@ -346,3 +389,17 @@ def sem(x: list, n: int) -> float:
 
     """
     return np.std(np.concatenate((x, np.zeros(n - len(x)))), ddof=1) / (n**0.5)
+
+
+def mean_sem_with_n(x: list, n: int) -> str:
+    """Format mean ± SEM as a string.
+
+    Args:
+        x: List of sample values
+        n: Total number of samples (including missing)
+
+    Returns:
+        Formatted string "mean ± sem"
+
+    """
+    return f"{sum(x) / n:.2f} ± {sem(x, n):.2f}"

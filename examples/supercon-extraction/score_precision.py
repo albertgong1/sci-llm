@@ -21,7 +21,7 @@ import logging
 # pbench imports
 import pbench
 from pbench_eval.metrics import compute_precision_per_material_property
-from utils import RUBRIC_PATH, sem
+from utils import RUBRIC_PATH, count_trials_per_agent_model, mean_sem_with_n
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,14 @@ pbench.setup_logging(args.log_level)
 # model used for property matching
 model_name = args.model_name
 
-# TODO: figure out how to count NUM_REFNOS dynamically
-NUM_REFNOS = 10
+# Count number of trials (refnos) per agent/model from jobs_dir
+if args.jobs_dir is None:
+    raise ValueError("--jobs_dir is required to count trials per agent/model")
+trials_df = count_trials_per_agent_model(args.jobs_dir)
+# Create lookup dict: (agent, model) -> num_trials
+trials_lookup: dict[tuple[str, str], int] = {
+    (row["agent"], row["model"]): row["num_trials"] for _, row in trials_df.iterrows()
+}
 
 # Load all CSV files from output_dir/pred_matches
 pred_matches_dir = args.output_dir / "pred_matches"
@@ -128,16 +134,29 @@ acc_by_refno = (
     .reset_index()
 )
 
-mean_sem = lambda x: f"{x.sum() / NUM_REFNOS:.2f} ± {sem(x, NUM_REFNOS):.2f}"  # noqa: E731
+# Merge trial counts into acc_by_refno for per-group normalization
+acc_by_refno["num_trials"] = acc_by_refno.apply(
+    lambda row: trials_lookup.get((row["agent"], row["model"]), 1), axis=1
+)
+
 acc = (
     acc_by_refno.groupby(["agent", "model"])
-    .agg(
-        avg_precision=pd.NamedAgg(column="precision_score", aggfunc=mean_sem),
-        avg_property_matches=pd.NamedAgg(column="property_matches", aggfunc=mean_sem),
-        avg_property_material_matches=pd.NamedAgg(
-            column="property_material_matches", aggfunc=mean_sem
+    .apply(
+        lambda g: pd.Series(
+            {
+                "avg_precision": mean_sem_with_n(
+                    g["precision_score"].tolist(), g["num_trials"].iloc[0]
+                ),
+                "avg_property_matches": mean_sem_with_n(
+                    g["property_matches"].tolist(), g["num_trials"].iloc[0]
+                ),
+                "avg_property_material_matches": mean_sem_with_n(
+                    g["property_material_matches"].tolist(), g["num_trials"].iloc[0]
+                ),
+                "successful_count": len(g),
+            }
         ),
-        successful_count=pd.NamedAgg(column="model", aggfunc="count"),
+        include_groups=False,
     )
     .reset_index()
 )
