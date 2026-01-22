@@ -184,13 +184,11 @@ def compute_precision_per_material_property(
 
     """
     # Group by predicted material and calculate precision scores
-    grouped = df.groupby(
-        ["refno", "agent", "model", "material_or_system_pred", "property_name_pred"]
-    )
+    grouped = df.groupby(["refno", "agent", "model", "id_pred"])
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 
-    for (refno, agent, model, material_pred, property_pred), group in grouped:
+    for (refno, agent, model, id_pred), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -200,11 +198,12 @@ def compute_precision_per_material_property(
             # - The materials must match using scorer_pymatgen
             if (
                 row["is_match"]
-                and pd.notna(material_pred)
+                and pd.notna(row["material_or_system_pred"])
                 and pd.notna(row["material_or_system_gt"])
             ):
                 if scorer_pymatgen(
-                    str(material_pred), str(row["material_or_system_gt"])
+                    str(row["material_or_system_pred"]),
+                    str(row["material_or_system_gt"]),
                 ):
                     matching_rows.append(row)
 
@@ -214,6 +213,14 @@ def compute_precision_per_material_property(
             # No matches, score is 0
             precision_score = 0.0
         else:
+            assert group["material_or_system_pred"].nunique() == 1, (
+                "Expected only one unique predicted material per group, "
+                f"but got: {group['material_or_system_pred'].unique()}"
+            )
+            assert group["property_name_pred"].nunique() == 1, (
+                "Expected only one unique predicted property name per group, "
+                f"but got: {group['property_name_pred'].unique()}"
+            )
             # At least one match, calculate scores and take max
             scores = []
 
@@ -243,8 +250,9 @@ def compute_precision_per_material_property(
                 "refno": refno,
                 "agent": agent,
                 "model": model,
-                "material_or_system_pred": material_pred,
-                "property_name_pred": property_pred,
+                "id_pred": id_pred,
+                "material_or_system_pred": group["material_or_system_pred"].iloc[0],
+                "property_name_pred": group["property_name_pred"].iloc[0],
                 "value_string_pred": ", ".join(
                     list(
                         set(

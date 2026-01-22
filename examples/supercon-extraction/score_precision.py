@@ -35,15 +35,6 @@ pbench.setup_logging(args.log_level)
 # model used for property matching
 model_name = args.model_name
 
-# Count number of trials (refnos) per agent/model from jobs_dir
-if args.jobs_dir is None:
-    raise ValueError("--jobs_dir is required to count trials per agent/model")
-trials_df = count_trials_per_agent_model(args.jobs_dir)
-# Create lookup dict: (agent, model) -> num_trials
-trials_lookup: dict[tuple[str, str], int] = {
-    (row["agent"], row["model"]): row["num_trials"] for _, row in trials_df.iterrows()
-}
-
 # Load all CSV files from output_dir/pred_matches
 pred_matches_dir = args.output_dir / "pred_matches"
 
@@ -75,9 +66,25 @@ if False:
         (df_matches["agent"] == "gemini-cli")
         & (df_matches["model"] == "gemini/gemini-3-pro-preview")
     ]
+if False:
+    # only include rows where batch starts with 'bn1'
+    df_matches = df_matches[df_matches["batch"].str.startswith("bn1")]
 logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
+
+# If jobs_dir was not provided, count unique refnos per agent/model from the data
+if args.jobs_dir is None:
+    trials_lookup = df_matches.groupby(["agent", "model"])["refno"].nunique().to_dict()
+else:
+    # Count number of trials (refnos) per agent/model
+    # trials_lookup will be populated after df_matches is loaded if jobs_dir is not provided
+    trials_lookup: dict[tuple[str, str], int] = {}
+    trials_df = count_trials_per_agent_model(args.jobs_dir)
+    trials_lookup = {
+        (row["agent"], row["model"]): row["num_trials"]
+        for _, row in trials_df.iterrows()
+    }
 
 # Load rubric
 logger.info(f"Loading rubric from {RUBRIC_PATH}")
@@ -130,6 +137,7 @@ acc_by_refno = (
         property_material_matches=pd.NamedAgg(
             column="num_property_material_matches", aggfunc=counta
         ),
+        num_pred=pd.NamedAgg(column="id_pred", aggfunc="size"),
     )
     .reset_index()
 )
@@ -154,6 +162,9 @@ acc = (
                     g["property_material_matches"].tolist(), g["num_trials"].iloc[0]
                 ),
                 "successful_count": len(g),
+                "avg_num_pred": mean_sem_with_n(
+                    g["num_pred"].tolist(), g["num_trials"].iloc[0]
+                ),
             }
         ),
         include_groups=False,
