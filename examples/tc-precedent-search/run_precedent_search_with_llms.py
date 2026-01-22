@@ -77,10 +77,10 @@ def extract_predictions_from_json(json_data: dict, material: str) -> dict:
     """
     result = {
         "material": material,
-        "is_superconducting": None,
+        "is_superconducting": None,  # "Yes", "No", or "Unknown"
         "tc_values": [],
         "tcn_values": [],
-        "source_dois": [],
+        "sources": [],  # List of source objects with title, authors, year, doi, quoted_span
         "superconductors_mentioned": [],
         "electronic_or_magnetic_phases": [],
         "missing_or_notable_information": None,
@@ -90,19 +90,19 @@ def extract_predictions_from_json(json_data: dict, material: str) -> dict:
     for prop in properties:
         prop_name = prop.get("property_name", "")
         value = prop.get("value_string", "")
-        dois = prop.get("source_dois", [])
+        sources = prop.get("source_dois", [])
 
         if prop_name == "is_superconducting":
             result["is_superconducting"] = value
-            result["source_dois"].extend(dois)
+            result["sources"].extend(sources)
         elif prop_name == "tc":
             if value:
                 result["tc_values"].append(value)
-            result["source_dois"].extend(dois)
+            result["sources"].extend(sources)
         elif prop_name == "tcn":
             if value:
                 result["tcn_values"].append(value)
-            result["source_dois"].extend(dois)
+            result["sources"].extend(sources)
 
     # Extract other fields
     result["superconductors_mentioned"] = json_data.get("superconductors_mentioned", [])
@@ -113,8 +113,15 @@ def extract_predictions_from_json(json_data: dict, material: str) -> dict:
         "missing_or_notable_information", ""
     )
 
-    # Deduplicate DOIs
-    result["source_dois"] = list(set(result["source_dois"]))
+    # Deduplicate sources by DOI
+    seen_dois = set()
+    unique_sources = []
+    for source in result["sources"]:
+        doi = source.get("doi") if isinstance(source, dict) else source
+        if doi and doi not in seen_dois:
+            seen_dois.add(doi)
+            unique_sources.append(source)
+    result["sources"] = unique_sources
 
     return result
 
@@ -148,12 +155,12 @@ async def process_material(
         "is_superconducting": None,
         "tc_values": None,
         "tcn_values": None,
-        "source_dois": None,
+        "sources": None,
         "superconductors_mentioned": None,
         "electronic_or_magnetic_phases": None,
         "missing_or_notable_information": None,
         "web_search_queries": None,
-        "web_search_results": None,
+        "web_search_uris": None,
         "raw_response": None,
         "error": None,
     }
@@ -180,7 +187,7 @@ async def process_material(
         result["is_superconducting"] = predictions["is_superconducting"]
         result["tc_values"] = json.dumps(predictions["tc_values"])
         result["tcn_values"] = json.dumps(predictions["tcn_values"])
-        result["source_dois"] = json.dumps(predictions["source_dois"])
+        result["sources"] = json.dumps(predictions["sources"])
         result["superconductors_mentioned"] = json.dumps(
             predictions["superconductors_mentioned"]
         )
@@ -299,12 +306,12 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
         "gt_highest_tc",
         "tcn_values",
         "gt_lowest_tcn",
-        "source_dois",
+        "sources",
         "superconductors_mentioned",
         "electronic_or_magnetic_phases",
         "missing_or_notable_information",
-        "grounding_queries",
-        "grounding_sources",
+        "web_search_queries",
+        "web_search_uris",
         "raw_response",
         "error",
     ]
