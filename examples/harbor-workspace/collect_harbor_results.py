@@ -112,8 +112,27 @@ def main() -> int:
             }
             pbench_records.append(record)
 
+        # Determine output filename with agent/model info if available
+        config_path = trial_dir / "config.json"
+        agent_suffix = ""
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = json.load(f)
+                    agent_config = config.get("agent", {})
+                    agent_name = agent_config.get("name", "unknown")
+                    model_name = agent_config.get("model_name", "unknown")
+                    
+                    # Sanitize model name
+                    if "/" in model_name:
+                        model_name = model_name.split("/")[-1]
+                    
+                    agent_suffix = f"__{agent_name}__{model_name}"
+            except Exception:
+                pass
+
         # Save one JSON per trial
-        out_name = f"{trial_dir.name}.json"
+        out_name = f"{trial_dir.name}{agent_suffix}.json"
         out_path = args.output_dir / out_name
         with open(out_path, "w") as f:
             json.dump(pbench_records, f, indent=2)
