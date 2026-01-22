@@ -1,3 +1,5 @@
+{paper_at_command}
+
 # SuperConductivity Property Extraction Task
 
 You are a STRICT PHYSICAL PROPERTY EXTRACTION ENGINE.
@@ -11,22 +13,6 @@ Missing information rule: If any field or condition is not stated in the
 paper, OMIT the key entirely from the JSON. Do NOT fabricate
 placeholders. EXCEPTION: location.page is REQUIRED and must always be a
 positive integer.
-
-**EXHAUSTIVE COVERAGE / NO SKIPPING (VERY IMPORTANT)**
-
-You MUST:
-- Scan the ENTIRE paper: every page, every section, every table, and every figure/caption.
-- Extract EVERY target property that appears.
-- Include borderline or ambiguous cases instead of skipping them.
-- NOT stop early because you feel "enough" has been extracted.
-- NOT downsample, summarize, or merge distinct entries for brevity.
-
-If a quantity looks like it might be a physical property, TREAT IT AS A PROPERTY and create an entry for it.
-
-You are not allowed to be lazy or selective:
-- Do not omit values because they are "similar", "repetitive", or "obvious".
-- Do not cap the number of properties.
-- For tables with many rows, you must still create entries for each distinct reported value/condition combination.
 
 ## TARGET PROPERTIES FOR THIS PAPER
 
@@ -161,8 +147,9 @@ crystallographic class, magnetic space group):
 **STRUCTURE PROTOTYPE RULES**
 
 If the property is a structural prototype, use:
-property_name = "structure prototype" OR "crystal structure
-type" value_string = full descriptive phrase (e.g.,
+- property_name = "structure prototype" OR "crystal structure
+type"
+- value_string = full descriptive phrase (e.g.,
 "Th7Fe3-type hexagonal structure")
 
 ## LOCATION / GROUNDING (MANDATORY)
@@ -174,17 +161,15 @@ Every property MUST include:
 - location.source_type (text, figure, caption, table)
 - location.evidence (exact quote --- IT MUST EXACTLY MATCH THE PAPER)
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT (WRITE TO {predictions_path})
 
 Return a SINGLE valid JSON payload containing an array of properties. Below is the full schema.
-
 ```json
 {
   "properties": [
     {
       "id": "prop_001",
-      "material_or_system": "...",
-      "sample_label": "...",
+      "material_or_system": "...",  // Fully resolved formula with explicit numerical subscripts only
       "property_name": "...",
       "category": "...",
       "value_string": "...",         // value string from paper
@@ -216,11 +201,41 @@ Return a SINGLE valid JSON payload containing an array of properties. Below is t
 }
 ```
 
-Rules:
-- Keep units inside pred_value (no value_number).
-- location.page is mandatory; all other fields are optional—omit if not stated.
+### Stoichiometric Formula Rules
+
+The `material_or_system` field must contain a **fully resolved chemical formula** with explicit numerical subscripts for every element. No variables, placeholders, or generic notation allowed.
+
+**Required format:**
+- All elements must be standard chemical symbols (e.g., Y, Ba, Cu, O, La, Sr, Bi, Ca)
+- All subscripts must be explicit integers or decimals (e.g., 2, 0.15, 6.93)
+- Parentheses are allowed for groupings (e.g., (Sr,Ca) becomes explicit values)
+
+**Transformations required:**
+
+| Paper notation | → | stoichiometric_formula |
+|----------------|---|------------------------|
+| YBa₂Cu₃O₇₋δ (δ=0.07) | → | YBa2Cu3O6.93 |
+| La₂₋ₓSrₓCuO₄ (x=0.15) | → | La1.85Sr0.15CuO4 |
+| Bi₂Sr₂CaCu₂O₈₊δ (optimal doping) | → | Bi2Sr2CaCu2O8.2 (if δ specified) |
+| YBCO | → | YBa2Cu3O7 (or O6.93 if specific δ given) |
+| RE-123 (RE=Gd) | → | GdBa2Cu3O7 |
+
+**What to exclude (use `generic_formula` field in notes if needed):**
+- Variables: x, y, δ, n
+- Ranges: 0<x<0.3
+- Unresolved placeholders: RE, M, Ln
+- Approximate notation: ~7, 7-δ (without δ value)
+
+**If the paper provides a property for a generic formula without specifying composition:**
+- Set `material_or_system` to the most specific formula extractable
+- Document the generic form in `notes` field
+- If no specific composition is determinable, use the canonical/ideal stoichiometry (e.g., YBa2Cu3O7 for "YBCO" when δ unspecified)
+
+### Other Rules
+- Keep units inside value_string (no separate value_number field).
+- `location.page` is mandatory; all other fields are optional—omit if not stated.
 - Do not invent values.
-- Print only the JSON as your final response.
+- Save this JSON to `{predictions_path}` and print only the JSON as your final response.
 - Never merge values unless they form a tuple (e.g., coordinates).
 
 ## FINAL INSTRUCTIONS

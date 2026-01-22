@@ -53,7 +53,7 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
-  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset supercon-extraction@v0.0.0 \
+  --registry-path out-0121-harbor/targeted-stoichiometric-template/registry.json --dataset supercon-extraction@main \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
@@ -160,6 +160,14 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-template \
     --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split SPLIT --gt-hf-revision main \
     --force --upload-hf --hf-repo-id kilian-group/supercon-extraction-harbor-tasks --hf-repo-type dataset --hf-dataset-version v0.2.0
+```
+
+**Stoichiometric variant of prompt:**
+
+```bash
+uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
+    --pdf-dir data-arxiv/Paper_DB --output-dir out-0121-harbor --workspace . --template targeted-stoichiometric-template \
+    --gt-hf-repo kilian-group/supercon-extraction --gt-hf-split full --gt-hf-revision main --force
 ```
 
 

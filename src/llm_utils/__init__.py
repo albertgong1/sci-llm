@@ -23,11 +23,57 @@ __all__ = [
     "LLMChatResponse",
     "Message",
     "get_llm",
-    "MODEL_PRICING"
+    "MODEL_PRICING",
+    "calculate_cost",
 ]
 
 # Supported LLM servers
 SUPPORTED_SERVERS = ["gemini", "openai"]
+
+
+def calculate_cost(
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cached_tokens: int = 0,
+    thinking_tokens: int = 0,
+) -> float | None:
+    """Calculate dollar cost based on token usage.
+
+    Args:
+        model: Model name (must be in MODEL_PRICING).
+        prompt_tokens: Total prompt/input tokens.
+        completion_tokens: Completion/output tokens.
+        cached_tokens: Cached input tokens (subtracted from prompt_tokens for pricing).
+        thinking_tokens: Thinking/reasoning tokens (priced as output).
+
+    Returns:
+        Total cost in USD, or None if model pricing is unavailable.
+
+    """
+    if model not in MODEL_PRICING:
+        return None
+
+    prices = MODEL_PRICING[model]
+    if prices is None or not isinstance(prices, dict):
+        return None
+
+    input_price = prices.get("input")  # USD per 1M tokens
+    cache_price = prices.get("context_cache_read") or prices.get(
+        "cached_input"
+    )  # USD per 1M tokens
+    output_price = prices.get("output")  # USD per 1M tokens
+
+    if input_price is None or output_price is None:
+        return None
+
+    # Calculate cost (divide by 1M since prices are per 1M tokens)
+    prompt_cost = (prompt_tokens - cached_tokens) * input_price / 1_000_000
+    cache_cost = cached_tokens * (cache_price or 0) / 1_000_000
+    thinking_cost = thinking_tokens * output_price / 1_000_000
+    completion_cost = completion_tokens * output_price / 1_000_000
+
+    return prompt_cost + cache_cost + thinking_cost + completion_cost
 
 
 def get_llm(server: str, model_name: str) -> LLMChat:

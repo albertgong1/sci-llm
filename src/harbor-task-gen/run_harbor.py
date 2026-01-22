@@ -388,15 +388,22 @@ def main() -> int:
     ):
         os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = os.environ["CLAUDE_CODE_API_TOKEN"]
 
+    # Ensure OpenAI/Codex API key is present (no mapping needed, just a check/log if missing?)
+    # Harbor's codex agent reads OPENAI_API_KEY directly.
+
     argv = _rewrite_override_storage(argv)
     argv = _rewrite_gemini_model(argv)
+    argv = _rewrite_openai_model(argv)
+    argv = _rewrite_qwen_model(argv)
+    _apply_qwen_coder_defaults(argv)
     argv = _apply_modal_defaults(argv, modal_requested)
     argv = _rewrite_env_flag(argv)
     argv = _apply_hf_args(argv, hf_args, workspace=workspace)
+
     modal_active = _detect_environment_type(argv) == "modal"
 
     run_roots = _run_roots_from_args(argv, workspace=workspace)
-    pre_run_mtime = _latest_run_mtime(run_roots) if post_run.enabled else None
+    pre_run_mtime = _latest_run_mtime(run_roots)
 
     env = os.environ.copy()
     src_path = str(_repo_root() / "src")
@@ -434,6 +441,10 @@ def main() -> int:
 
     if exit_code != 0:
         _summarize_failure(argv, workspace=workspace)
+    
+    # Try to score external trials (Codex/Terminus) if script exists
+    _maybe_score_external_trials(workspace, run_roots, pre_run_mtime)
+
     if post_run.enabled:
         exit_code = _run_post_actions(
             argv=argv,
@@ -444,6 +455,63 @@ def main() -> int:
         )
 
     return exit_code
+
+
+def _maybe_score_external_trials(
+    workspace: Path, 
+    run_roots: list[Path], 
+    pre_run_mtime: float | None
+) -> None:
+    """Invoke score_harbor_trials.py if present to fix up Codex/Terminus results."""
+    # Assume scoring script is in examples/harbor-workspace
+    # This path construction assumes standard repo layout
+    scoring_script = _repo_root() / "examples" / "harbor-workspace" / "score_harbor_trials.py"
+    if not scoring_script.exists():
+        return
+
+    # Find new trials created during this run
+    new_trials: list[Path] = []
+    
+    # Check roots (usually workspace/trials or workspace/jobs)
+    for root in run_roots:
+        if not root.exists():
+            continue
+            
+        # Helper to decide if a path is new
+        def is_new(p: Path) -> bool:
+            return pre_run_mtime is None or p.stat().st_mtime > pre_run_mtime
+
+        # If searching 'jobs' dir, trials are nested one level deeper (job/trial)
+        if root.name == "jobs":
+            for job_dir in root.iterdir():
+                if not job_dir.is_dir():
+                    continue
+                # If job dir itself is new, scan its children
+                # If job dir is old, check if children are new (e.g. retries?)
+                # Simplification: just scan all children of new/modified jobs
+                if is_new(job_dir):
+                    for trial_dir in job_dir.iterdir():
+                        if trial_dir.is_dir():
+                            new_trials.append(trial_dir)
+        else:
+            # Assuming 'trials' dir, direct children are trials
+            for trial_dir in root.iterdir():
+                if trial_dir.is_dir() and is_new(trial_dir):
+                    new_trials.append(trial_dir)
+    
+    if not new_trials:
+        return
+
+    print(f"Running external scoring verification on {len(new_trials)} new trials...")
+    subprocess.run(
+        [
+            sys.executable, 
+            str(scoring_script), 
+            "--trial-paths", 
+            *[str(p) for p in new_trials]
+        ],
+        check=False,
+    )
 
 
 def _rewrite_override_storage(argv: list[str]) -> list[str]:
@@ -652,6 +720,42 @@ def _rewrite_gemini_model(argv: list[str]) -> list[str]:
             skip_next = True
             continue
 
+        if arg.startswith("--model-name="):
+            rewritten.append(f"--model-name={_fix(arg.split('=', 1)[1])}")
+            continue
+
+        rewritten.append(arg)
+
+    return rewritten
+
+
+def _rewrite_openai_model(argv: list[str]) -> list[str]:
+    """Ensure OpenAI/GPT model names include the provider prefix.
+
+    This is mostly for consistency in logs; Harbor's codex agent strips the prefix anyway.
+    """
+
+    def _fix(value: str) -> str:
+        if "/" in value:
+            return value
+        if value.startswith("gpt-") or value.startswith("o1-") or value.startswith("o3-"):
+            return f"openai/{value}"
+        return value
+
+    rewritten: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if arg in {"-m", "--model", "--model-name"}:
+            rewritten.append(arg)
+            if idx + 1 < len(argv):
+                rewritten.append(_fix(argv[idx + 1]))
+            skip_next = True
+            continue
+
         if arg.startswith("--model="):
             rewritten.append(f"--model={_fix(arg.split('=', 1)[1])}")
             continue
@@ -662,6 +766,124 @@ def _rewrite_gemini_model(argv: list[str]) -> list[str]:
         rewritten.append(arg)
 
     return rewritten
+
+
+def _rewrite_qwen_model(argv: list[str]) -> list[str]:
+    """Ensure Qwen model names are routed via OpenRouter (user preference)."""
+
+    # Check if we are running the native qwen-coder agent
+    is_native_agent = False
+    for i, arg in enumerate(argv):
+        if arg in ("-a", "--agent") and i + 1 < len(argv) and argv[i + 1] == "qwen-coder":
+            is_native_agent = True
+            break
+        if arg.startswith("--agent=") and "qwen-coder" in arg:
+            is_native_agent = True
+            break
+
+    def _fix(value: str) -> str:
+        # If Native Agent, DO NOT prefix. OpenRouter expects "qwen/model", not "openrouter/qwen/model"
+        if is_native_agent:
+            return value
+
+        # If Terminus/LiteLLM, we DO need the prefix so LiteLLM knows to route to OpenRouter.
+        # If already has a provider prefix (like openrouter/), leave it
+        if value.startswith("openrouter/") or value.startswith("dashscope/"):
+            return value
+        
+        # If it looks like a Qwen model ID (starts with qwen or qwen/)
+        if value.lower().startswith("qwen"):
+            if "/" in value:
+                return f"openrouter/{value}"
+            return f"openrouter/{value}"
+            
+        return value
+
+    rewritten: list[str] = []
+    skip_next = False
+    for idx, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if arg in {"-m", "--model", "--model-name"}:
+            rewritten.append(arg)
+            if idx + 1 < len(argv):
+                rewritten.append(_fix(argv[idx + 1]))
+            skip_next = True
+            continue
+
+        if arg.startswith("--model="):
+            rewritten.append(f"--model={_fix(arg.split('=', 1)[1])}")
+            continue
+        if arg.startswith("--model-name="):
+            rewritten.append(f"--model-name={_fix(arg.split('=', 1)[1])}")
+            continue
+
+        rewritten.append(arg)
+
+    return rewritten
+
+
+def _apply_qwen_coder_defaults(argv: list[str]) -> None:
+    """If using qwen-coder agent, ensure OpenAI-compatible env vars point to OpenRouter."""
+    print(f"DEBUG: argv={argv}") 
+    is_qwen_code = False
+    for i, arg in enumerate(argv):
+        if arg in ("-a", "--agent") and i + 1 < len(argv) and argv[i + 1] == "qwen-coder":
+            is_qwen_code = True
+            break
+        if arg.startswith("--agent=") and "qwen-coder" in arg:
+            is_qwen_code = True
+            break
+
+    # Also detect if we are RESUMING a job that uses qwen-coder
+    # argv might be like: jobs resume -p out/harbor/jobs/2026-01-18__19-17-22
+    if not is_qwen_code and "resume" in argv:
+        path_idx = -1
+        if "-p" in argv:
+            path_idx = argv.index("-p") + 1
+        elif "--path" in argv:
+             path_idx = argv.index("--path") + 1
+        
+        if path_idx > 0 and path_idx < len(argv):
+             job_path = Path(argv[path_idx])
+             config_path = job_path / "config.json"
+             if config_path.exists():
+                 try:
+                     with open(config_path) as f:
+                        config = json.load(f)
+                        # Config has "agents": [{"name": "qwen-coder", ...}]
+                        agents = config.get("agents", [])
+                        if isinstance(agents, list):
+                            for agent in agents:
+                                if agent.get("name") == "qwen-coder":
+                                    is_qwen_code = True
+                                    print(f"DEBUG: Detected qwen-coder agent in resumed job config: {config_path}")
+                                    break
+                 except Exception as e:
+                     print(f"DEBUG: Failed to read config {config_path}: {e}")
+
+    if is_qwen_code:
+        print(f"DEBUG: Detected qwen-coder agent. Checking env vars...")
+        
+        # If we have an OpenRouter key, we should USE it as the OpenAI key for this agent,
+        # because we are likely defaulting the Base URL to OpenRouter.
+        # This overrides any native OpenAI key that might be present (e.g. for Codex).
+        if "OPENROUTER_API_KEY" in os.environ:
+            print("DEBUG: Overwriting OPENAI_API_KEY with OPENROUTER_API_KEY (to match OpenRouter URL)")
+            os.environ["OPENAI_API_KEY"] = os.environ["OPENROUTER_API_KEY"]
+        elif "OPENAI_API_KEY" in os.environ:
+             print("DEBUG: Using existing OPENAI_API_KEY (No OpenRouter key found).")
+        else:
+             print("DEBUG: Warning: No API key found (OPENAI_API_KEY or OPENROUTER_API_KEY missing).")
+
+        # If User didn't specify a base URL, default to OpenRouter
+        if "OPENAI_BASE_URL" not in os.environ:
+            print("DEBUG: Setting OPENAI_BASE_URL to OpenRouter default")
+            os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
+        else:
+            print(f"DEBUG: OPENAI_BASE_URL already set: {os.environ['OPENAI_BASE_URL']}")
 
 
 def _extract_hf_args(argv: list[str]) -> tuple[list[str], dict[str, str]]:

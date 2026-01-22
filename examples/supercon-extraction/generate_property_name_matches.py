@@ -94,8 +94,6 @@ async def main(args: argparse.Namespace) -> None:
     if jobs_dir is not None:
         # Load predictions from Harbor jobs directory
         df = get_harbor_data(jobs_dir)
-        # HACK
-        df = df[df["agent"].isin(["gemini-cli", "codex"])]
     else:
         # Load predictions from CSV files
         pred_properties_dir = output_dir / "unsupervised_llm_extraction"
