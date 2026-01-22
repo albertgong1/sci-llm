@@ -162,7 +162,7 @@ async def process_single_page(
     refno: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
-) -> list[dict]:
+) -> tuple[list[dict], dict]:
     """Process a single page and extract properties.
 
     Args:
@@ -174,7 +174,7 @@ async def process_single_page(
         inf_gen_config: InferenceGenerationConfig instance
 
     Returns:
-        List of property dicts (with page_num included for sorting later)
+        Tuple of (list of property dicts, usage dict)
 
     """
     # Build conversation
@@ -197,37 +197,38 @@ DO NOT extract properties that are on other pages.
         response: LLMChatResponse = await llm.generate_response_async(
             conv, inf_gen_config
         )
+        usage = response.usage
 
         # Check for errors
         if response.error:
             logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
-            return []
+            return [], usage
 
         # Parse JSON from response
         json_data = parse_json_response(response.pred)
         if json_data is None:
             logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
-            return []
+            return [], usage
 
         # Check for properties array
         if "properties" not in json_data:
             logger.warning(f"No 'properties' key in JSON for {refno} page {page_num}")
-            return []
+            return [], usage
 
         properties = json_data["properties"]
         if not isinstance(properties, list):
             logger.warning(f"'properties' is not a list for {refno} page {page_num}")
-            return []
+            return [], usage
 
         # Add page_num to each property for later sorting
         for prop in properties:
             prop["_page_num"] = page_num
 
-        return properties
+        return properties, usage
 
     except Exception as e:
         logger.error(f"Error processing {refno} page {page_num}: {e}")
-        return []
+        return [], {}
 
 
 async def process_paper(
@@ -236,7 +237,7 @@ async def process_paper(
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
     model_name: str,
-) -> list[pd.Series]:
+) -> tuple[list[pd.Series], dict]:
     """Process a single paper by prompting the LLM one page at a time to extract properties.
 
     Args:
@@ -247,7 +248,7 @@ async def process_paper(
         model_name: Name of the LLM model used for extraction
 
     Returns:
-        List of pandas Series (one per extracted property)
+        Tuple of (list of pandas Series, aggregated usage dict)
 
     """
     # Extract refno from filename and create file object for the paper
@@ -262,7 +263,7 @@ async def process_paper(
         doc.close()
     except Exception as e:
         logger.error(f"Failed to get number of pages from {paper_path}: {e}")
-        return []
+        return [], {}
 
     # Create tasks for all pages
     tasks = [
@@ -274,21 +275,25 @@ async def process_paper(
     total_properties = 0
     pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
 
-    page_results = []
+    page_results: list[tuple[list[dict], dict]] = []
     for coro in asyncio.as_completed(tasks):
         result = await coro
         page_results.append(result)
-        total_properties += len(result)
+        total_properties += len(result[0])  # result[0] is the properties list
         pbar.set_description(f"Processing {refno} ({total_properties} props)")
         pbar.update(1)
 
     pbar.close()
 
+    # Aggregate usage across all pages
+    usage_list = [result[1] for result in page_results]
+    aggregated_usage = llm_utils.aggregate_usage(usage_list)
+
     # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
     property_counter = 0
 
-    for properties in page_results:
+    for properties, _ in page_results:
         for prop in properties:
             try:
                 # Remove the temporary page_num field before converting
@@ -315,7 +320,7 @@ async def process_paper(
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
-    return all_rows
+    return all_rows, aggregated_usage
 
 
 async def extract_properties(args: argparse.Namespace) -> None:
@@ -417,7 +422,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
             continue
 
         # Process the paper
-        rows = await process_paper(
+        rows, usage = await process_paper(
             pdf_path, prompt, llm, inf_gen_config, args.model_name
         )
 
@@ -429,6 +434,15 @@ async def extract_properties(args: argparse.Namespace) -> None:
             logger.info(f"Saved {len(rows)} properties from {refno} to {output_path}")
         else:
             logger.warning(f"No properties extracted from {refno}")
+
+        # Save usage to JSON
+        usage_dir = args.output_dir / "usage"
+        usage_dir.mkdir(parents=True, exist_ok=True)
+        usage_filename = f"usage__model={model_name_safe}__refno={refno}.json"
+        usage_path = usage_dir / usage_filename
+        with open(usage_path, "w") as f:
+            json.dump(usage, f, indent=2)
+        logger.info(f"Saved usage for {refno} to {usage_path}")
 
 
 def main() -> None:
