@@ -194,7 +194,10 @@ async def generate_property_name_matches(
                 )
                 tasks[task_id] = task
     # Execute all tasks concurrently
-    BATCH_SIZE = 100
+    if False:
+        BATCH_SIZE = 100
+    else:
+        BATCH_SIZE = len(tasks)  # run all at once
     results_data = []
     for i in range(0, len(tasks), BATCH_SIZE):
         batch_tasks = {k: tasks[k] for k in list(tasks.keys())[i : i + BATCH_SIZE]}
