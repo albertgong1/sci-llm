@@ -238,7 +238,10 @@ async def main(args: argparse.Namespace) -> None:
         df = get_harbor_data(jobs_dir)
     else:
         # Load predictions from CSV files
-        pred_properties_dir = output_dir / "unsupervised_llm_extraction"
+        if False:
+            pred_properties_dir = output_dir / "unsupervised_llm_extraction"
+        else:
+            pred_properties_dir = output_dir / "preds"
         pred_properties_files = list(pred_properties_dir.glob("*.csv"))
         if not pred_properties_files:
             raise FileNotFoundError(
