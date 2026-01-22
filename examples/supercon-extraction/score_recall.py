@@ -35,7 +35,8 @@ pbench.setup_logging(args.log_level)
 # model used for property matching
 model_name = args.model_name
 
-NUM_REFNOS = 50
+# TODO: figure out how to count NUM_REFNOS dynamically
+NUM_REFNOS = 10
 
 # Load all CSV files from output_dir/gt_matches
 gt_matches_dir = args.output_dir / "gt_matches"
@@ -59,7 +60,10 @@ for csv_file in csv_files:
     dfs.append(df)
 
 df_matches = pd.concat(dfs, ignore_index=True)
-df_matches = df_matches[df_matches["judge"] == model_name]
+# NOTE: if judge is NaN, it means exact string match was used for matching
+df_matches = df_matches[
+    (df_matches["judge"] == model_name) | (df_matches["judge"].isna())
+]
 logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
@@ -128,7 +132,7 @@ acc = (
         avg_property_material_matches=pd.NamedAgg(
             column="property_material_matches", aggfunc=mean_sem
         ),
-        count=pd.NamedAgg(column="model", aggfunc="count"),
+        successful_count=pd.NamedAgg(column="model", aggfunc="count"),
     )
     .reset_index()
 )
