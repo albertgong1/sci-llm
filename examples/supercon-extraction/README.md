@@ -143,8 +143,8 @@ uv run python generate_property_unit_mappings.py
 > Also make sure to update HF_DATASET_NAME, HF_DATASET_REVISION, and HF_DATASET_SPLIT accordingly.
 
 ```bash
-uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
-    --tag_name v0.0.0 --repo_name kilian-group/supercon-extraction --split SPLIT
+uv run python create_huggingface_dataset.py -dd data-arxiv -od out-0122-harbor --filter_pdf \
+    --hf_revision v0.2.1 --hf_repo kilian-group/supercon-extraction --hf_split full
 ```
 
 5. Generate embeddings for the ground-truth property names for scoring:
