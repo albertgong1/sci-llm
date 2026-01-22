@@ -419,7 +419,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
         # Save to CSV
         if len(rows) > 0:
             # Create DataFrame from list of Series
-            df = pd.DataFrame(rows)
+            df = pd.DataFrame(rows, dtype=str)
             df.to_csv(output_path, index=False)
             logger.info(f"Saved {len(rows)} properties from {refno} to {output_path}")
         else:
