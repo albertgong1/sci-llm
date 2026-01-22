@@ -35,15 +35,6 @@ pbench.setup_logging(args.log_level)
 # model used for property matching
 model_name = args.model_name
 
-# Count number of trials (refnos) per agent/model from jobs_dir
-if args.jobs_dir is None:
-    raise ValueError("--jobs_dir is required to count trials per agent/model")
-trials_df = count_trials_per_agent_model(args.jobs_dir)
-# Create lookup dict: (agent, model) -> num_trials
-trials_lookup: dict[tuple[str, str], int] = {
-    (row["agent"], row["model"]): row["num_trials"] for _, row in trials_df.iterrows()
-}
-
 # Load all CSV files from output_dir/gt_matches
 gt_matches_dir = args.output_dir / "gt_matches"
 
@@ -70,9 +61,24 @@ df_matches = pd.concat(dfs, ignore_index=True)
 df_matches = df_matches[
     (df_matches["judge"] == model_name) | (df_matches["judge"].isna())
 ]
+if False:
+    # only include rows where batch starts with 'bn1'
+    df_matches = df_matches[df_matches["batch"].str.startswith("bn1")]
 logger.info(
     f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
 )
+
+# If jobs_dir was not provided, count unique refnos per agent/model from the data
+if args.jobs_dir is None:
+    trials_lookup = df_matches.groupby(["agent", "model"])["refno"].nunique().to_dict()
+else:
+    # Count number of trials (refnos) per agent/model
+    trials_lookup: dict[tuple[str, str], int] = {}
+    trials_df = count_trials_per_agent_model(args.jobs_dir)
+    trials_lookup = {
+        (row["agent"], row["model"]): row["num_trials"]
+        for _, row in trials_df.iterrows()
+    }
 
 # Load rubric
 logger.info(f"Loading rubric from {RUBRIC_PATH}")
