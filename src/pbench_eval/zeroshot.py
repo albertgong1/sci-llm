@@ -31,8 +31,6 @@ import re
 from pathlib import Path
 
 import pandas as pd
-from tqdm.asyncio import tqdm
-import fitz  # PyMuPDF
 
 import llm_utils
 from llm_utils.common import Conversation, File, LLMChatResponse, Message
@@ -42,6 +40,9 @@ logger = logging.getLogger(__name__)
 
 # Maximum number of conditions to store in CSV
 MAX_CONDITIONS = 10
+
+# Default concurrency limit for parallel processing
+MAX_CONCURRENT_TASKS = 10
 
 
 def load_prompt(prompt_path: Path) -> str:
@@ -255,66 +256,35 @@ async def process_paper(
     refno = paper_path.stem
     file = File(path=paper_path)
 
-    # Get number of pages in the paper, we will upload the entire paper to the LLM
-    # server at once, but prompt one page at a time.
-    try:
-        doc = fitz.open(paper_path)
-        num_pages = len(doc)
-        doc.close()
-    except Exception as e:
-        logger.error(f"Failed to get number of pages from {paper_path}: {e}")
-        return [], {}
-
-    if False:
-        # Create tasks for all pages
-        tasks = [
-            process_single_page(page_num, file, prompt, refno, llm, inf_gen_config)
-            for page_num in range(1, num_pages + 1)
+    conv = Conversation(
+        messages=[
+            Message(role="user", content=[file, prompt]),
         ]
+    )
 
-        # Process all pages concurrently with progress bar
-        total_properties = 0
-        pbar = tqdm(total=len(tasks), desc=f"Processing {refno} (0 props)")
-
-        page_results: list[tuple[list[dict], dict]] = []
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            page_results.append(result)
-            total_properties += len(result[0])  # result[0] is the properties list
-            pbar.set_description(f"Processing {refno} ({total_properties} props)")
-            pbar.update(1)
-
-        pbar.close()
-    else:
-        conv = Conversation(
-            messages=[
-                Message(role="user", content=[file, prompt]),
-            ]
+    properties = []
+    usage = {}
+    try:
+        # Get LLM response
+        response: LLMChatResponse = await llm.generate_response_async(
+            conv, inf_gen_config
         )
-
-        properties = []
-        usage = {}
-        try:
-            # Get LLM response
-            response: LLMChatResponse = await llm.generate_response_async(
-                conv, inf_gen_config
-            )
-            usage = response.usage
-            # Check for errors
-            if response.error:
-                logger.warning(f"LLM error for {refno}: {response.error}")
-            # Parse JSON from response
-            json_data = parse_json_response(response.pred)
-            if json_data is None:
-                logger.warning(f"Failed to parse JSON from {refno}")
-            # Check for properties array
-            if "properties" not in json_data:
-                logger.warning(f"No 'properties' key in JSON for {refno}")
-            properties = json_data["properties"]
-            if not isinstance(properties, list):
-                logger.warning(f"'properties' is not a list for {refno}")
-        except Exception as e:
-            logger.error(f"Error processing {refno}: {e}")
+        usage = response.usage
+        # Check for errors
+        if response.error:
+            logger.warning(f"LLM error for {refno}: {response.error}")
+        # Parse JSON from response
+        json_data = parse_json_response(response.pred)
+        if json_data is None:
+            logger.warning(f"Failed to parse JSON from {refno}")
+        # Check for properties array
+        if "properties" not in json_data:
+            logger.warning(f"No 'properties' key in JSON for {refno}")
+        properties = json_data["properties"]
+        if not isinstance(properties, list):
+            logger.warning(f"'properties' is not a list for {refno}")
+    except Exception as e:
+        logger.error(f"Error processing {refno}: {e}")
 
     # Aggregate usage across all pages
     aggregated_usage = usage
@@ -351,6 +321,72 @@ async def process_paper(
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
     return all_rows, aggregated_usage
+
+
+async def process_single_paper_task(
+    pdf_path: Path,
+    prompt: str,
+    llm: llm_utils.LLMChat,
+    inf_gen_config: llm_utils.InferenceGenerationConfig,
+    model_name: str,
+    model_name_safe: str,
+    preds_dir: Path,
+    usage_dir: Path,
+    force: bool,
+    semaphore: asyncio.Semaphore,
+) -> None:
+    """Process a single paper with semaphore-controlled concurrency.
+
+    Args:
+        pdf_path: Path to the PDF file
+        prompt: Extraction prompt text
+        llm: LLMChat instance
+        inf_gen_config: InferenceGenerationConfig instance
+        model_name: Name of the LLM model used for extraction
+        model_name_safe: Sanitized model name for filenames
+        preds_dir: Directory to save predictions
+        usage_dir: Directory to save usage data
+        force: Whether to overwrite existing files
+        semaphore: Semaphore to limit concurrency
+
+    """
+    async with semaphore:
+        refno = pdf_path.stem
+        logger.info(f"Processing {refno}...")
+
+        # Construct output path
+        output_filename = (
+            f"extracted_properties__model={model_name_safe}__refno={refno}.csv"
+        )
+        output_path = preds_dir / output_filename
+
+        # Skip if output file already exists and --force is not set
+        if output_path.exists() and not force:
+            logger.info(
+                f"Skipping {refno} as {output_path} already exists. Use --force to overwrite."
+            )
+            return
+
+        # Process the paper
+        rows, usage = await process_paper(
+            pdf_path, prompt, llm, inf_gen_config, model_name
+        )
+
+        # Save to CSV
+        if len(rows) > 0:
+            # Create DataFrame from list of Series
+            df = pd.DataFrame(rows)
+            df.to_csv(output_path, index=False)
+            logger.info(f"Saved {len(rows)} properties from {refno} to {output_path}")
+        else:
+            logger.warning(f"No properties extracted from {refno}")
+
+        # Save usage to JSON
+        usage_filename = f"usage__model={model_name_safe}__refno={refno}.json"
+        usage_path = usage_dir / usage_filename
+        with open(usage_path, "w") as f:
+            json.dump(usage, f, indent=2)
+        logger.info(f"Saved usage for {refno} to {usage_path}")
 
 
 async def extract_properties(args: argparse.Namespace) -> None:
@@ -408,6 +444,12 @@ async def extract_properties(args: argparse.Namespace) -> None:
                 reordered_pdf_files.append(pdf)
                 break
 
+    # Filter by refno if specified
+    if args.refno is not None:
+        reordered_pdf_files = [
+            pdf for pdf in reordered_pdf_files if pdf.stem == args.refno
+        ]
+
     num_pdfs = len(reordered_pdf_files)
     logger.info(f"Found {num_pdfs} PDF files in {paper_dir}")
 
@@ -423,56 +465,40 @@ async def extract_properties(args: argparse.Namespace) -> None:
         max_output_tokens=args.max_output_tokens,
     )
 
-    # Setup output directory
+    # Setup output directories
     preds_dir = args.output_dir / "preds"
     preds_dir.mkdir(parents=True, exist_ok=True)
+    usage_dir = args.output_dir / "usage"
+    usage_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
 
-    # Process each PDF
-    for pdf_path in tqdm(reordered_pdf_files, desc="Processing PDFs"):
-        refno = pdf_path.stem
+    # Create semaphore to limit concurrency
+    max_concurrent = args.max_concurrent
+    semaphore = asyncio.Semaphore(max_concurrent)
 
-        # Skip if refno is specified and this isn't it
-        if args.refno is not None and refno != args.refno:
-            continue
-
-        # Construct output path
-        output_filename = (
-            f"extracted_properties__model={model_name_safe}__refno={refno}.csv"
+    # Build list of tasks for all papers
+    tasks = [
+        process_single_paper_task(
+            pdf_path=pdf_path,
+            prompt=prompt,
+            llm=llm,
+            inf_gen_config=inf_gen_config,
+            model_name=args.model_name,
+            model_name_safe=model_name_safe,
+            preds_dir=preds_dir,
+            usage_dir=usage_dir,
+            force=args.force,
+            semaphore=semaphore,
         )
-        output_path = preds_dir / output_filename
+        for pdf_path in reordered_pdf_files
+    ]
 
-        # Skip if output file already exists and --force is not set
-        if output_path.exists() and not args.force:
-            logger.info(
-                f"Skipping {refno} as {output_path} already exists. Use --force to overwrite."
-            )
-            continue
-
-        # Process the paper
-        rows, usage = await process_paper(
-            pdf_path, prompt, llm, inf_gen_config, args.model_name
-        )
-
-        # Save to CSV
-        if len(rows) > 0:
-            # Create DataFrame from list of Series
-            df = pd.DataFrame(rows)
-            df.to_csv(output_path, index=False)
-            logger.info(f"Saved {len(rows)} properties from {refno} to {output_path}")
-        else:
-            logger.warning(f"No properties extracted from {refno}")
-
-        # Save usage to JSON
-        usage_dir = args.output_dir / "usage"
-        usage_dir.mkdir(parents=True, exist_ok=True)
-        usage_filename = f"usage__model={model_name_safe}__refno={refno}.json"
-        usage_path = usage_dir / usage_filename
-        with open(usage_path, "w") as f:
-            json.dump(usage, f, indent=2)
-        logger.info(f"Saved usage for {refno} to {usage_path}")
+    logger.info(
+        f"Processing {len(tasks)} papers with max {max_concurrent} concurrent tasks..."
+    )
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def main() -> None:
@@ -526,6 +552,12 @@ def main() -> None:
         type=int,
         default=65536,
         help="Maximum number of output tokens for LLM response (default: 65536)",
+    )
+    parser.add_argument(
+        "--max_concurrent",
+        type=int,
+        default=MAX_CONCURRENT_TASKS,
+        help=f"Maximum number of concurrent tasks (default: {MAX_CONCURRENT_TASKS})",
     )
 
     args = parser.parse_args()
