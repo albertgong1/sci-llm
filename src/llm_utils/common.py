@@ -1,6 +1,8 @@
 """Common utilities and base classes for LLM interactions."""
 
 import abc
+import json
+import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -209,3 +211,37 @@ class LLMChat(abc.ABC):
 
         """
         pass
+
+
+def parse_json_response(response_text: str | dict[str, Any]) -> dict[str, Any]:
+    """Parse a JSON response from the LLM, or search the string for a JSON code block and parse it.
+
+    Args:
+        response_text: The response text from the LLM.
+        If the response is a dictionary, it will be returned as is.
+
+    Returns:
+        The parsed JSON response.
+    
+    Raises:
+        ValueError: If the response text is not a valid JSON or if the string
+            does not contain a JSON code block.
+    """
+    if isinstance(response_text, dict):
+        return response_text
+    
+    # Try to parse as JSON
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to find JSON in the text then parse it
+    try:
+        json_match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(1))
+    except json.JSONDecodeError:
+        pass
+    
+    raise ValueError(f"Failed to parse JSON response: {response_text}")

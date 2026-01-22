@@ -19,14 +19,13 @@ import argparse
 import asyncio
 import json
 import logging
-import re
 from pathlib import Path
 
 import pandas as pd
 from tqdm.asyncio import tqdm
 
 import llm_utils
-from llm_utils.common import Conversation, LLMChatResponse, Message
+from llm_utils.common import Conversation, LLMChatResponse, Message, parse_json_response
 
 import pbench
 
@@ -183,7 +182,8 @@ async def process_material(
             result["web_search_uris"] = json.dumps(web_search_metadata.uris)
 
         # Extract predictions
-        predictions = extract_predictions_from_json(response.pred, material)
+        json_data = parse_json_response(response.pred)
+        predictions = extract_predictions_from_json(json_data, material)
         result["is_superconducting"] = predictions["is_superconducting"]
         result["tc_values"] = json.dumps(predictions["tc_values"])
         result["tcn_values"] = json.dumps(predictions["tcn_values"])
@@ -233,9 +233,15 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
     llm = llm_utils.get_llm(args.server, args.model_name)
 
     # Create inference config with web search enabled
+    # NOTE: OpenAI does not support web_search+JSON output format. So if the server is openai and web search is enabled, the output format will be text.
+    if args.server == "openai" and args.use_web_search:
+        output_format = "text"
+    else:
+        output_format = "json"
+
     inf_gen_config = llm_utils.InferenceGenerationConfig(
         max_output_tokens=args.max_output_tokens,
-        output_format="json",
+        output_format=output_format,
         use_web_search=args.use_web_search,
     )
 
@@ -365,8 +371,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--use_web_search",
         action="store_true",
-        default=True,
-        help="Enable web search grounding (default: True)",
+        default=False,
+        help="Enable web search grounding (default: False)",
     )
 
     args = parser.parse_args()
