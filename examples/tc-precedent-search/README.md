@@ -318,3 +318,15 @@ uv run python examples/tc-precedent-search/analyze_citation_quality.py
 - `<base>/detailed_matches.csv`
 - `<base>/title_or_doi_matches.csv`
 - `<base>/high_score_no_citation_match.csv`
+
+## LLM API Workflow
+
+We can prompt LLMs with web search grounding to perform Tc precedent search as well. After creating the Tc dev set in step 1:
+
+```bash
+uv run python run_precedent_search_with_llms.py --server gemini -m gemini-3-pro-preview -od out --use_web_search
+```
+
+This creates a CSV at `out/precedent_search__model=gemini-3-pro-preview__web_search.csv` with LLM predictions and DOI citations for material Tc values. This CSV already contains ground-truth Tc values from SuperCon merged.
+
+TODO: instructions to evaluate CSV output.

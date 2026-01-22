@@ -1,6 +1,8 @@
 """Common utilities and base classes for LLM interactions."""
 
 import abc
+import json
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
@@ -30,6 +32,11 @@ class InferenceGenerationConfig(BaseModel):
     # Docs: https://ai.google.dev/api/generate-content#generationconfig
     output_format: Literal["text", "json"] = Field(default="text")
 
+    # Web search / grounding
+    # Gemini: https://ai.google.dev/gemini-api/docs/google-search
+    # OpenAI: https://platform.openai.com/docs/guides/tools-web-search
+    use_web_search: bool = Field(default=False)
+
 
 class File(BaseModel):
     """A file wrapper to interface with the LLM server."""
@@ -55,13 +62,26 @@ class Conversation(BaseModel):
     messages: list[Message]
 
 
+class WebSearchMetadata(BaseModel):
+    """Metadata about the web search uris.
+    
+    Args:
+        queries: The queries used to search the web.
+        uris: The uris of the web search results.
+    """
+
+    queries: list[str]
+    uris: list[str]
+
+
 class LLMChatResponse(BaseModel):
     """Response from an LLM chat completion."""
 
     pred: str | dict[str, Any]
     usage: dict[str, Any]
     error: str | None
-    thought: str | None
+    thought: str | None = None
+    web_search_metadata: WebSearchMetadata | None = None
 
 
 class LLMChat(abc.ABC):
@@ -192,6 +212,40 @@ class LLMChat(abc.ABC):
 
         """
         pass
+
+
+def parse_json_response(response_text: str | dict[str, Any]) -> dict[str, Any]:
+    """Parse a JSON response from the LLM, or search the string for a JSON code block and parse it.
+
+    Args:
+        response_text: The response text from the LLM.
+        If the response is a dictionary, it will be returned as is.
+
+    Returns:
+        The parsed JSON response.
+    
+    Raises:
+        ValueError: If the response text is not a valid JSON or if the string
+            does not contain a JSON code block.
+    """
+    if isinstance(response_text, dict):
+        return response_text
+    
+    # Try to parse as JSON
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to find JSON in the text then parse it
+    try:
+        json_match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(1))
+    except json.JSONDecodeError:
+        pass
+    
+    raise ValueError(f"Failed to parse JSON response: {response_text}")
 
 
 def aggregate_usage(usage_list: list[dict]) -> dict:

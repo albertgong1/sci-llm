@@ -22,6 +22,7 @@ from llm_utils.common import (
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
+    WebSearchMetadata,
 )
 
 
@@ -45,7 +46,6 @@ class GeminiChat(LLMChat):
 
         Args:
             model_name: The name of the Gemini model to use.
-
         """
         super().__init__(model_name)
         api_key = os.environ.get("GOOGLE_API_KEY")
@@ -139,10 +139,10 @@ class GeminiChat(LLMChat):
         else:
             raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
 
-        # Disable automatic function calling
-        gen_kwargs["automatic_function_calling"] = (
-            genai_types.AutomaticFunctionCallingConfig(disable=True)
-        )
+        # Enable Google Search grounding if requested
+        # https://ai.google.dev/gemini-api/docs/google-search
+        if inf_gen_config.use_web_search:
+            gen_kwargs["tools"] = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
 
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
@@ -242,7 +242,27 @@ class GeminiChat(LLMChat):
                 "thinking_tokens": response.usage_metadata.thoughts_token_count,
                 "total_tokens": response.usage_metadata.total_token_count,
             }
-            return LLMChatResponse(pred=pred, usage=usage, error=None, thought=thought)
+
+            # Extract grounding metadata if web search was used
+            # https://ai.google.dev/gemini-api/docs/google-search
+            if grounding_metadata := response.candidates[0].grounding_metadata:
+                # Convert GroundingChunk objects to serializable dicts
+                queries = grounding_metadata.web_search_queries
+                uris = []
+                for chunk in grounding_metadata.grounding_chunks or []:
+                    if hasattr(chunk, "web") and chunk.web:
+                        uris.append(chunk.web.uri)
+                web_search_metadata = WebSearchMetadata(
+                    queries=queries,
+                    uris=uris,
+                )
+            else:
+                web_search_metadata = None
+
+
+            return LLMChatResponse(
+                pred=pred, usage=usage, error=None, thought=thought, web_search_metadata=web_search_metadata
+            )
         except Exception as e:
             # Handle cases where Gemini refuses to generate
             return LLMChatResponse(
@@ -250,6 +270,7 @@ class GeminiChat(LLMChat):
                 usage={},
                 error=str(e),
                 thought=None,
+                web_search_metadata=None,
             )
 
     def upload_file(self, file: File) -> None:
