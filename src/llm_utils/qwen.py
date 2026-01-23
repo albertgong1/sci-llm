@@ -4,14 +4,14 @@ import base64
 import inspect
 import json
 import os
-from dataclasses import asdict, is_dataclass
-from typing import Any, Optional
+import re
+from typing import Any
 
 import requests
 
 try:
-    import httpx  # optional, used for async calls
-except Exception:  # pragma: no cover
+    import httpx 
+except Exception: 
     httpx = None
 
 from llm_utils.common import (
@@ -20,6 +20,7 @@ from llm_utils.common import (
     InferenceGenerationConfig,
     LLMChat,
     LLMChatResponse,
+    WebSearchMetadata,
 )
 
 
@@ -46,20 +47,19 @@ class QwenClient:
             )
 
         self.timeout_s = float(os.getenv("OPENROUTER_TIMEOUT_S", "120"))
-
         self.site_url = os.getenv("OPENROUTER_SITE_URL")
         self.app_name = os.getenv("OPENROUTER_APP_NAME")
 
     def _headers(self) -> dict[str, str]:
-        h = {
+        headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         if self.site_url:
-            h["HTTP-Referer"] = self.site_url
+            headers["HTTP-Referer"] = self.site_url
         if self.app_name:
-            h["X-Title"] = self.app_name
-        return h
+            headers["X-Title"] = self.app_name
+        return headers
 
     def chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}/chat/completions"
@@ -83,55 +83,29 @@ class QwenChat(LLMChat):
     def __init__(self, model_name: str) -> None:
         super().__init__(model_name)
         self.client = QwenClient(model_name)
+
+        # OpenRouter inline-file cache: key -> {"filename":..., "file_data":...}
         self._file_cache: dict[str, dict[str, Any]] = {}
 
-    def generate_response(
-        self,
-        conv: Conversation,
-        inf_gen_config: InferenceGenerationConfig,
-    ) -> LLMChatResponse:
-
-        for msg in conv.messages:
-            for content in msg.content:
-                if isinstance(content, File):
-                    self.upload_file(content)
-
-        messages = self._convert_conv_to_api_format(conv)
-        response = self._call_api(messages, inf_gen_config)
-        return self._parse_api_output(response, inf_gen_config)
-
-    async def generate_response_async(
-        self,
-        conv: Conversation,
-        inf_gen_config: InferenceGenerationConfig,
-    ) -> LLMChatResponse:
-        for msg in conv.messages:
-            for content in msg.content:
-                if isinstance(content, File):
-                    self.upload_file(content)
-
-        messages = self._convert_conv_to_api_format(conv)
-        response = await self._call_api(messages, inf_gen_config, use_async=True)
-        return self._parse_api_output(response, inf_gen_config)
+    # NOTE: We intentionally do NOT override generate_response / generate_response_async.
+    # The base class LLMChat already handles file upload and calls the hooks below.
 
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
         """
-        OpenRouter uses OpenAI-style messages:
-          [{"role": "...", "content": "..." | [{"type":"text","text":"..."}, {"type":"file","file":{...}}]}]
+        Convert llm_utils.common.Conversation into OpenRouter/OpenAI-style messages.
 
-        For PDFs, OpenRouter supports:
-          {"type":"file","file":{"filename":"x.pdf","file_data":"data:application/pdf;base64,..."}}
-        or:
-          {"type":"file","file":{"filename":"x.pdf","fileData":"https://..."}}
-         [oai_citation:3‡OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/pdfs)
+        Input (common.py):
+          Conversation(messages=[Message(role=..., content=[str|File, ...]), ...])
+
+        Output (OpenRouter):
+          [{"role": "...", "content": [{"type":"text","text":"..."}, {"type":"file","file":{...}}]}]
+
+        We always use the list-of-parts format to support mixed text + PDFs.
         """
         out: list[dict[str, Any]] = []
 
         for msg in conv.messages:
-            role = getattr(msg, "role", None) or getattr(msg, "speaker", None)
-            if role is None:
-                raise ValueError("Conversation message missing role/speaker.")
-
+            role = msg.role
             parts: list[dict[str, Any]] = []
             text_accum: list[str] = []
 
@@ -139,23 +113,24 @@ class QwenChat(LLMChat):
                 if isinstance(c, str):
                     text_accum.append(c)
                 elif isinstance(c, File):
-                    
+                    # Flush text before file to preserve ordering.
                     if text_accum:
                         parts.append({"type": "text", "text": "\n".join(text_accum).strip()})
                         text_accum = []
 
                     key = self._file_cache_key(c)
                     cached = self._file_cache.get(key)
-                    if not cached:
-                        # If user didn't call upload_file() first for some reason, do it now.
+                    if cached is None:
+                        # Base class should have called upload_file; this is a safe fallback.
                         self.upload_file(c)
                         cached = self._file_cache.get(key)
 
-                    if not cached:
+                    if cached is None:
                         raise RuntimeError("Failed to cache file for OpenRouter message formatting.")
 
                     parts.append({"type": "file", "file": cached})
                 else:
+                    # Should not happen with common.Message typing, but keep safe.
                     text_accum.append(str(c))
 
             if text_accum:
@@ -172,105 +147,80 @@ class QwenChat(LLMChat):
         use_async: bool = False,
     ) -> Any:
         """
-        Calls OpenRouter Chat Completions endpoint.  [oai_citation:4‡OpenRouter](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+        Call OpenRouter Chat Completions endpoint.
+
+        Uses common.InferenceGenerationConfig field names.
         """
         payload: dict[str, Any] = {
             "model": self.model_name,
             "messages": messages,
         }
 
-        def _get(obj: Any, name: str, default: Any = None) -> Any:
-            return getattr(obj, name, default)
+        # -----------------------------
+        # Generation params (common.py)
+        # -----------------------------
+        payload["max_tokens"] = inf_gen_config.max_output_tokens
 
-        temperature = _get(inf_gen_config, "temperature", None)
-        top_p = _get(inf_gen_config, "top_p", None)
-        max_tokens = _get(inf_gen_config, "max_tokens", None) or _get(inf_gen_config, "max_output_tokens", None)
-        stop = _get(inf_gen_config, "stop", None)
-        seed = _get(inf_gen_config, "seed", None)
+        if inf_gen_config.temperature is not None:
+            payload["temperature"] = inf_gen_config.temperature
+        if inf_gen_config.top_p is not None:
+            payload["top_p"] = inf_gen_config.top_p
+        if inf_gen_config.stop_sequences is not None:
+            payload["stop"] = inf_gen_config.stop_sequences
 
-        if temperature is not None:
-            payload["temperature"] = temperature
-        if top_p is not None:
-            payload["top_p"] = top_p
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
-        if stop is not None:
-            payload["stop"] = stop
-        if seed is not None:
-            payload["seed"] = seed
 
-        # ---- PDF  configuration ---- [oai_citation:5‡OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/pdfs)
-        pdf_engine = "pdf-text"
-
+        # -----------------------------
+        # Plugins: PDF parsing
+        # -----------------------------
         if self._messages_contain_files(messages):
-            payload["plugins"] = [
+            payload.setdefault("plugins", [])
+            payload["plugins"].append(
                 {
                     "id": "file-parser",
-                    "pdf": {"engine": pdf_engine},
+                    "pdf": {"engine": "pdf-text"},
                 }
-            ]
-        
-        # =====================================================
-        # ---- OpenRouter web search (plugin) ----
-        # =====================================================
-        use_web_search = (
-            _get(inf_gen_config, "use_web_search", False)
-            or _get(inf_gen_config, "web_search", False)
-        )
-        web_max_results = _get(inf_gen_config, "web_max_results", None)
-        web_engine = _get(inf_gen_config, "web_engine", None)      # "native" | "exa"
-        web_search_prompt = _get(inf_gen_config, "web_search_prompt", None)
+            )
 
-        if use_web_search:
+        # -----------------------------
+        # Plugins: Web search
+        # -----------------------------
+        if inf_gen_config.use_web_search:
             payload.setdefault("plugins", [])
-
-            web_plugin: dict[str, Any] = {"id": "web"}
-
-            if web_engine is not None:
-                web_plugin["engine"] = web_engine
-            if web_max_results is not None:
-                web_plugin["max_results"] = web_max_results
-            if web_search_prompt is not None:
-                web_plugin["search_prompt"] = web_search_prompt
-
-            payload["plugins"].append(web_plugin)
-        # =====================================================
-
+            payload["plugins"].append({"id": "web"})
 
         if use_async:
             return self.client.chat_completions_async(payload)
         return self.client.chat_completions(payload)
 
-    def _parse_api_output(
-        self, response: Any, inf_gen_config: InferenceGenerationConfig
-    ) -> LLMChatResponse:
+    def _parse_api_output(self, response: Any, inf_gen_config: InferenceGenerationConfig) -> LLMChatResponse:
         """
-        OpenRouter returns OpenAI-style ChatCompletion JSON:
-          { choices: [{ message: { role, content }, finish_reason }], usage: {...}, ... }
-         [oai_citation:6‡OpenRouter](https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request)
+        Parse OpenRouter ChatCompletion response into llm_utils.common.LLMChatResponse.
+
+        - pred: text or parsed json
+        - web_search_metadata: WebSearchMetadata | None
         """
-        # If async path returned a coroutine (because caller didn't await), fail loudly.
         if inspect.iscoroutine(response):
             raise RuntimeError("Async response not awaited; did you call generate_response_async correctly?")
 
         text = ""
-        finish_reason = None
-        usage = None
-        model = None
+        usage: dict[str, Any] = {}
+        web_meta: WebSearchMetadata | None = None
+
+        # Tool-calling is not part of common.LLMChatResponse yet; we ignore tool_calls here.
+        # If you need it, extend the common response schema.
+        annotations: list[dict[str, Any]] = []
 
         if isinstance(response, dict):
-            model = response.get("model")
-            usage = response.get("usage")
+            usage = response.get("usage") or {}
             choices = response.get("choices") or []
             if choices:
-                finish_reason = choices[0].get("finish_reason")
                 msg = choices[0].get("message") or {}
                 content = msg.get("content")
+                annotations = msg.get("annotations") or []
 
                 if isinstance(content, str):
                     text = content
                 elif isinstance(content, list):
-
                     chunks: list[str] = []
                     for part in content:
                         if isinstance(part, dict) and part.get("type") == "text":
@@ -278,6 +228,24 @@ class QwenChat(LLMChat):
                     text = "\n".join([c for c in chunks if c]).strip()
                 else:
                     text = str(content) if content is not None else ""
+
+        # Build WebSearchMetadata if we can find URLs (structured annotations or inline text)
+        uris: list[str] = []
+
+        for a in annotations:
+            if isinstance(a, dict) and a.get("type") == "url_citation":
+                url = a.get("url")
+                if isinstance(url, str) and url:
+                    uris.append(url)
+
+        if not uris and text:
+            # fallback: extract URLs embedded in markdown/plain text
+            uris = re.findall(r"https?://\S+", text)
+
+        if uris:
+            # Deduplicate while preserving order
+            dedup = list(dict.fromkeys(uris))
+            web_meta = WebSearchMetadata(queries=[], uris=dedup)
 
         try:
             if inf_gen_config.output_format == "json":
@@ -289,68 +257,52 @@ class QwenChat(LLMChat):
 
             return LLMChatResponse(
                 pred=pred,
-                usage=usage or {},
+                usage=usage,
                 error=None,
                 thought=None,
-                web_search_metadata=None,
+                web_search_metadata=web_meta,
             )
         except Exception as e:
             return LLMChatResponse(
                 pred="",
-                usage=usage or {},
+                usage=usage,
                 error=str(e),
                 thought=None,
-                web_search_metadata=None,
+                web_search_metadata=web_meta,
             )
 
     def upload_file(self, file: File) -> None:
         """
-        OpenRouter does not require a pre-upload step for PDFs; you include them inline
-        as URL or data: URL in the message content.  [oai_citation:7‡OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/pdfs)
+        common.File only has .path; OpenRouter accepts inline data URLs for PDFs.
 
-        We cache the converted representation to avoid repeated base64 encoding.
+        We cache base64 encoding and set file.uploaded_handle so File.is_uploaded() works.
         """
         key = self._file_cache_key(file)
         if key in self._file_cache:
+            file.uploaded_handle = key
             return
 
-        filename = getattr(file, "filename", None) or getattr(file, "name", None) or "document.pdf"
-        mime_type = getattr(file, "mime_type", None) or getattr(file, "content_type", None) or "application/pdf"
+        path = file.path
+        filename = path.name
+        mime_type = "application/pdf"
 
-        url = getattr(file, "url", None) or getattr(file, "file_url", None)
-        if url:
-            self._file_cache[key] = {
-                "filename": filename,
-                "fileData": url,
-            }
-            return
-
-        data: Optional[bytes] = getattr(file, "data", None) or getattr(file, "bytes", None) or getattr(file, "content", None)
-        path = getattr(file, "path", None)
-
-        if data is None and path:
-            with open(path, "rb") as f:
-                data = f.read()
-
-        if data is None:
-            raise ValueError("File has no url and no bytes/path to read from.")
-
+        data = path.read_bytes()
         b64 = base64.b64encode(data).decode("utf-8")
         data_url = f"data:{mime_type};base64,{b64}"
 
         self._file_cache[key] = {
             "filename": filename,
-            # OpenRouter examples show `file_data` for base64 data URLs.  [oai_citation:9‡OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/pdfs)
             "file_data": data_url,
         }
+        file.uploaded_handle = key
 
     def delete_file(self, file: File) -> None:
         """
-        No server-side deletion required for OpenRouter inline files.
-        We just drop the local cache entry.
+        OpenRouter inline files: no server deletion. Clear local cache and uploaded_handle.
         """
         key = self._file_cache_key(file)
         self._file_cache.pop(key, None)
+        file.uploaded_handle = None
 
     # -------------------- helpers --------------------
 
@@ -364,59 +316,5 @@ class QwenChat(LLMChat):
         return False
 
     def _file_cache_key(self, file: File) -> str:
-        # Try stable identifiers first
-        fid = getattr(file, "id", None) or getattr(file, "file_id", None)
-        if fid:
-            return str(fid)
-
-        # Fall back to a deterministic key based on name+path; last resort is object id.
-        name = getattr(file, "filename", None) or getattr(file, "name", None) or ""
-        path = getattr(file, "path", None) or ""
-        if name or path:
-            return f"{name}::{path}"
-
-        return f"obj::{id(file)}"
-
-    def _make_llm_chat_response(
-        self,
-        text: str,
-        raw: Any,
-        model: str,
-        finish_reason: Any = None,
-        usage: Any = None,
-    ) -> LLMChatResponse:
-        """
-        Construct LLMChatResponse without assuming its exact constructor signature.
-        """
-        sig = inspect.signature(LLMChatResponse)  # works for dataclasses and normal classes
-        kwargs: dict[str, Any] = {}
-
-        # common names used across codebases
-        candidates = {
-            "text": text,
-            "content": text,
-            "message": text,
-            "output_text": text,
-            "raw": raw,
-            "raw_response": raw,
-            "response": raw,
-            "model": model,
-            "finish_reason": finish_reason,
-            "stop_reason": finish_reason,
-            "usage": usage,
-        }
-
-        for name, val in candidates.items():
-            if name in sig.parameters and val is not None:
-                kwargs[name] = val
-
-        try:
-            return LLMChatResponse(**kwargs) 
-        except TypeError:
-            try:
-                return LLMChatResponse(text)  
-            except TypeError:
-                raise RuntimeError(
-                    f"Could not construct LLMChatResponse; inferred kwargs={kwargs} "
-                    f"signature={sig}"
-                )
+        # common.File has .path; use it as a stable key
+        return str(file.path)
