@@ -218,17 +218,15 @@ uv run streamlit run ../../src/pbench_validator_app/app.py -- -od out-new-superc
 ```bash
 uv run python combine_validation_results.py \
     --output_dir1 out-new-supercon-papers-stoic__for_validation-joshua \
-    --output_dir2 out-new-supercon-papers-stoic__for_validation-aaditya
+    --output_dir2 out-new-supercon-papers-stoic__for_validation-aaditya \
+    --data_dir data/new-supercon-papers
 ```
 
-5. Create a local HuggingFace dataset `out-new-supercon-papers/SPLIT` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
-
-> \[!NOTE\]
-> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+5. Create a local HuggingFace dataset `out-new-supercon-papers/full` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
 
 ```bash
-uv run python create_huggingface_dataset.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
-    --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
+uv run python create_huggingface_dataset_post-2021.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
+    --hf_revision v0.0.0 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
 ```
 
 6. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
