@@ -7,7 +7,7 @@ Usage:
 ```bash
 cd examples/flux-precedent-search/
 uv run python run_precedent_search_with_llms.py \
-    --csv flux_materials-devset.csv \
+    --csv flux-material_dev-set.csv \
     --server gemini \
     -m gemini-3-pro-preview \
     -od out/ \
@@ -184,8 +184,8 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
 
     logger.info(f"Loading materials from {csv_path}")
     df = pd.read_csv(csv_path)
-    # Load materials from material_id column and remove spaces
-    materials = df["material_id"].apply(lambda x: x.replace(" ", "")).tolist()
+    # Load materials from material column and remove spaces
+    materials = df["material"].apply(lambda x: x.replace(" ", "")).tolist()
 
     if args.limit:
         materials = materials[: args.limit]
@@ -223,7 +223,7 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
     # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
     web_search_suffix = "__websearch" if args.use_web_search else ""
-    output_filename = f"flux_precedent_search__model={model_name_safe}{web_search_suffix}.csv"
+    output_filename = f"precedent_search__model={model_name_safe}{web_search_suffix}.csv"
     output_path = output_dir / output_filename
 
     # Check if output already exists
@@ -255,25 +255,47 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
     # Convert to DataFrame and save
     results_df = pd.DataFrame(results)
 
+    # Merge with ground truth from original CSV for comparison
+    ground_truth_df = df[
+        [
+            "material",
+            "is_grown_with_flux",
+            "refno",
+            "joshua_notes",
+        ]
+    ].rename(
+        columns={
+            "is_grown_with_flux": "gt_is_grown_with_flux",
+            "refno": "gt_refno",
+            "joshua_notes": "gt_joshua_notes",
+        }
+    )
+
+    # Merge predictions with ground truth
+    merged_df = results_df.merge(ground_truth_df, on="material", how="left")
+
     # Reorder columns for clarity
     column_order = [
         "material",
         "is_grown_with_flux",
+        "gt_is_grown_with_flux",
+        "gt_refno",
         "sources",
+        "gt_joshua_notes",
         "missing_or_notable_information",
         "web_search_queries",
         "web_search_uris",
         "raw_response",
         "error",
     ]
-    results_df = results_df[[c for c in column_order if c in results_df.columns]]
+    merged_df = merged_df[[c for c in column_order if c in merged_df.columns]]
 
-    results_df.to_csv(output_path, index=False)
+    merged_df.to_csv(output_path, index=False)
     logger.info(f"Saved results to {output_path}")
 
     # Print summary
-    n_success = results_df["error"].isna().sum()
-    n_errors = results_df["error"].notna().sum()
+    n_success = merged_df["error"].isna().sum()
+    n_errors = merged_df["error"].notna().sum()
     logger.info(f"Completed: {n_success} successful, {n_errors} errors")
 
 
@@ -285,8 +307,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--csv",
         type=Path,
-        default=Path("flux_materials-devset.csv"),
-        help="Path to CSV file with materials (default: flux_materials-devset.csv)",
+        default=Path("flux-material_dev-set.csv"),
+        help="Path to CSV file with materials (default: flux-material_dev-set.csv)",
     )
     parser.add_argument(
         "--template_path",
