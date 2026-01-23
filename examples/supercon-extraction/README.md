@@ -6,7 +6,7 @@
 TODO:
 - [X] Move steps for generating GT property name embeddings to [Constructing the dataset](#constructing-the-dataset-from-supercon-original).
 - [ ] Share embeddings on HF.
-- [ ] Add instructions for computing interannotator agreement for post-2021 SuperCon.
+- [X] Add instructions for computing interannotator agreement for post-2021 SuperCon.
 - [ ] Fill in "category" field in GT dataset
 
 ## Setup Instructions
@@ -234,6 +234,8 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
 
 ## Evaluating quality of dataset construction pipeline
 
+### Recall wrt SuperCon database
+
 Please follow the same instructions as in [Using the LLM API (no Harbor)](#using-the-llm-api-no-harbor) but replacing step 1 with the following command:
 
 ```bash
@@ -242,3 +244,19 @@ uv run --env-file=.env pbench-extract -dd DATA_DIR --server gemini -m gemini-3-p
 ```
 
 and adding the following flag when running steps 2 and 3: `-pd unsupervised_llm_extraction`.
+
+### Inter-annotator agreement rate:
+
+Assuming you have two separate validation results (one at `OUTPUT_DIR_HUMAN_1` and another at `OUTPUT_DIR_HUMAN_2`), please run the following command:
+
+```bash
+uv run python compute_cohens_kappa.py -od1 OUTPUT_DIR_HUMAN_1 -od2 OUTPUT_DIR_HUMAN_2
+```
+
+### Validation Accuracy
+
+Assuming the validation results are at `OUTPUT_DIR`, please run the following command:
+
+```bash
+uv run python format_validation_accuracy.py -od OUTPUT_DIR
+```
