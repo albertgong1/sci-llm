@@ -21,7 +21,7 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--output_dir",
         "-od",
         type=Path,
-        default="out/",
+        default=None,
         help="Output directory (default: out)",
     )
     parser.add_argument(
