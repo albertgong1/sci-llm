@@ -87,9 +87,6 @@ class QwenChat(LLMChat):
         # OpenRouter inline-file cache: key -> {"filename":..., "file_data":...}
         self._file_cache: dict[str, dict[str, Any]] = {}
 
-    # NOTE: We intentionally do NOT override generate_response / generate_response_async.
-    # The base class LLMChat already handles file upload and calls the hooks below.
-
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
         """
         Convert llm_utils.common.Conversation into OpenRouter/OpenAI-style messages.
@@ -113,7 +110,6 @@ class QwenChat(LLMChat):
                 if isinstance(c, str):
                     text_accum.append(c)
                 elif isinstance(c, File):
-                    # Flush text before file to preserve ordering.
                     if text_accum:
                         parts.append({"type": "text", "text": "\n".join(text_accum).strip()})
                         text_accum = []
@@ -121,7 +117,6 @@ class QwenChat(LLMChat):
                     key = self._file_cache_key(c)
                     cached = self._file_cache.get(key)
                     if cached is None:
-                        # Base class should have called upload_file; this is a safe fallback.
                         self.upload_file(c)
                         cached = self._file_cache.get(key)
 
@@ -130,7 +125,6 @@ class QwenChat(LLMChat):
 
                     parts.append({"type": "file", "file": cached})
                 else:
-                    # Should not happen with common.Message typing, but keep safe.
                     text_accum.append(str(c))
 
             if text_accum:
@@ -206,8 +200,6 @@ class QwenChat(LLMChat):
         usage: dict[str, Any] = {}
         web_meta: WebSearchMetadata | None = None
 
-        # Tool-calling is not part of common.LLMChatResponse yet; we ignore tool_calls here.
-        # If you need it, extend the common response schema.
         annotations: list[dict[str, Any]] = []
 
         if isinstance(response, dict):
@@ -239,11 +231,9 @@ class QwenChat(LLMChat):
                     uris.append(url)
 
         if not uris and text:
-            # fallback: extract URLs embedded in markdown/plain text
             uris = re.findall(r"https?://\S+", text)
 
         if uris:
-            # Deduplicate while preserving order
             dedup = list(dict.fromkeys(uris))
             web_meta = WebSearchMetadata(queries=[], uris=dedup)
 
@@ -316,5 +306,4 @@ class QwenChat(LLMChat):
         return False
 
     def _file_cache_key(self, file: File) -> str:
-        # common.File has .path; use it as a stable key
         return str(file.path)
