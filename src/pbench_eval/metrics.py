@@ -64,14 +64,11 @@ def compute_recall_per_material_property(
 
     """
     # Group by ground truth material AND property name to calculate recall scores
-    grouped = df.groupby(
-        ["refno", "agent", "model", "material_or_system_gt", "property_name_gt"]
-    )
+    grouped = df.groupby(["refno", "agent", "model", "id_gt"], dropna=False)
     logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
-    # import pdb; pdb.set_trace()
     results = []
 
-    for (refno, agent, model, material_gt, property_gt), group in grouped:
+    for (refno, agent, model, id_gt), group in grouped:
         # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
 
@@ -81,11 +78,12 @@ def compute_recall_per_material_property(
             # - The materials must match using scorer_pymatgen
             if (
                 row["is_match"]
-                and pd.notna(material_gt)
+                and pd.notna(row["material_or_system_gt"])
                 and pd.notna(row["material_or_system_pred"])
             ):
                 if scorer_pymatgen(
-                    str(material_gt), str(row["material_or_system_pred"])
+                    str(row["material_or_system_gt"]),
+                    str(row["material_or_system_pred"]),
                 ):
                     matching_rows.append(row)
 
@@ -95,6 +93,15 @@ def compute_recall_per_material_property(
             # No matches, score is 0
             recall_score = 0.0
         else:
+            # Extract ground truth values from the group (should be unique per group)
+            assert group["material_or_system_gt"].nunique() == 1, (
+                "Expected only one unique ground truth material per group, "
+                f"but got: {group['material_or_system_gt'].unique()}"
+            )
+            assert group["property_name_gt"].nunique() == 1, (
+                "Expected only one unique ground truth property name per group, "
+                f"but got: {group['property_name_gt'].unique()}"
+            )
             # At least one match, calculate scores and take max
             scores = []
 
@@ -124,8 +131,9 @@ def compute_recall_per_material_property(
                 "refno": refno,
                 "agent": agent,
                 "model": model,
-                "material_or_system_gt": material_gt,
-                "property_name_gt": property_gt,
+                "id_gt": id_gt,
+                "material_or_system_gt": group["material_or_system_gt"].iloc[0],
+                "property_name_gt": group["property_name_gt"].iloc[0],
                 "value_string_gt": ", ".join(
                     list(
                         set(
@@ -184,7 +192,7 @@ def compute_precision_per_material_property(
 
     """
     # Group by predicted material and calculate precision scores
-    grouped = df.groupby(["refno", "agent", "model", "id_pred"])
+    grouped = df.groupby(["refno", "agent", "model", "id_pred"], dropna=False)
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 

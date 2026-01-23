@@ -438,7 +438,9 @@ async def extract_properties(args: argparse.Namespace) -> None:
         # Save usage to JSON
         usage_dir = args.output_dir / "usage"
         usage_dir.mkdir(parents=True, exist_ok=True)
-        usage_filename = f"usage__model={model_name_safe}__refno={refno}.json"
+        usage_filename = (
+            f"usage__agent=mass_extract__model={model_name_safe}__refno={refno}.json"
+        )
         usage_path = usage_dir / usage_filename
         with open(usage_path, "w") as f:
             json.dump(usage, f, indent=2)

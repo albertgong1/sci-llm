@@ -101,18 +101,6 @@ parser = ArgumentParser(
 )
 parser = pbench.add_base_args(parser)
 parser.add_argument(
-    "--repo_name",
-    type=str,
-    default=None,
-    help="Name of the HuggingFace repository to push to",
-)
-parser.add_argument(
-    "--tag_name",
-    type=str,
-    default=None,
-    help="Name of the tag to apply to the dataset",
-)
-parser.add_argument(
     "--filter_pdf",
     action="store_true",
     help="If true, filter out rows where paper PDF is not found at data_dir/Paper_DB",
@@ -161,7 +149,6 @@ def process_row(row: pd.Series) -> pd.Series:
     """
     # element corresponds to the label "chemical formula"
     properties = []
-    prop_id = 0
     for col in df.columns:
         if col in ["refno", "element"]:
             continue
@@ -237,7 +224,7 @@ def process_row(row: pd.Series) -> pd.Series:
 
         properties.append(
             {
-                "id": f"prop_{prop_id:03d}",
+                "id": None,  # assigned after grouping by refno
                 "material_or_system": row[
                     "element"
                 ],  # TODO (Albert): normalize using pymatgen
@@ -255,7 +242,6 @@ def process_row(row: pd.Series) -> pd.Series:
                 "notes": None,
             }
         )
-        prop_id += 1
     return pd.Series(
         {
             "refno": row["refno"],
@@ -274,18 +260,23 @@ df = df.groupby("refno", as_index=False).agg(
     {"properties": lambda x: [prop for props_list in x for prop in props_list]}
 )
 
+# Reassign prop_id to be unique within each refno
+for idx, row in df.iterrows():
+    for prop_id, prop in enumerate(row["properties"]):
+        prop["id"] = f"prop_{prop_id:03d}"
+
 if args.filter_pdf:
     logger.info("Filtering out rows where paper PDF is not found")
     df = df[df["refno"].apply(lambda x: Path(paper_dir / f"{x}.pdf").exists())]
     logger.info(f"{len(df)} rows have paper PDF")
 
 logger.info("Saving dataset to CSV...")
-save_path = args.output_dir / f"{args.split}.csv"
+save_path = args.output_dir / f"{args.hf_split}.csv"
 save_path.parent.mkdir(parents=True, exist_ok=True)
 df.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
-if False:
+if True:
     # FOR DEBUGGING PURPOSES ONLY:
     # save exploded version of the dataset for easier inspection
     df_exploded = df.explode("properties").reset_index(drop=True)
@@ -305,17 +296,17 @@ if False:
     properties_df.insert(property_name_idx, "db_label", db_label_values)
     # import pdb; pdb.set_trace()
     # save properties_df to csv
-    exploded_save_path = args.output_dir / f"{args.split}_exploded.csv"
+    exploded_save_path = args.output_dir / f"{args.hf_split}_exploded.csv"
     logger.info(f"Saving exploded dataset to {exploded_save_path}...")
     properties_df.to_csv(exploded_save_path, index=False)
-    exit(0)
+    # exit(0)
 
 dataset = Dataset.from_pandas(df)
-dataset.save_to_disk(args.output_dir / f"{args.split}")
-logger.info(f"Dataset saved to {args.output_dir / f'{args.split}'}")
+dataset.save_to_disk(args.output_dir / f"{args.hf_split}")
+logger.info(f"Dataset saved to {args.output_dir / f'{args.hf_split}'}")
 
 # Load the dataset from disk and print the first row
-loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.split}")
+loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.hf_split}")
 logger.info("Loading first row from saved dataset:")
 first_row = loaded_dataset[0]
 print("\n" + "=" * 80)
@@ -329,19 +320,19 @@ print("=" * 80 + "\n")
 # %%
 # Push to HuggingFace Hub (requires authentication)
 # Make sure you're logged in: hf auth login
-if args.repo_name is not None:
-    logger.info(f"Pushing dataset to HuggingFace Hub: {args.repo_name}")
+if args.hf_repo is not None:
+    logger.info(f"Pushing dataset to HuggingFace Hub: {args.hf_repo}...")
     logger.info(f"Uploading {len(df)} rows...")
     dataset = Dataset.from_pandas(df)
     # Note: If schema changes, you may need to delete existing data first:
-    # huggingface_hub.HfApi().delete_folder(repo_id=args.repo_name, path_in_repo="data", repo_type="dataset")
-    dataset.push_to_hub(args.repo_name, private=False, split=args.split)
-    logger.info(f"✓ All {len(df)} rows pushed to {args.repo_name}")
+    # huggingface_hub.HfApi().delete_folder(repo_id=args.hf_repo, path_in_repo="data", repo_type="dataset")
+    dataset.push_to_hub(args.hf_repo, private=False, split=args.hf_split)
+    logger.info(f"✓ All {len(df)} rows pushed to {args.hf_repo}")
 
     # Tag the dataset so that we can easily refer to different versions of the dataset
     # Ref: https://github.com/huggingface/datasets/discussions/5370
-    if args.tag_name is not None:
+    if args.hf_revision is not None:
         huggingface_hub.create_tag(
-            args.repo_name, tag=args.tag_name, repo_type="dataset"
+            args.hf_repo, tag=args.hf_revision, repo_type="dataset"
         )
-        logger.info(f"✓ Dataset tagged with {args.tag_name}")
+        logger.info(f"✓ Dataset tagged with {args.hf_revision}")

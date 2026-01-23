@@ -33,6 +33,7 @@ args = parser.parse_args()
 pbench.setup_logging(args.log_level)
 jobs_dir = args.jobs_dir
 force = args.force
+preds_dirname = args.preds_dirname
 # model_name = args.model_name
 # agent = args.agent
 
@@ -43,7 +44,7 @@ if jobs_dir is not None:
     # df = df[(df["agent"] == agent) & (df["model"] == model_name)]
 else:
     # Load predictions from CSV files
-    preds_dir = args.output_dir / "unsupervised_llm_extraction"
+    preds_dir = args.output_dir / preds_dirname
     preds_files = list(preds_dir.glob("*.csv"))
     if not preds_files:
         raise FileNotFoundError(f"No CSV files found in {preds_dir}")

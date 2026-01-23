@@ -70,10 +70,13 @@ uv run python format_accuracy.py -jd JOBS_DIR
 
 1. Please run the following command to generate the predictions:
 
+> \[!IMPORTANT\]
+> Registry and max num papers flags define an ordering to process the big list of papers and a limit. This script assumes that `registry_data.json` exists in this examples subdirectory. Ask ag2435@cornell.edu on Slack for a copy of this file.
+> Remove these flags to process the full dataset in DATA_DIR=data.
+
 ```bash
-# Registry and max num papers flags define an ordering to process the big list of papers and a limit. Remove them
-# to process the full dataset in DATA_DIR=data
-uv run --env-file=.env pbench-extract -dd DATA_DIR --server gemini -m gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50
+uv run --env-file=.env pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/targeted_stoic_extraction_prompt.md \
+    --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50 -od OUTPUT_DIR
 ```
 
 2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
@@ -143,8 +146,8 @@ uv run python generate_property_unit_mappings.py
 > Also make sure to update HF_DATASET_NAME, HF_DATASET_REVISION, and HF_DATASET_SPLIT accordingly.
 
 ```bash
-uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
-    --tag_name v0.0.0 --repo_name kilian-group/supercon-extraction --split SPLIT
+uv run python create_huggingface_dataset.py -dd data-arxiv -od out-0122-harbor --filter_pdf \
+    --hf_revision v0.2.1 --hf_repo kilian-group/supercon-extraction --hf_split full
 ```
 
 5. Generate embeddings for the ground-truth property names for scoring:
@@ -228,3 +231,14 @@ uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
 ```
+
+## Evaluating quality of dataset construction pipeline
+
+Please follow the same instructions as in [Using the LLM API (no Harbor)](#using-the-llm-api-no-harbor) but replacing step 1 with the following command:
+
+```bash
+uv run --env-file=.env pbench-extract -dd DATA_DIR --server gemini -m gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md
+    --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50
+```
+
+and adding the following flag when running steps 2 and 3: `-pd unsupervised_llm_extraction`.

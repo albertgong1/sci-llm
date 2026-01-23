@@ -382,7 +382,9 @@ async def process_single_paper_task(
             logger.warning(f"No properties extracted from {refno}")
 
         # Save usage to JSON
-        usage_filename = f"usage__model={model_name_safe}__refno={refno}.json"
+        usage_filename = (
+            f"usage__agent=zeroshot__model={model_name_safe}__refno={refno}.json"
+        )
         usage_path = usage_dir / usage_filename
         with open(usage_path, "w") as f:
             json.dump(usage, f, indent=2)

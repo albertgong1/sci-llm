@@ -5,6 +5,7 @@ Reference for SuperCon integer codes: https://mdr.nims.go.jp/filesets/28e52e3f-8
 
 import json
 import re
+import uuid
 from json import JSONDecoder
 from pathlib import Path
 from typing import Any
@@ -352,6 +353,11 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
                     f"No properties found in predictions for trial: {trial_dir}"
                 )
                 continue
+            # HACK: if "id" key is missing from any property in the predictions list,
+            # then assign a dummy id to each property based on its index using uuid
+            for prop in predictions["properties"]:
+                if "id" not in prop:
+                    prop["id"] = f"prop_{uuid.uuid4()}"
             # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
             refno, _ = trial_dir.name.split("__")
 

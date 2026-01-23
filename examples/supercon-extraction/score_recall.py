@@ -131,10 +131,10 @@ acc_by_refno = (
         property_material_matches=pd.NamedAgg(
             column="num_property_material_matches", aggfunc=counta
         ),
+        num_gt=pd.NamedAgg(column="id_gt", aggfunc="size"),
     )
     .reset_index()
 )
-
 # Merge trial counts into acc_by_refno for per-group normalization
 acc_by_refno["num_trials"] = acc_by_refno.apply(
     lambda row: trials_lookup.get((row["agent"], row["model"]), 1), axis=1
@@ -155,6 +155,10 @@ acc = (
                     g["property_material_matches"].tolist(), g["num_trials"].iloc[0]
                 ),
                 "successful_count": len(g),
+                "avg_num_gt": mean_sem_with_n(
+                    g["num_gt"].tolist(), g["num_trials"].iloc[0]
+                ),
+                "num_trials": g["num_trials"].iloc[0],
             }
         ),
         include_groups=False,

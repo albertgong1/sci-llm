@@ -53,10 +53,13 @@ def calculate_cost(
         Total cost in USD, or None if model pricing is unavailable.
 
     """
-    if model not in MODEL_PRICING:
+    # Strip provider prefix (e.g., "openai/gpt-5" -> "gpt-5")
+    model_key = model.split("/")[-1] if "/" in model else model
+
+    if model_key not in MODEL_PRICING:
         return None
 
-    prices = MODEL_PRICING[model]
+    prices = MODEL_PRICING[model_key]
     if prices is None or not isinstance(prices, dict):
         return None
 

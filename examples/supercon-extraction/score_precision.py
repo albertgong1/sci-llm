@@ -128,6 +128,7 @@ for (agent, model, refno), group in df_results.groupby(
     # import pdb; pdb.set_trace()
     group.to_csv(output_csv_path, index=False)
 
+# get the number of rows where we found at least one match
 counta = lambda x: (x > 0).sum()  # noqa: E731
 acc_by_refno = (
     df_results.groupby(["agent", "model", "refno"], dropna=False)
@@ -141,7 +142,6 @@ acc_by_refno = (
     )
     .reset_index()
 )
-
 # Merge trial counts into acc_by_refno for per-group normalization
 acc_by_refno["num_trials"] = acc_by_refno.apply(
     lambda row: trials_lookup.get((row["agent"], row["model"]), 1), axis=1
@@ -165,6 +165,7 @@ acc = (
                 "avg_num_pred": mean_sem_with_n(
                     g["num_pred"].tolist(), g["num_trials"].iloc[0]
                 ),
+                "num_trials": g["num_trials"].iloc[0],
             }
         ),
         include_groups=False,
