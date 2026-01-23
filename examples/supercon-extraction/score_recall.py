@@ -158,6 +158,7 @@ acc = (
                 "avg_num_gt": mean_sem_with_n(
                     g["num_gt"].tolist(), g["num_trials"].iloc[0]
                 ),
+                "num_trials": g["num_trials"].iloc[0],
             }
         ),
         include_groups=False,

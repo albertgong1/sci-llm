@@ -165,6 +165,7 @@ acc = (
                 "avg_num_pred": mean_sem_with_n(
                     g["num_pred"].tolist(), g["num_trials"].iloc[0]
                 ),
+                "num_trials": g["num_trials"].iloc[0],
             }
         ),
         include_groups=False,
