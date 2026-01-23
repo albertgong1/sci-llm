@@ -61,15 +61,17 @@ uv run python format_accuracy.py -jd JOBS_DIR
 
 1. Download PDFs from [Google Drive Folder](https://drive.google.com/drive/folders/1HYwG2V38DaOHH-Osn7NvxtQdZNLoeINt?usp=share_link) and place them in `data/Paper_DB`:
 
-- [ ] @tempoxylophone: The subsequent steps assumes that that the PDF for refno is at `data/Paper_DB/refno.pdf`, so we (annoyingly) need to rename the PDFs to use refno instead of the arXiv ID. If a single refno maps to multiple arXiv IDs, then we can probably throw away that refno. See Step 1 [README.md](../supercon-extraction/README.md#constructing-the-dataset-from-supercon-original) for how I renamed the files. Let me know on Slack if you have thoughts on this / better workarounds.
+- [x] @tempoxylophone: The subsequent steps assumes that that the PDF for refno is at `data/Paper_DB/refno.pdf`, so we (annoyingly) need to rename the PDFs to use refno instead of the arXiv ID. If a single refno maps to multiple arXiv IDs, then we can probably throw away that refno. See Step 1 [README.md](../supercon-extraction/README.md#constructing-the-dataset-from-supercon-original) for how I renamed the files. Let me know on Slack if you have thoughts on this / better workarounds.
+    - we have resolved this. There is no `refno` for CDW, I (@tempoxylophone) had used the arXiv ID because it was a unique property that was already available and mapped clearly to a paper's filename.
 
 2. Obtain candidate properties:
 
 - Extract properties from PDFs using an LLM:
 
 ```bash
-uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp prompts/targeted_extraction_prompt.md
+uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-preview -od OUTPUT_DIR -pp examples/cdw-extraction/prompts/targeted_extraction_prompt_02.md
 ```
+>Ensure that you have set the `GOOGLE_API_KEY` in the `.env` file before calling Gemini via the above command.
 
 - Add `data_type` column to the CSV. The resulting CSV will be saved to `OUTPUT_DIR/candidates`.
 

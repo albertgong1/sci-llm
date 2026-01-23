@@ -135,7 +135,9 @@ def process_csv_file(input_path: Path) -> pd.DataFrame | None:
     logger.info(f"Processing {input_path.name}")
 
     # Read CSV
-    df = pd.read_csv(input_path)
+    # refno on arxiv IDs can be coerced to float, we don't want that
+    # e.g. 08123.1 should stay "08123.1", it should not become 8123.1
+    df = pd.read_csv(input_path, dtype={"refno": "string"})
 
     # Check if value_string column exists
     if "value_string" not in df.columns:
