@@ -92,30 +92,35 @@ uv run --env-file=.env pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-
     --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50 -od OUTPUT_DIR
 ```
 
-2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
+2. Compute task-average precision and recall by model:
 
 ```bash
 uv run --env-file=.env python generate_pred_embeddings.py -od OUTPUT_DIR
-```
-
-3. Query LLM to determine best match between generated and ground-truth property name:
-
-```bash
-uv run --env-file=.env generate_gt_embeddings.py
-uv run --env-file=.env python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
-```
-
-4. Compute precision:
-
-```bash
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run --env-file=.env python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash
+# Compute precision:
 uv run --env-file=.env python score_precision.py -od OUTPUT_DIR
-```
-
-5. Compute recall:
-
-```bash
+# Compute recall:
 uv run --env-file=.env python score_recall.py -od OUTPUT_DIR
 ```
+
+<details>
+    <summary>Instructions for SuperCon Post-2021</summary>
+
+```bash
+uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+# Compute precision
+uv run python score_precision.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+# Compute recall
+uv run python score_recall.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+```
+
+</details>
 
 6. Compute task-average token usage, steps, and cost:
 
