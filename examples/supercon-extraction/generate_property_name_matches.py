@@ -379,11 +379,11 @@ if __name__ == "__main__":
 
     # Setup logging
     pbench.setup_logging(args.log_level)
+    # Load env variables
+    load_dotenv()
     # Check env
     if "GOOGLE_API_KEY" not in os.environ:
         raise ValueError("GOOGLE_API_KEY not found in environment.")
-    # Load env variables
-    load_dotenv()
 
     # Run main
     asyncio.run(main(args))

@@ -12,6 +12,7 @@ from datasets import load_dataset
 import json
 
 # third-party imports
+from dotenv import load_dotenv
 from slugify import slugify
 
 # pbench imports
@@ -24,6 +25,9 @@ from utils import (
     HF_DATASET_REVISION,
     HF_DATASET_SPLIT,
 )
+
+# Load env variables
+load_dotenv()
 
 parser = ArgumentParser(description="Generate embeddings from property names.")
 parser = pbench.add_base_args(parser)
