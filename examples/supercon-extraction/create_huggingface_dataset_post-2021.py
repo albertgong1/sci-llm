@@ -111,10 +111,9 @@ data_path = args.data_dir / "combined_validation_results.csv"
 logger.info(f"Loading dataset from {data_path}...")
 df = pd.read_csv(data_path, dtype=str)
 logger.info(f"Loaded {len(df)} rows")
-
 # Filter out rows where validated is not True
-df = df[df["validated"].str.lower() == "true"]
-logger.info(f"After filtering for validated=True: {len(df)} rows")
+df = df[df["validated_resolved"].str.lower() == "true"]
+logger.info(f"After filtering for validated_resolved=True: {len(df)} rows")
 
 
 def process_row(row: pd.Series) -> dict:

@@ -111,13 +111,13 @@ uv run --env-file=.env python score_recall.py -od OUTPUT_DIR
 uv run python generate_pred_embeddings.py -od OUTPUT_DIR
 # Query LLM to determine best match between generated and ground-truth property name:
 uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
 # Compute precision
 uv run python score_precision.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
 # Compute recall
 uv run python score_recall.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.0
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
 ```
 
 </details>
@@ -256,7 +256,7 @@ uv run python create_huggingface_dataset_post-2021.py -dd data/new-supercon-pape
 5. Generate embeddings for the ground-truth property names for scoring:
 
 ```bash
-uv run python generate_gt_embeddings.py --hf_revision v0.0.0 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
+uv run python generate_gt_embeddings.py --hf_revision v0.0.1 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
 ```
 
 6. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
