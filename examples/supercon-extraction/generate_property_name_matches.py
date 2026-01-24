@@ -40,7 +40,6 @@ from utils import (
     HF_DATASET_REVISION,
     HF_DATASET_SPLIT,
     get_harbor_data,
-    GT_EMBEDDINGS_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,8 +227,17 @@ async def main(args: argparse.Namespace) -> None:
     if not pred_embeddings_files:
         raise FileNotFoundError(f"No embeddings files found in {pred_embeddings_dir}")
 
-    logger.info(f"Loading ground truth embeddings from {GT_EMBEDDINGS_PATH}...")
-    df_gt_embeddings = pd.read_json(GT_EMBEDDINGS_PATH)
+    # Construct GT embeddings path from HF dataset parameters
+    hf_dataset_name = args.hf_repo or HF_DATASET_NAME
+    hf_split_name = args.hf_split or HF_DATASET_SPLIT
+    hf_revision = args.hf_revision or HF_DATASET_REVISION
+    gt_embeddings_filename = (
+        f"embeddings_{slugify(f'{hf_dataset_name}_{hf_split_name}_{hf_revision}')}.json"
+    )
+    gt_embeddings_path = Path("scoring") / gt_embeddings_filename
+
+    logger.info(f"Loading ground truth embeddings from {gt_embeddings_path}...")
+    df_gt_embeddings = pd.read_json(gt_embeddings_path)
 
     #
     # Load extracted properties
@@ -254,9 +262,6 @@ async def main(args: argparse.Namespace) -> None:
     #
     # Load ground truth properties
     #
-    hf_dataset_name = args.hf_repo or HF_DATASET_NAME
-    hf_split_name = args.hf_split or HF_DATASET_SPLIT
-    hf_revision = args.hf_revision or HF_DATASET_REVISION
     logger.info(
         f"Loading dataset from HuggingFace: {hf_dataset_name} "
         f"(revision={hf_revision}, split={hf_split_name})"

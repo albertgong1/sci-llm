@@ -229,6 +229,12 @@ uv run python create_huggingface_dataset_post-2021.py -dd data/new-supercon-pape
     --hf_revision v0.0.0 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
 ```
 
+5. Generate embeddings for the ground-truth property names for scoring:
+
+```bash
+uv run python generate_gt_embeddings.py --hf_revision v0.0.0 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
+```
+
 6. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
 
 ```bash

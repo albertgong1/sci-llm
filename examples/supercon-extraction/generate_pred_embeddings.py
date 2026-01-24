@@ -6,7 +6,6 @@ Reference: https://ai.google.dev/gemini-api/docs/embeddings#task-types
 # standard imports
 import pandas as pd
 from argparse import ArgumentParser
-import re
 import logging
 
 # pbench imports
@@ -51,11 +50,10 @@ else:
     dfs = []
     for file in preds_files:
         df = pd.read_csv(file)
-        if True:
-            logger.warning(
-                "Inferring refno from filename using regex pattern: refno=<value>"
-            )
-            df["refno"] = re.search(r"refno=([^.]+)", str(file)).group(1)
+        assert "refno" in df.columns, "refno column not found in predictions CSV"
+        assert df["refno"].nunique() == 1, (
+            "Expected only one unique refno per predictions CSV"
+        )
         dfs.append(df)
     df = pd.concat(dfs, ignore_index=True)
 
