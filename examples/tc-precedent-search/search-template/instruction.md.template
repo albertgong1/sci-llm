@@ -1,5 +1,3 @@
-{paper_at_command}
-
 You are a careful condensed-matter physicist and materials scientist.
 
 Your task is to determine whether the material **{material}** has been reported to be superconducting, and to extract detailed properties about its phase behavior and related materials.
@@ -11,7 +9,7 @@ Q1. Has **{material}** been reported to be superconducting? (Answer "Yes" or "No
 Q2. If Yes, what are ALL the measured superconducting transition temperatures (Tc) reported? (Provide values designated in Kelvin as a list, e.g., ["12", "11.5"]. Do NOT include unit.)
 Q3. If No, what are ALL the lowest temperatures at which it was measured and found NOT to be superconducting (Tcn)? (Provide values designated in Kelvin as a list, e.g., ["0.05", "4.2"].)
 
-**Output Format:**
+**Output Format (WRITE TO {predictions_path}):**
 
 You must output a SINGLE JSON object exactly matching this structure:
 
@@ -114,3 +112,7 @@ You must output a SINGLE JSON object exactly matching this structure:
     - Do NOT infer superconductivity or phases even if they are typical for the material class.
     - **Source DOIs**: For each source, provide an object with: `title`, `authors` (list), `year` (int), `doi`, and `quoted_span` (relevant text snippet supporting the extraction).
     - Provide ONLY the JSON. No Markdown fencing or explanation.
+
+## FINAL INSTRUCTIONS:
+1. Provide ONLY the JSON. No Markdown fencing or explanation.
+2. Save this JSON to `{predictions_path}` as your final response.
