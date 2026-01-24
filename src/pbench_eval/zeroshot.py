@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
 import llm_utils
 from llm_utils.common import Conversation, File, LLMChatResponse, Message
@@ -156,82 +157,6 @@ def json_property_to_csv_row(prop: dict) -> pd.Series:
     return pd.Series(row_data)
 
 
-async def process_single_page(
-    page_num: int,
-    file: File,
-    prompt: str,
-    refno: str,
-    llm: llm_utils.LLMChat,
-    inf_gen_config: llm_utils.InferenceGenerationConfig,
-) -> tuple[list[dict], dict]:
-    """Process a single page and extract properties.
-
-    Args:
-        page_num: Page number to process
-        file: File object for the paper
-        prompt: Extraction prompt text
-        refno: Reference number of the paper
-        llm: LLMChat instance
-        inf_gen_config: InferenceGenerationConfig instance
-
-    Returns:
-        Tuple of (list of property dicts, usage dict)
-
-    """
-    # Build conversation
-    page_prompt = f"""
-\n\n
-------FINAL INSTRUCTIONS------
-Now extract all properties in the research article that are on page number {page_num}.
-It is important to ONLY extract properties that are on page number {page_num}.
-DO NOT extract properties that are on other pages.
---------------------------------
-    """
-    conv = Conversation(
-        messages=[
-            Message(role="user", content=[file, prompt, page_prompt]),
-        ]
-    )
-
-    try:
-        # Get LLM response
-        response: LLMChatResponse = await llm.generate_response_async(
-            conv, inf_gen_config
-        )
-        usage = response.usage
-
-        # Check for errors
-        if response.error:
-            logger.error(f"LLM error for {refno} page {page_num}: {response.error}")
-            return [], usage
-
-        # Parse JSON from response
-        json_data = parse_json_response(response.pred)
-        if json_data is None:
-            logger.warning(f"Failed to parse JSON from {refno} page {page_num}")
-            return [], usage
-
-        # Check for properties array
-        if "properties" not in json_data:
-            logger.warning(f"No 'properties' key in JSON for {refno} page {page_num}")
-            return [], usage
-
-        properties = json_data["properties"]
-        if not isinstance(properties, list):
-            logger.warning(f"'properties' is not a list for {refno} page {page_num}")
-            return [], usage
-
-        # Add page_num to each property for later sorting
-        for prop in properties:
-            prop["_page_num"] = page_num
-
-        return properties, usage
-
-    except Exception as e:
-        logger.error(f"Error processing {refno} page {page_num}: {e}")
-        return [], {}
-
-
 async def process_paper(
     paper_path: Path,
     prompt: str,
@@ -273,10 +198,14 @@ async def process_paper(
         # Check for errors
         if response.error:
             logger.warning(f"LLM error for {refno}: {response.error}")
-        # Parse JSON from response
-        json_data = parse_json_response(response.pred)
-        if json_data is None:
-            logger.warning(f"Failed to parse JSON from {refno}")
+        if False:
+            # Parse JSON from response
+            json_data = parse_json_response(response.pred)
+            if json_data is None:
+                logger.warning(f"Failed to parse JSON from {refno}")
+        else:
+            # Since we specified output_format="json", response.pred is already parsed JSON
+            json_data = response.pred
         # Check for properties array
         if "properties" not in json_data:
             logger.warning(f"No 'properties' key in JSON for {refno}")
@@ -465,6 +394,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
     # Create inference config
     inf_gen_config = llm_utils.InferenceGenerationConfig(
         max_output_tokens=args.max_output_tokens,
+        output_format="json",
     )
 
     # Setup output directories
@@ -505,6 +435,8 @@ async def extract_properties(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """CLI entry point for console script."""
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description="Mass extract properties from PDF files using unsupervised LLM extraction"
     )
