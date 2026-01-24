@@ -227,7 +227,7 @@ uv run pbench-filter -dd data/new-supercon-papers -od out-new-supercon-papers
 
 3. Launch the validator app and accept/reject the candidates:
 
-> \[!NOTE\]
+> \[!WARNING\]
 > This step requires manual effort and is not fully reproducibile.
 
 ```bash
@@ -238,6 +238,9 @@ uv run streamlit run ../../src/pbench_validator_app/app.py -- -od out-new-superc
 ```
 
 4. Combine validation results from multiple human experts:
+
+> \[!WARNING\]
+> A CSV file will be created at `data/new-supercon-papers` with a column "validated_resolved". This will be auto-resolved if possible and set to "RESOLVE" if manual resolution is needed.
 
 ```bash
 uv run python combine_validation_results.py \

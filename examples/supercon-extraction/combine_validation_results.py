@@ -223,19 +223,19 @@ combined.loc[only_2_true_mask, "agreement_category"] = f"only_{annotator2}_true"
 combined.loc[records_only_1, "agreement_category"] = f"only_{annotator1}_validated"
 combined.loc[records_only_2, "agreement_category"] = f"only_{annotator2}_validated"
 
-# Add resolved "validated" column
+# Add resolved "validated_resolved" column
 # - If only one annotator validated: use their result
 # - If both agreed: use their agreed result
 # - If both disagreed: set to "RESOLVE"
 # - If neither validated: leave blank
-combined["validated"] = ""
-combined.loc[both_true_mask, "validated"] = "True"
-combined.loc[both_false_mask, "validated"] = "False"
-combined.loc[only_1_true_mask | only_2_true_mask, "validated"] = "RESOLVE"
-combined.loc[records_only_1, "validated"] = combined.loc[
+combined["validated_resolved"] = ""
+combined.loc[both_true_mask, "validated_resolved"] = "True"
+combined.loc[both_false_mask, "validated_resolved"] = "False"
+combined.loc[only_1_true_mask | only_2_true_mask, "validated_resolved"] = "RESOLVE"
+combined.loc[records_only_1, "validated_resolved"] = combined.loc[
     records_only_1, f"validated_{annotator1}"
 ].astype(str)
-combined.loc[records_only_2, "validated"] = combined.loc[
+combined.loc[records_only_2, "validated_resolved"] = combined.loc[
     records_only_2, f"validated_{annotator2}"
 ].astype(str)
 
