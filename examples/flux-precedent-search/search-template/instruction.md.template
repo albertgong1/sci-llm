@@ -34,8 +34,6 @@ You must output a SINGLE JSON object exactly matching this structure:
 ```
 
 **Rules & Constraints:**
-
-**Rules & Constraints:**
 1. **Core Flux Growth Check**
     - Find whether the material has even been grown or synthesized with flux/molten solution/self flux growth.
     - Check all relevant permutations of the compound formula.
