@@ -102,7 +102,7 @@ conversion_df = pd.read_csv(conversion_factors_path, index_col=0)
 # Check for missing rubrics
 missing_rubric = df["rubric"].isna().sum()
 if missing_rubric > 0:
-    logger.warning(f"{missing_rubric} rows have no matching rubric")
+    logger.warning(f"{missing_rubric} out of {len(df)} rows have no matching rubric")
 
 df_results = compute_recall_per_material_property(df, conversion_df=conversion_df)
 
