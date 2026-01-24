@@ -17,7 +17,7 @@
 # %%
 """Script to create a HuggingFace dataset from the Biosurfactants dataset.
 
-NOTE: skip the --repo_name argument if you don't want to push to HuggingFace Hub.
+NOTE: skip the --hf_repo argument if you don't want to push to HuggingFace Hub.
 
 Each row contains the following information:
 {
@@ -53,13 +53,13 @@ Usage:
 # To filter out rows where paper PDF is not found at data_dir/Paper_DB
 uv run python create_huggingface_dataset.py \
     --output_dir out-0113-for-jiashuo \
-    --repo_name REPO_NAME \
+    --hf_repo REPO_NAME \
     --filter_pdf
 
 # To use all rows (including rows where paper PDF is not found at data_dir/Paper_DB)
 uv run python create_huggingface_dataset.py \
     --output_dir out-0113-for-jiashuo \
-    --repo_name REPO_NAME
+    --hf_repo REPO_NAME
 ```
 """
 
@@ -82,27 +82,9 @@ parser = ArgumentParser(
 )
 parser = pbench.add_base_args(parser)
 parser.add_argument(
-    "--repo_name",
-    type=str,
-    default=None,
-    help="Name of the HuggingFace repository to push to",
-)
-parser.add_argument(
-    "--tag_name",
-    type=str,
-    default=None,
-    help="Name of the tag to apply to the dataset",
-)
-parser.add_argument(
     "--filter_pdf",
     action="store_true",
     help="If true, filter out rows where paper PDF is not found at data_dir/Paper_DB",
-)
-parser.add_argument(
-    "--split",
-    type=str,
-    default="test",
-    help="Name of the split to use for the dataset (default: test)",
 )
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
@@ -197,17 +179,17 @@ if args.filter_pdf:
     logger.info(f"{len(df_grouped)} rows have paper PDF")
 
 logger.info("Saving dataset to CSV...")
-save_path = args.output_dir / f"{args.split}.csv"
+save_path = args.output_dir / f"{args.hf_split}.csv"
 save_path.parent.mkdir(parents=True, exist_ok=True)
 df_grouped.to_csv(save_path, index=False)
 logger.info(f"Dataset saved to {save_path}")
 
 dataset = Dataset.from_pandas(df_grouped)
-dataset.save_to_disk(args.output_dir / f"{args.split}")
-logger.info(f"Dataset saved to {args.output_dir / f'{args.split}'}")
+dataset.save_to_disk(args.output_dir / f"{args.hf_split}")
+logger.info(f"Dataset saved to {args.output_dir / f'{args.hf_split}'}")
 
 # Load the dataset from disk and print the first row
-loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.split}")
+loaded_dataset = Dataset.load_from_disk(args.output_dir / f"{args.hf_split}")
 logger.info("Loading first row from saved dataset:")
 first_row = loaded_dataset[0]
 print("\n" + "=" * 80)
@@ -221,17 +203,30 @@ print("=" * 80 + "\n")
 # %%
 # Push to HuggingFace Hub (requires authentication)
 # Make sure you're logged in: hf auth login
-if args.repo_name is not None:
-    logger.info(f"Pushing dataset to HuggingFace Hub: {args.repo_name}")
+if args.hf_repo is not None:
+    logger.info(f"Pushing dataset to HuggingFace Hub: {args.hf_repo}")
     logger.info(f"Uploading {len(df_grouped)} rows...")
+
     dataset = Dataset.from_pandas(df_grouped)
-    dataset.push_to_hub(args.repo_name, private=False, split=args.split)
-    logger.info(f"All {len(df_grouped)} rows pushed to {args.repo_name}")
+    try:
+        dataset.push_to_hub(args.hf_repo, private=False, split=args.hf_split)
+    except ValueError as e:
+        if "Features of the new split don't match" in str(e):
+            # Schema mismatch - tell user how to fix it
+            raise ValueError(
+                f"Schema mismatch: the new dataset has different condition keys than the "
+                f"existing dataset on HuggingFace Hub.\n\n"
+                f"To fix this, delete the existing repo and re-run:\n"
+                f"  hf repo delete {args.hf_repo} --repo-type dataset"
+            ) from e
+        else:
+            raise
+    logger.info(f"✓ All {len(df_grouped)} rows pushed to {args.hf_repo}")
 
     # Tag the dataset so that we can easily refer to different versions of the dataset
     # Ref: https://github.com/huggingface/datasets/discussions/5370
-    if args.tag_name is not None:
+    if args.hf_revision is not None:
         huggingface_hub.create_tag(
-            args.repo_name, tag=args.tag_name, repo_type="dataset"
+            args.hf_repo, tag=args.hf_revision, repo_type="dataset"
         )
-        logger.info(f"Dataset tagged with {args.tag_name}")
+        logger.info(f"✓ Dataset tagged with {args.hf_revision}")
