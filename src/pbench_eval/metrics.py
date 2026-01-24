@@ -14,15 +14,6 @@ SERVER = "gemini"
 MODEL_NAME = "gemini-3-flash-preview"
 MAX_OUTPUT_TOKENS = 4096
 
-# Initialize LLM that will be used for all property matching
-llm = get_llm(SERVER, MODEL_NAME)
-
-# Create inference config
-inf_gen_config = InferenceGenerationConfig(
-    max_output_tokens=MAX_OUTPUT_TOKENS,
-    output_format="json",
-)
-
 
 #
 # Property extraction metrics
@@ -341,6 +332,15 @@ async def compute_mean_recall_precision(
     # assert that df_gt contains the necessary columns
     assert "rubric" in df_gt.columns, (
         "Ground truth dataframe must contain a 'rubric' column"
+    )
+
+    # Initialize LLM that will be used for all property matching
+    llm = get_llm(SERVER, MODEL_NAME)
+
+    # Create inference config
+    inf_gen_config = InferenceGenerationConfig(
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        output_format="json",
     )
 
     # -- Generate embeddings for predicted properties --
