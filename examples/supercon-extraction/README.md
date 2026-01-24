@@ -294,8 +294,17 @@ uv run python compute_cohens_kappa.py -od1 OUTPUT_DIR_HUMAN_1 -od2 OUTPUT_DIR_HU
 
 ### Validation Accuracy
 
-Assuming the validation results are at `OUTPUT_DIR`, please run the following command:
+TODO:
+- [ ] Combine the below two steps into a single script.
+
+1. To compute the validation accuracy of a single annotator, please run the following command. This script assumes the validation results are at `OUTPUT_DIR`:
 
 ```bash
 uv run python format_validation_accuracy.py -od OUTPUT_DIR
+```
+
+2. To compute the validation accuracy of the resolved validation results, please run the following command:
+
+```bash
+uv run python format_validation_accuracy_resolved.py -dd data/new-supercon-papers
 ```
