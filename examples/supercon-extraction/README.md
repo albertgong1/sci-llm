@@ -60,10 +60,23 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 </details>
 
-2. Compute accuracy across tasks:
+2. Compute task-average precision and recall by agent and model:
 
 ```bash
-uv run python format_accuracy.py -jd JOBS_DIR
+# Generate property name embeddings
+uv run python generate_pred_embeddings.py -jd JOBS_DIR -od OUTPUT_DIR
+# Generate property name matches using top-3 (cosine similarity) followed by gemini-2.5-flash to determine a match
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -jd JOBS_DIR --model_name gemini-2.5-flash --top_k 3 --log_level INFO
+# Compute average precision
+uv run python score_precision.py -od OUPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
+# Compute average recall
+uv run python score_recall.py -od OUTPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
+```
+
+3. Compute task-average token usage, steps, and cost:
+
+```bash
+uv run python format_tokens.py -jd JOBS_DIR
 ```
 
 ### Using the LLM API (no Harbor)
@@ -102,6 +115,12 @@ uv run --env-file=.env python score_precision.py -od OUTPUT_DIR
 
 ```bash
 uv run --env-file=.env python score_recall.py -od OUTPUT_DIR
+```
+
+6. Compute task-average token usage, steps, and cost:
+
+```bash
+uv run python format_tokens.py -od OUTPUT_DIR
 ```
 
 ## Constructing the Dataset from SuperCon original
