@@ -32,6 +32,43 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 </details>
 
+### Using the LLM API (no Harbor)
+
+1. Please run the following command to generate the predictions:
+
+NOTE: we only need to get predictions for the refnos in the HF dataset
+- [ ] Specify the HF repo, revision, and split when calling pbench-eval in the command below.
+- [ ] Update the pbench-eval script as follows: if HF dataset is specified, then skip a paper if the refno is not in the HF dataset when processing papers.
+
+```bash
+uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/benchmark_soft_prompt_01.md -od OUTPUT_DIR
+```
+
+2. Compute task-average precision and recall by model:
+
+TODO:
+- [ ] Make domain-agnostic version of generate_property_name_matches.py, score_precision.py, and score_recall.py.
+```bash
+uv run pbench-pred-embeddings -od OUTPUT_DIR
+# Old command (deprecated): uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+# Compute precision
+uv run python score_precision.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+# Compute recall
+uv run python score_recall.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+```
+
+6. Compute task-average token usage, steps, and cost:
+
+```bash
+uv run python format_tokens.py -od OUTPUT_DIR
+```
+
+
 ## Reproducing the Dataset Construction
 
 1. Download PDFs and place them in `DATA_DIR/Paper_DB`.
@@ -97,8 +134,20 @@ uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 
 ```bash
 uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
-    --repo_name kilian-group/biosurfactants-extraction --tag_name v0.0.0 --split SPLIT
+    --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
 ```
+
+5. Generate embeddings for the ground-truth property names for scoring:
+
+```bash
+uv run pbench-gt-embeddings --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
+```
+
+<!-- Old command (deprecated):
+```bash
+uv run python generate_gt_embeddings.py --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
+```
+-->
 
 ## Constructing Harbor tasks
 

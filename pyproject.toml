@@ -51,6 +51,8 @@ validator = [
 pbench-extract = "pbench.mass_extract_properties_from_llm:main"
 pbench-filter = "pbench.filter_candidates:main"
 pbench-eval = "pbench_eval.zeroshot:main"
+pbench-gt-embeddings = "pbench.generate_gt_embeddings:main"
+pbench-pred-embeddings = "pbench_eval.generate_pred_embeddings:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
