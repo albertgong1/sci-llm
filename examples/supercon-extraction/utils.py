@@ -15,6 +15,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Single column figures
+TICK_FONT_SIZE = 6
+MINOR_TICK_FONT_SIZE = 3
+LABEL_FONT_SIZE = 10
+LEGEND_FONT_SIZE = 7
+MARKER_ALPHA = 1
+MARKER_SIZE = 3
+LINE_ALPHA = 0.75
+OUTWARD = 4
+
 # Dataset configuration
 HF_DATASET_NAME = "kilian-group/supercon-extraction"
 HF_DATASET_REVISION = "main"  # "v0.0.0"
