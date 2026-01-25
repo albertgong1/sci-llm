@@ -139,11 +139,43 @@ def cli_main() -> None:
         f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
     )
 
-    # If jobs_dir was not provided, count unique refnos per agent/model from the data
+    # If jobs_dir was not provided, count trajectory JSONs in trajectories directory
     if args.jobs_dir is None:
-        trials_lookup = (
-            df_matches.groupby(["agent", "model"])["refno"].nunique().to_dict()
-        )
+        trajectory_dir = args.output_dir / "trajectories"
+        trials_lookup: dict[tuple[str, str], int] = {}
+        if trajectory_dir.exists():
+            # Count trajectory files per agent/model
+            # Pattern: trajectory__agent={agent}__model={model}__refno={refno}.json
+            import re
+
+            trajectory_counts: dict[tuple[str, str], int] = {}
+            for traj_file in trajectory_dir.glob("trajectory__*.json"):
+                # Parse agent and model from filename
+                match = re.match(
+                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=.+\.json",
+                    traj_file.name,
+                )
+                if match:
+                    agent, model = match.groups()
+                    # Convert model name back (-- to /)
+                    model = model.replace("--", "/")
+                    key = (agent, model)
+                    trajectory_counts[key] = trajectory_counts.get(key, 0) + 1
+            trials_lookup = trajectory_counts
+            logger.info(f"Counted trials from {trajectory_dir}: {trials_lookup}")
+        else:
+            # Fallback to counting unique refnos from data
+            logger.warning(
+                f"Trajectories directory not found: {trajectory_dir}. "
+                "Falling back to counting unique refnos from data."
+            )
+            trials_lookup = {
+                k: v
+                for k, v in df_matches.groupby(["agent", "model"])["refno"]
+                .nunique()
+                .to_dict()
+                .items()
+            }
     else:
         # Count number of trials (refnos) per agent/model
         trials_lookup: dict[tuple[str, str], int] = {}
