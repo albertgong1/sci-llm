@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 # Supported LLM servers
-SUPPORTED_SERVERS = ["gemini", "openai"]
+SUPPORTED_SERVERS = ["gemini", "openai", "qwen"]
 
 
 def calculate_cost(
@@ -114,6 +114,10 @@ def get_llm(server: str, model_name: str) -> LLMChat:
             from llm_utils.openai import OpenAIChat
 
             return OpenAIChat(model_name)
+        case "qwen":
+            from llm_utils.qwen import QwenChat
+
+            return QwenChat(model_name)
         case _:
             raise ValueError(
                 f"Unsupported server: {server}. "
