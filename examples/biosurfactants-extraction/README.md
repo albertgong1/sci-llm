@@ -36,12 +36,10 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 1. Please run the following command to generate the predictions:
 
-NOTE: we only need to get predictions for the refnos in the HF dataset
-- [ ] Specify the HF repo, revision, and split when calling pbench-eval in the command below.
-- [ ] Update the pbench-eval script as follows: if HF dataset is specified, then skip a paper if the refno is not in the HF dataset when processing papers.
-
 ```bash
-uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/benchmark_soft_prompt_01.md -od OUTPUT_DIR
+uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview \
+    -pp prompts/benchmark_soft_prompt_01.md -od OUTPUT_DIR \
+    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0
 ```
 
 2. Compute task-average precision and recall by model:
