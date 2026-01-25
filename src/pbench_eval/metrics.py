@@ -435,6 +435,8 @@ async def compute_mean_recall_precision(
 ) -> tuple[float, float]:
     """Calculate mean recall and precision metrics for a single task.
 
+    TODO: test that this function recreates the results from using the step-by-step scripts.
+
     Args:
         df_pred: DataFrame with predicted properties.
         df_gt: DataFrame with ground truth properties.
