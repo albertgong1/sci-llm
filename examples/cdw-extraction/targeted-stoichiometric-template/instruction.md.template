@@ -1,3 +1,5 @@
+{paper_at_command}
+
 # Charge Density Wave Property Extraction Task
 
 You are a STRICT PHYSICAL PROPERTY EXTRACTION ENGINE.
@@ -184,7 +186,7 @@ Every property MUST include:
 - location.source_type (text, figure, caption, table)
 - location.evidence (exact quote --- IT MUST EXACTLY MATCH THE PAPER)
 
-## OUTPUT FORMAT
+## OUTPUT FORMAT (WRITE TO {predictions_path})
 
 Return a SINGLE valid JSON payload containing an array of properties. Below is the full schema.
 ```json
@@ -259,7 +261,7 @@ The `material_or_system` field must contain a **fully resolved chemical formula*
 - Keep units inside value_string (no separate value_number field).
 - `location.page` is mandatory; all other fields are optional—omit if not stated.
 - Do not invent values.
-- Print only the JSON as your final response.
+- Save this JSON to `{predictions_path}` and print only the JSON as your final response.
 - Never merge values unless they form a tuple (e.g., coordinates).
 
 ## FINAL INSTRUCTIONS
