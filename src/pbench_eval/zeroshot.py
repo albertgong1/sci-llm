@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from datasets import load_dataset
 from dotenv import load_dotenv
 
 import llm_utils
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 MAX_CONDITIONS = 10
 
 # Default concurrency limit for parallel processing
-MAX_CONCURRENT_TASKS = 10
+MAX_CONCURRENT_TASKS = 20
 
 
 def load_prompt(prompt_path: Path) -> str:
@@ -58,6 +59,23 @@ def load_prompt(prompt_path: Path) -> str:
     """
     with open(prompt_path, "r") as f:
         return f.read()
+
+
+def load_hf_refnos(hf_repo: str, hf_split: str, hf_revision: str | None) -> set[str]:
+    """Load refnos from a HuggingFace dataset.
+
+    Args:
+        hf_repo: HuggingFace dataset repository name
+        hf_split: Dataset split to load
+        hf_revision: Optional dataset revision/version
+
+    Returns:
+        Set of refnos from the dataset
+
+    """
+    dataset = load_dataset(hf_repo, split=hf_split, revision=hf_revision)
+    refnos = {row["refno"] for row in dataset}
+    return refnos
 
 
 def parse_json_response(response_text: str) -> dict | None:
@@ -163,7 +181,7 @@ async def process_paper(
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
     model_name: str,
-) -> tuple[list[pd.Series], dict]:
+) -> tuple[list[pd.Series], LLMChatResponse | None]:
     """Process a single paper by prompting the LLM one page at a time to extract properties.
 
     Args:
@@ -174,7 +192,7 @@ async def process_paper(
         model_name: Name of the LLM model used for extraction
 
     Returns:
-        Tuple of (list of pandas Series, aggregated usage dict)
+        Tuple of (list of pandas Series, LLMChatResponse object)
 
     """
     # Extract refno from filename and create file object for the paper
@@ -188,13 +206,10 @@ async def process_paper(
     )
 
     properties = []
-    usage = {}
+    response: LLMChatResponse | None = None
     try:
         # Get LLM response
-        response: LLMChatResponse = await llm.generate_response_async(
-            conv, inf_gen_config
-        )
-        usage = response.usage
+        response = await llm.generate_response_async(conv, inf_gen_config)
         # Check for errors
         if response.error:
             logger.warning(f"LLM error for {refno}: {response.error}")
@@ -214,9 +229,6 @@ async def process_paper(
             logger.warning(f"'properties' is not a list for {refno}")
     except Exception as e:
         logger.error(f"Error processing {refno}: {e}")
-
-    # Aggregate usage across all pages
-    aggregated_usage = usage
 
     # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
@@ -249,7 +261,7 @@ async def process_paper(
 
     logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
     llm.delete_file(file)
-    return all_rows, aggregated_usage
+    return all_rows, response
 
 
 async def process_single_paper_task(
@@ -260,7 +272,7 @@ async def process_single_paper_task(
     model_name: str,
     model_name_safe: str,
     preds_dir: Path,
-    usage_dir: Path,
+    trajectory_dir: Path,
     force: bool,
     semaphore: asyncio.Semaphore,
 ) -> None:
@@ -274,7 +286,7 @@ async def process_single_paper_task(
         model_name: Name of the LLM model used for extraction
         model_name_safe: Sanitized model name for filenames
         preds_dir: Directory to save predictions
-        usage_dir: Directory to save usage data
+        trajectory_dir: Directory to save trajectory data
         force: Whether to overwrite existing files
         semaphore: Semaphore to limit concurrency
 
@@ -297,7 +309,7 @@ async def process_single_paper_task(
             return
 
         # Process the paper
-        rows, usage = await process_paper(
+        rows, response = await process_paper(
             pdf_path, prompt, llm, inf_gen_config, model_name
         )
 
@@ -310,14 +322,19 @@ async def process_single_paper_task(
         else:
             logger.warning(f"No properties extracted from {refno}")
 
-        # Save usage to JSON
-        usage_filename = (
-            f"usage__agent=zeroshot__model={model_name_safe}__refno={refno}.json"
+        # Save trajectory to JSON (prompt, llm response, inf gen config)
+        trajectory_filename = (
+            f"trajectory__agent=zeroshot__model={model_name_safe}__refno={refno}.json"
         )
-        usage_path = usage_dir / usage_filename
-        with open(usage_path, "w") as f:
-            json.dump(usage, f, indent=2)
-        logger.info(f"Saved usage for {refno} to {usage_path}")
+        trajectory_path = trajectory_dir / trajectory_filename
+        trajectory_data = {
+            "prompt": prompt,
+            "inf_gen_config": inf_gen_config.model_dump(),
+            "llm_response": response.model_dump() if response else None,
+        }
+        with open(trajectory_path, "w") as f:
+            json.dump(trajectory_data, f, indent=2)
+        logger.info(f"Saved trajectory for {refno} to {trajectory_path}")
 
 
 async def extract_properties(args: argparse.Namespace) -> None:
@@ -381,6 +398,23 @@ async def extract_properties(args: argparse.Namespace) -> None:
             pdf for pdf in reordered_pdf_files if pdf.stem == args.refno
         ]
 
+    # Filter by HuggingFace dataset refnos if specified
+    if args.hf_repo is not None and args.hf_split is not None:
+        logger.info(
+            f"Loading refnos from HuggingFace dataset: {args.hf_repo} "
+            f"(split={args.hf_split}, revision={args.hf_revision})"
+        )
+        hf_refnos = load_hf_refnos(args.hf_repo, args.hf_split, args.hf_revision)
+        original_count = len(reordered_pdf_files)
+        reordered_pdf_files = [
+            pdf for pdf in reordered_pdf_files if pdf.stem in hf_refnos
+        ]
+        filtered_count = original_count - len(reordered_pdf_files)
+        if filtered_count > 0:
+            logger.info(
+                f"Filtered out {filtered_count} PDF(s) not in HuggingFace dataset"
+            )
+
     num_pdfs = len(reordered_pdf_files)
     logger.info(f"Found {num_pdfs} PDF files in {paper_dir}")
 
@@ -395,13 +429,14 @@ async def extract_properties(args: argparse.Namespace) -> None:
     inf_gen_config = llm_utils.InferenceGenerationConfig(
         max_output_tokens=args.max_output_tokens,
         output_format="json",
+        reasoning_effort=args.openai_reasoning_effort,
     )
 
     # Setup output directories
     preds_dir = args.output_dir / "preds"
     preds_dir.mkdir(parents=True, exist_ok=True)
-    usage_dir = args.output_dir / "usage"
-    usage_dir.mkdir(parents=True, exist_ok=True)
+    trajectory_dir = args.output_dir / "trajectories"
+    trajectory_dir.mkdir(parents=True, exist_ok=True)
 
     # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
@@ -420,7 +455,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
             model_name=args.model_name,
             model_name_safe=model_name_safe,
             preds_dir=preds_dir,
-            usage_dir=usage_dir,
+            trajectory_dir=trajectory_dir,
             force=args.force,
             semaphore=semaphore,
         )
@@ -486,6 +521,12 @@ def main() -> None:
         type=int,
         default=65536,
         help="Maximum number of output tokens for LLM response (default: 65536)",
+    )
+    parser.add_argument(
+        "--openai_reasoning_effort",
+        type=str,
+        default="high",
+        help="Reasoning effort for OpenAI models (default: high)",
     )
     parser.add_argument(
         "--max_concurrent",

@@ -2495,6 +2495,7 @@ dependencies = [
     { name = "python-slugify" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
+    { name = "tabulate" },
     { name = "tqdm" },
 ]
 
@@ -2525,6 +2526,7 @@ requires-dist = [
     { name = "python-slugify", specifier = ">=8.0.4" },
     { name = "pyyaml" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "tabulate" },
     { name = "tqdm" },
 ]
 

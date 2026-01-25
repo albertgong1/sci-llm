@@ -530,8 +530,8 @@ def main() -> None:
     parser.add_argument(
         "--template",
         type=str,
-        default="ground-template",
-        help="Template folder under the workspace (default: ground-template).",
+        default="targeted-template",
+        help="Template folder under the workspace (default: targeted-template).",
     )
     parser.add_argument(
         "--task",

@@ -82,15 +82,15 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     )
 
     # Logging args
-    parser.add_argument("--log_level", type=str, default="INFO", help="Logging level")
+    parser.add_argument("--log_level", type=str, default="ERROR", help="Logging level")
     return parser
 
 
-def setup_logging(log_level: int = logging.INFO) -> None:
+def setup_logging(log_level: str = "ERROR") -> None:
     """Setup logging for the script.
 
     Args:
-        log_level: Logging level (default: `logging.INFO`)
+        log_level: Logging level (default: `logging.ERROR`)
 
     """
     # Suppress logging from httpx

@@ -15,22 +15,83 @@
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
-  --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
+  --hf-tasks-repo kilian-group/biosurfactants-extraction-harbor-tasks --hf-tasks-version head \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
-  --workspace . --seed 1 --jobs-dir JOBS_DIR
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 50
 ```
 
 <details>
-    <summary>Instructions for running Harbor on Modal</summary>
+    <summary>Instructions for running Harbor tasks saved locally</summary>
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
-  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
-  --seed 1 --jobs-dir JOBS_DIR
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
 
 </details>
+
+2. Compute task-average precision and recall by model:
+
+```bash
+# Generate embeddings for predicted property names
+uv run pbench-pred-embeddings -jd JOBS_DIR -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (condition-based matching for biosurfactants)
+uv run pbench-score-precision -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
+
+# Compute recall (condition-based matching for biosurfactants)
+uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
+```
+
+### Using the LLM API (no Harbor)
+
+1. Please run the following command to generate the predictions:
+
+```bash
+uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview \
+    -pp prompts/benchmark_soft_prompt_01.md -od OUTPUT_DIR \
+    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0
+```
+
+2. Compute task-average precision and recall by model:
+
+```bash
+# Generate embeddings for predicted property names
+uv run pbench-pred-embeddings -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name
+uv run pbench-generate-matches -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (condition-based matching for biosurfactants)
+uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
+
+# Compute recall (condition-based matching for biosurfactants)
+uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
+```
+
+6. Compute task-average token usage, steps, and cost:
+
+```bash
+uv run python format_tokens.py -od OUTPUT_DIR
+```
+
 
 ## Reproducing the Dataset Construction
 
@@ -97,16 +158,26 @@ uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 
 ```bash
 uv run python create_huggingface_dataset.py -dd DATA_DIR -od OUTPUT_DIR --filter_pdf \
-    --repo_name kilian-group/biosurfactants-extraction --tag_name v0.0.0 --split SPLIT
+    --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
 ```
 
-## Constructing Harbor tasks
+5. Generate embeddings for the ground-truth property names for scoring:
 
-1. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/biosurfactants-extraction-harbor-tasks.
+```bash
+uv run pbench-gt-embeddings --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
+```
+
+<!-- Old command (deprecated):
+```bash
+uv run python generate_gt_embeddings.py --hf_repo kilian-group/biosurfactants-extraction --hf_revision v0.0.0 --hf_split SPLIT
+```
+-->
+
+6. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/biosurfactants-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir DATA_DIR/Paper_DB --output-dir OUTPUT_DIR --workspace . \
-    --gt-hf-repo kilian-group/biosurfactants-extraction --gt-hf-split lite --gt-hf-revision v0.0.0 \
+    --gt-hf-repo kilian-group/biosurfactants-extraction --gt-hf-split full --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/biosurfactants-extraction-harbor-tasks
 ```

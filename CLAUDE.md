@@ -31,6 +31,7 @@ parser = argparse.ArgumentParser(
 parser = pbench.add_base_args(parser)
 ```
 - Use a flat script structure for Python scripts within an examples/ subdirectory. Assume that the script will never be imported as a module, so do not use if __name__ == "__main__" to run the script.
+- Always add argument type annotations and return type annotations.
 
 For bash files:
 - Start with shebang `!/usr/bin/env bash`

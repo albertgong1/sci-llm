@@ -2,6 +2,8 @@
 
 import pandas as pd
 import logging
+from typing import Literal
+
 from llm_utils import get_llm, InferenceGenerationConfig
 import json
 
@@ -11,8 +13,84 @@ from pbench_eval.utils import scorer_pymatgen, score_value
 logger = logging.getLogger(__name__)
 
 SERVER = "gemini"
-MODEL_NAME = "gemini-3-flash-preview"
+MODEL_NAME = "gemini-2.5-flash"
 MAX_OUTPUT_TOKENS = 4096
+
+
+def get_conditions_for_property(
+    property_name: str,
+    rubric_df: pd.DataFrame,
+    important_only: bool = True,
+) -> list[str]:
+    """Get the condition column names for a given property from the rubric.
+
+    Args:
+        property_name: The property name to look up
+        rubric_df: DataFrame containing the rubric with condition_name column
+        important_only: If True, only return conditions marked as "important"
+
+    Returns:
+        List of condition column names for this property
+
+    """
+    # Filter to rows for this property where condition_name is not empty
+    property_conditions = rubric_df[
+        (rubric_df["property_name"] == property_name)
+        & (rubric_df["condition_name"].notna())
+        & (rubric_df["condition_name"] != "")
+    ]
+
+    if important_only and "not_important" in rubric_df.columns:
+        # Keep only rows where not_important != "not_important"
+        property_conditions = property_conditions[
+            property_conditions["not_important"] != "not_important"
+        ]
+
+    return property_conditions["condition_name"].tolist()
+
+
+def check_conditions_match(
+    row: pd.Series,
+    condition_columns: list[str],
+    gt_suffix: str = "_gt",
+    pred_suffix: str = "_pred",
+) -> bool:
+    """Check if all condition columns match between ground truth and prediction.
+
+    Args:
+        row: DataFrame row containing both gt and pred condition values
+        condition_columns: List of condition column names (without suffixes)
+        gt_suffix: Suffix for ground truth columns
+        pred_suffix: Suffix for prediction columns
+
+    Returns:
+        True if all conditions match (or are both missing), False otherwise
+
+    """
+    for cond in condition_columns:
+        gt_col = f"{cond}{gt_suffix}"
+        pred_col = f"{cond}{pred_suffix}"
+
+        # If columns don't exist, skip this condition
+        if gt_col not in row.index or pred_col not in row.index:
+            continue
+
+        gt_val = row.get(gt_col)
+        pred_val = row.get(pred_col)
+
+        # Both missing is OK
+        if pd.isna(gt_val) and pd.isna(pred_val):
+            continue
+
+        # One missing, one not - not a match
+        if pd.isna(gt_val) or pd.isna(pred_val):
+            return False
+
+        # Compare values (convert to string for comparison)
+        if str(gt_val).strip().lower() != str(pred_val).strip().lower():
+            return False
+
+    return True
 
 
 #
@@ -32,7 +110,11 @@ def construct_context(row: pd.Series) -> str:
 
 
 def compute_recall_per_material_property(
-    df: pd.DataFrame, conversion_df: pd.DataFrame
+    df: pd.DataFrame,
+    conversion_df: pd.DataFrame | None = None,
+    matching_mode: Literal["material", "conditions"] = "material",
+    material_column: str = "material_or_system",
+    rubric_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Score recall for a dataframe of predicted-ground truth pairs.
 
@@ -42,40 +124,59 @@ def compute_recall_per_material_property(
 
     Args:
         df: DataFrame with the following columns:
-            - material_or_system_gt: Ground truth material or system.
             - property_name_gt: Ground truth property name.
             - value_string_gt: Ground truth value string.
-            - material_or_system_pred: Predicted material or system.
             - value_string_pred: Predicted value string.
             - rubric: Rubric for the property.
-        conversion_df: DataFrame with unit conversion factors.
+            - For material mode: material_or_system_gt, material_or_system_pred
+            - For conditions mode: condition columns with _gt and _pred suffixes
+        conversion_df: DataFrame with unit conversion factors. If None, skip unit conversion.
+        matching_mode: "material" for material-based matching (supercon),
+                       "conditions" for condition-based matching (biosurfactants)
+        material_column: Column name for material matching (used when matching_mode="material")
+        rubric_df: DataFrame containing the rubric with condition definitions
+                   (required when matching_mode="conditions")
 
     Returns:
         DataFrame with recall score for each (material, property) pair.
 
     """
+    if matching_mode == "conditions" and rubric_df is None:
+        raise ValueError("rubric_df is required when matching_mode='conditions'")
+
     # Group by ground truth material AND property name to calculate recall scores
     grouped = df.groupby(["refno", "agent", "model", "id_gt"], dropna=False)
     logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
     results = []
 
+    gt_material_col = f"{material_column}_gt"
+    pred_material_col = f"{material_column}_pred"
+
     for (refno, agent, model, id_gt), group in grouped:
-        # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
+        property_name = group["property_name_gt"].iloc[0]
 
         for idx, row in group.iterrows():
-            # In order for a row to be considered a match:
-            # - The properties must match (using the "is_match" column)
-            # - The materials must match using scorer_pymatgen
-            if (
-                row["is_match"]
-                and pd.notna(row["material_or_system_gt"])
-                and pd.notna(row["material_or_system_pred"])
-            ):
-                if scorer_pymatgen(
-                    str(row["material_or_system_gt"]),
-                    str(row["material_or_system_pred"]),
+            # Property must match (using the "is_match" column)
+            if not row["is_match"]:
+                continue
+
+            if matching_mode == "material":
+                # Material-based matching (supercon)
+                if pd.notna(row.get(gt_material_col)) and pd.notna(
+                    row.get(pred_material_col)
                 ):
+                    if scorer_pymatgen(
+                        str(row[gt_material_col]),
+                        str(row[pred_material_col]),
+                    ):
+                        matching_rows.append(row)
+            else:
+                # Condition-based matching (biosurfactants)
+                condition_columns = get_conditions_for_property(
+                    property_name, rubric_df, important_only=True
+                )
+                if check_conditions_match(row, condition_columns, "_gt", "_pred"):
                     matching_rows.append(row)
 
         num_matches = len(matching_rows)
@@ -84,15 +185,6 @@ def compute_recall_per_material_property(
             # No matches, score is 0
             recall_score = 0.0
         else:
-            # Extract ground truth values from the group (should be unique per group)
-            assert group["material_or_system_gt"].nunique() == 1, (
-                "Expected only one unique ground truth material per group, "
-                f"but got: {group['material_or_system_gt'].unique()}"
-            )
-            assert group["property_name_gt"].nunique() == 1, (
-                "Expected only one unique ground truth property name per group, "
-                f"but got: {group['property_name_gt'].unique()}"
-            )
             # At least one match, calculate scores and take max
             scores = []
 
@@ -117,93 +209,118 @@ def compute_recall_per_material_property(
             # Take maximum score
             recall_score = max(scores) if scores else 0.0
 
-        results.append(
-            {
-                "refno": refno,
-                "agent": agent,
-                "model": model,
-                "id_gt": id_gt,
-                "material_or_system_gt": group["material_or_system_gt"].iloc[0],
-                "property_name_gt": group["property_name_gt"].iloc[0],
-                "value_string_gt": ", ".join(
-                    list(
-                        set(
-                            [str(row["value_string_gt"]) for _, row in group.iterrows()]
-                        )
+        result = {
+            "refno": refno,
+            "agent": agent,
+            "model": model,
+            "id_gt": id_gt,
+            "property_name_gt": property_name,
+            "value_string_gt": ", ".join(
+                list(set([str(row["value_string_gt"]) for _, row in group.iterrows()]))
+            ),
+            "num_property_matches": len(group),
+            "num_property_material_matches": num_matches,
+            "recall_score": recall_score,
+            "matches": ", ".join(
+                [
+                    f"{row['property_name_pred']}: {row['value_string_pred']}"
+                    for row in matching_rows
+                ]
+            ),
+            "answers": ", ".join(
+                [
+                    f"{row['value_string_pred']}"
+                    for _, row in group.iterrows()
+                    if row["is_match"]
+                ]
+            ),
+        }
+
+        # Add material columns if in material mode
+        if matching_mode == "material" and gt_material_col in group.columns:
+            result["material_or_system_gt"] = group[gt_material_col].iloc[0]
+            result["material_or_system_pred"] = ", ".join(
+                list(
+                    set(
+                        [
+                            str(row[pred_material_col])
+                            for _, row in group.iterrows()
+                            if pred_material_col in row.index
+                        ]
                     )
-                ),
-                "num_property_matches": len(group),
-                "num_property_material_matches": num_matches,
-                "material_or_system_pred": ", ".join(
-                    list(
-                        set(
-                            [
-                                str(row["material_or_system_pred"])
-                                for _, row in group.iterrows()
-                            ]
-                        )
-                    )
-                ),
-                "recall_score": recall_score,
-                "matches": ", ".join(
-                    [
-                        f"{row['property_name_pred']}: {row['value_string_pred']}"
-                        for row in matching_rows
-                    ]
-                ),
-                "answers": ", ".join(
-                    [
-                        f"{row['material_or_system_pred']}: {row['value_string_pred']}"
-                        for _, row in group.iterrows()
-                        if row["is_match"]
-                    ]
-                ),
-            }
-        )
+                )
+            )
+
+        results.append(result)
 
     df_results = pd.DataFrame(results)
     return df_results
 
 
 def compute_precision_per_material_property(
-    df: pd.DataFrame, conversion_df: pd.DataFrame
+    df: pd.DataFrame,
+    conversion_df: pd.DataFrame | None = None,
+    matching_mode: Literal["material", "conditions"] = "material",
+    material_column: str = "material_or_system",
+    rubric_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Score precision for a dataframe of predicted-ground truth pairs.
 
     Args:
         df: DataFrame with the following columns:
-            - material_or_system_pred: Predicted material or system.
+            - property_name_pred: Predicted property name.
             - value_string_pred: Predicted value string.
             - value_string_gt: Ground truth value string.
             - rubric: Rubric for the property.
-        conversion_df: DataFrame with unit conversion factors.
+            - For material mode: material_or_system_gt, material_or_system_pred
+            - For conditions mode: condition columns with _gt and _pred suffixes
+        conversion_df: DataFrame with unit conversion factors. If None, skip unit conversion.
+        matching_mode: "material" for material-based matching (supercon),
+                       "conditions" for condition-based matching (biosurfactants)
+        material_column: Column name for material matching (used when matching_mode="material")
+        rubric_df: DataFrame containing the rubric with condition definitions
+                   (required when matching_mode="conditions")
 
     Returns:
         DataFrame with precision score for each predicted material.
 
     """
+    if matching_mode == "conditions" and rubric_df is None:
+        raise ValueError("rubric_df is required when matching_mode='conditions'")
+
     # Group by predicted material and calculate precision scores
     grouped = df.groupby(["refno", "agent", "model", "id_pred"], dropna=False)
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 
+    gt_material_col = f"{material_column}_gt"
+    pred_material_col = f"{material_column}_pred"
+
     for (refno, agent, model, id_pred), group in grouped:
-        # Check which rows have matching materials using scorer_pymatgen
         matching_rows = []
+        property_name = group["property_name_pred"].iloc[0]
 
         for idx, row in group.iterrows():
-            # In order for a row to be considered a match:
-            # - The properties must match (using the "is_match" column)
-            # - The materials must match using scorer_pymatgen
-            if (
-                row["is_match"]
-                and pd.notna(row["material_or_system_pred"])
-                and pd.notna(row["material_or_system_gt"])
-            ):
-                if scorer_pymatgen(
-                    str(row["material_or_system_pred"]),
-                    str(row["material_or_system_gt"]),
+            # Property must match (using the "is_match" column)
+            if not row["is_match"]:
+                continue
+
+            if matching_mode == "material":
+                # Material-based matching (supercon)
+                if pd.notna(row.get(pred_material_col)) and pd.notna(
+                    row.get(gt_material_col)
                 ):
+                    if scorer_pymatgen(
+                        str(row[pred_material_col]),
+                        str(row[gt_material_col]),
+                    ):
+                        matching_rows.append(row)
+            else:
+                # Condition-based matching (biosurfactants)
+                condition_columns = get_conditions_for_property(
+                    property_name, rubric_df, important_only=True
+                )
+                if check_conditions_match(row, condition_columns, "_gt", "_pred"):
                     matching_rows.append(row)
 
         num_matches = len(matching_rows)
@@ -212,14 +329,6 @@ def compute_precision_per_material_property(
             # No matches, score is 0
             precision_score = 0.0
         else:
-            assert group["material_or_system_pred"].nunique() == 1, (
-                "Expected only one unique predicted material per group, "
-                f"but got: {group['material_or_system_pred'].unique()}"
-            )
-            assert group["property_name_pred"].nunique() == 1, (
-                "Expected only one unique predicted property name per group, "
-                f"but got: {group['property_name_pred'].unique()}"
-            )
             # At least one match, calculate scores and take max
             scores = []
 
@@ -244,42 +353,52 @@ def compute_precision_per_material_property(
             # Take maximum score
             precision_score = max(scores) if scores else 0.0
 
-        results.append(
-            {
-                "refno": refno,
-                "agent": agent,
-                "model": model,
-                "id_pred": id_pred,
-                "material_or_system_pred": group["material_or_system_pred"].iloc[0],
-                "property_name_pred": group["property_name_pred"].iloc[0],
-                "value_string_pred": ", ".join(
-                    list(
-                        set(
-                            [
-                                str(row["value_string_pred"])
-                                for _, row in group.iterrows()
-                            ]
-                        )
+        result = {
+            "refno": refno,
+            "agent": agent,
+            "model": model,
+            "id_pred": id_pred,
+            "property_name_pred": property_name,
+            "value_string_pred": ", ".join(
+                list(
+                    set([str(row["value_string_pred"]) for _, row in group.iterrows()])
+                )
+            ),
+            "num_property_matches": len(group),
+            "num_property_material_matches": num_matches,
+            "precision_score": precision_score,
+            "matches": ", ".join(
+                [
+                    f"{row['property_name_gt']}: {row['value_string_gt']}"
+                    for row in matching_rows
+                ]
+            ),
+            "answers": ", ".join(
+                [
+                    f"{row['value_string_gt']}"
+                    for _, row in group.iterrows()
+                    if row["is_match"]
+                ]
+            ),
+        }
+
+        # Add material columns if in material mode
+        if matching_mode == "material" and pred_material_col in group.columns:
+            result["material_or_system_pred"] = group[pred_material_col].iloc[0]
+            result["material_or_system_gt"] = ", ".join(
+                list(
+                    set(
+                        [
+                            str(row[gt_material_col])
+                            for _, row in group.iterrows()
+                            if gt_material_col in row.index
+                        ]
                     )
-                ),
-                "num_property_matches": len(group),
-                "num_property_material_matches": num_matches,
-                "precision_score": precision_score,
-                "matches": ", ".join(
-                    [
-                        f"{row['property_name_gt']}: {row['value_string_gt']}"
-                        for row in matching_rows
-                    ]
-                ),
-                "answers": ", ".join(
-                    [
-                        f"{row['material_or_system_gt']}: {row['value_string_gt']}"
-                        for _, row in group.iterrows()
-                        if row["is_match"]
-                    ]
-                ),
-            }
-        )
+                )
+            )
+
+        results.append(result)
+
     df_results = pd.DataFrame(results)
     return df_results
 
@@ -315,6 +434,8 @@ async def compute_mean_recall_precision(
     conversion_df: pd.DataFrame,
 ) -> tuple[float, float]:
     """Calculate mean recall and precision metrics for a single task.
+
+    TODO: test that this function recreates the results from using the step-by-step scripts.
 
     Args:
         df_pred: DataFrame with predicted properties.
