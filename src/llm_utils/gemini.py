@@ -46,6 +46,7 @@ class GeminiChat(LLMChat):
 
         Args:
             model_name: The name of the Gemini model to use.
+
         """
         super().__init__(model_name)
         api_key = os.environ.get("GOOGLE_API_KEY")
@@ -142,7 +143,9 @@ class GeminiChat(LLMChat):
         # Enable Google Search grounding if requested
         # https://ai.google.dev/gemini-api/docs/google-search
         if inf_gen_config.use_web_search:
-            gen_kwargs["tools"] = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
+            gen_kwargs["tools"] = [
+                genai_types.Tool(google_search=genai_types.GoogleSearch())
+            ]
 
         # If messages has a system message, add it to gen_kwargs["system_instruction"]
         # and remove it from messages
@@ -233,6 +236,7 @@ class GeminiChat(LLMChat):
                 raise ValueError(
                     f"Invalid output format: {inf_gen_config.output_format}"
                 )
+            # Reference: https://ai.google.dev/api/generate-content#UsageMetadata
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
                 "cached_tokens": response.usage_metadata.cached_content_token_count
@@ -259,9 +263,12 @@ class GeminiChat(LLMChat):
             else:
                 web_search_metadata = None
 
-
             return LLMChatResponse(
-                pred=pred, usage=usage, error=None, thought=thought, web_search_metadata=web_search_metadata
+                pred=pred,
+                usage=usage,
+                error=None,
+                thought=thought,
+                web_search_metadata=web_search_metadata,
             )
         except Exception as e:
             # Handle cases where Gemini refuses to generate
