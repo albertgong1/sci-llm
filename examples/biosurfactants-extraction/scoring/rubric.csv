@@ -1,26 +1,96 @@
-property_name,condition_name,data_type,rubric,category,SI
-Surface Tension (γ),,,,interfacial_and_surface_properties,
-Surface Tension (γ),Surfactant ID,,,,
-Surface Tension (γ),Concentration,,,,
-Surface Tension (γ),Solvent ID,,,,
-Surface Tension (γ),Temperature,,,,
-Interfacial Tension (IFT),,,,interfacial_and_surface_properties,
-Critical Micelle Concentration (CMC),,,,interfacial_and_surface_properties,
-Adsorption Kinetics,,,,interfacial_and_surface_properties,
-Dynamic Surface Tension,,,,interfacial_and_surface_properties,
-Krafft Point,,,,physicochemical_and_phase_properties,
-Cloud Point,,,,physicochemical_and_phase_properties,
-HLB (Hydrophilic-Lipophilic Balance),,,,physicochemical_and_phase_properties,
-Phase Inversion Temperature (PIT),,,,physicochemical_and_phase_properties,
-Zeta Potential (ζ),,,,soil_handling_and_electrostatic_properties,
-Chelation Constant (pK / Kf),,,,soil_handling_and_electrostatic_properties,
-Emulsification Index (E24),,,,soil_handling_and_electrostatic_properties,
-Particulate Dispersion,,,,soil_handling_and_electrostatic_properties,
-Catalytic Activity (k_cat),,,,biological_and_kinetic_properties,
-Michaelis Constant (Km),,,,biological_and_kinetic_properties,
-Enzyme Half-life (t1/2),,,,biological_and_kinetic_properties,
-Biodegradability Rate,,,,biological_and_kinetic_properties,
-Dynamic Viscosity (η),,,,rheological_and_physical_properties,
-Dissolution Time,,,,rheological_and_physical_properties,
-Pour Point,,,,rheological_and_physical_properties,
-Foam Height,,,,rheological_and_physical_properties,
+property_name,condition_name,not_important,data_type,rubric,category,description,SI
+Surface Tension (γ),Surfactant ID,important,string,,,,
+Surface Tension (γ),Concentration,important,float,,,,mol/L
+Surface Tension (γ),Solvent ID,important,string,,,,
+Surface Tension (γ),Temperature,not_important,float,,,,K
+Surface Tension (γ),,important,float,,interfacial_and_surface_properties,"Measures the ability to break water's 'skin.' In cold water, surface tension is naturally higher; the detergent must lower this to allow the liquid to penetrate fabric pores.",mN/m
+Interfacial Tension (IFT),Aqueous Phase ID,important,string,,,,
+Interfacial Tension (IFT),Oil Phase ID,important,string,,,,
+Interfacial Tension (IFT),Temperature,not_important,float,,,,K
+Interfacial Tension (IFT),Interface Age,not_important,float,,,,s
+Interfacial Tension (IFT),,important,float,,interfacial_and_surface_properties,"The tension between wash water and oily soil. In cold water, oils are often solid; achieving ultra-low IFT is required to 'roll up' grease without heat.",mN/m
+Critical Micelle Concentration (CMC),Surfactant ID,important,string,,,,
+Critical Micelle Concentration (CMC),Electrolyte Concentration,not_important,float,,,,mol/L
+Critical Micelle Concentration (CMC),Solvent Type,important,string,,,,
+Critical Micelle Concentration (CMC),Temperature,not_important,float,,,,K
+Critical Micelle Concentration (CMC),,important,float,,interfacial_and_surface_properties,The concentration where surfactants form micelles. A low CMC in cold water ensures cleaning efficiency even at lower product dosages.,mol/L
+Adsorption Kinetics,Surfactant ID,important,string,,,,
+Adsorption Kinetics,Substrate Type,important,string,,,,
+Adsorption Kinetics,Concentration,not_important,float,,,,mol/L
+Adsorption Kinetics,Time Interval,not_important,float,,,,s
+Adsorption Kinetics,,important,float,,interfacial_and_surface_properties,"The speed molecules travel to the stain. Since cold water slows movement, slow kinetics can cause the wash cycle to end before the detergent reaches the dirt.",mol/(m²·s)
+Dynamic Surface Tension,Surfactant ID,important,string,,,,
+Dynamic Surface Tension,Surface Age/Bubble Frequency,not_important,float,,,,Hz
+Dynamic Surface Tension,Concentration,important,float,,,,mol/L
+Dynamic Surface Tension,,important,float,,interfacial_and_surface_properties,Measures tension during the first few milliseconds of agitation. Critical for short cold-wash cycles where equilibrium is never reached.,mN/m
+Krafft Point,Ionic Surfactant ID,important,string,,,,
+Krafft Point,Counter-ion Type,not_important,string,,,,
+Krafft Point,Water Hardness,not_important,float,,,,mg/L CaCO₃
+Krafft Point,,important,float,,physicochemical_and_phase_properties,"The 'freeze point' for surfactant activity. Below this temperature, the detergent remains as inactive crystals providing zero cleaning.",K
+Cloud Point,Non-ionic Surfactant ID,important,string,,,,
+Cloud Point,Concentration,not_important,float,,,,mol/L
+Cloud Point,Hydrotrope ID,important,string,,,,
+Cloud Point,Salinity,not_important,float,,,,mol/L
+Cloud Point,,important,float,,physicochemical_and_phase_properties,"The temperature where non-ionics become insoluble. For cold water, you must ensure this point is not reached during product storage or transport.",K
+HLB (Hydrophilic-Lipophilic Balance),Surfactant ID,important,string,,,,
+HLB (Hydrophilic-Lipophilic Balance),Calculation Method,not_important,string,,,,
+HLB (Hydrophilic-Lipophilic Balance),,important,float,,physicochemical_and_phase_properties,Indicates if a molecule prefers oil or water. An HLB of 12–15 is typically required to ensure surfactants stay dissolved in cold water.,dimensionless
+Phase Inversion Temperature (PIT),Surfactant Blend,important,string,,,,
+Phase Inversion Temperature (PIT),Oil Phase ID,,string,,,,
+Phase Inversion Temperature (PIT),Oil-to-Water Ratio,,float,,,,dimensionless
+Phase Inversion Temperature (PIT),,important,float,,physicochemical_and_phase_properties,The temp where an emulsion flips phases. Prevents the detergent from 'locking' onto clothes as a greasy residue in cold environments.,K
+Zeta Potential (ζ),Particle ID,,string,,,,
+Zeta Potential (ζ),Surfactant/Polymer ID,,string,,,,
+Zeta Potential (ζ),pH,,float,,,,dimensionless
+Zeta Potential (ζ),Ionic Strength,,float,,,,mol/L
+Zeta Potential (ζ),,,float,,soil_handling_and_electrostatic_properties,"The electrical charge on soil particles. A high negative charge ensures dirt and fabric repel each other, preventing 'graying' of clothes.",mV
+Chelation Constant (pK / Kf),Ligand/Builder ID,,string,,,,
+Chelation Constant (pK / Kf),Metal Cation ID,,string,,,,
+Chelation Constant (pK / Kf),pH,,float,,,,dimensionless
+Chelation Constant (pK / Kf),Temperature,,float,,,,K
+Chelation Constant (pK / Kf),,,float,,soil_handling_and_electrostatic_properties,"Strength of the water softener. In cold water, builders must bind minerals faster than the minerals can deactivate the surfactants.",dimensionless
+Emulsification Index (E24),Surfactant ID,,string,,,,
+Emulsification Index (E24),Oil Phase ID,,string,,,,
+Emulsification Index (E24),Volume Ratio,,float,,,,dimensionless
+Emulsification Index (E24),Time,,float,,,,s
+Emulsification Index (E24),,,float,,soil_handling_and_electrostatic_properties,Measures how well a surfactant keeps oil suspended. High values prevent oil from settling back onto fabric during the rinse.,%
+Particulate Dispersion,Dispersant ID,,string,,,,
+Particulate Dispersion,Particle Type,,string,,,,
+Particulate Dispersion,Solvent Matrix,,string,,,,
+Particulate Dispersion,Particle Size,,float,,,,m
+Particulate Dispersion,,,float,,soil_handling_and_electrostatic_properties,The ability of the formula to keep solid dirt (clay/soot) from clumping together in the cold wash liquor.,%
+Catalytic Activity (k_cat),Enzyme ID,,string,,,,
+Catalytic Activity (k_cat),Substrate ID,,string,,,,
+Catalytic Activity (k_cat),pH,,float,,,,dimensionless
+Catalytic Activity (k_cat),Temperature,,float,,,,K
+Catalytic Activity (k_cat),,,float,,biological_and_kinetic_properties,The speed of the enzyme. Cold water requires 'psychrophilic' enzymes that maintain a high catalytic rate at 15°C.,1/s
+Michaelis Constant (Km),Enzyme ID,,string,,,,
+Michaelis Constant (Km),Substrate ID,,string,,,,
+Michaelis Constant (Km),Buffer System,,string,,,,
+Michaelis Constant (Km),,,float,,biological_and_kinetic_properties,Measures enzyme affinity for a stain. A low Km means the enzyme is highly effective even at low stain concentrations.,mol/L
+Enzyme Half-life (t1/2),Enzyme ID,,string,,,,
+Enzyme Half-life (t1/2),Inhibitor ID,,string,,,,
+Enzyme Half-life (t1/2),Storage Temp,,float,,,,K
+Enzyme Half-life (t1/2),pH,,float,,,,dimensionless
+Enzyme Half-life (t1/2),,,float,,biological_and_kinetic_properties,Bottle stability. Cold-water enzymes are fragile and need stabilization to prevent degradation by other formula components.,s
+Biodegradability Rate,Substance ID,,string,,,,
+Biodegradability Rate,Inoculum Type,,string,,,,
+Biodegradability Rate,Duration,,float,,,,s
+Biodegradability Rate,,,float,,biological_and_kinetic_properties,The environmental footprint. High biodegradability is a key requirement for biosurfactants like rhamnolipids.,%
+Dynamic Viscosity (η),Formulation ID,,string,,,,
+Dynamic Viscosity (η),Shear Rate,,float,,,,1/s
+Dynamic Viscosity (η),Temperature,,float,,,,K
+Dynamic Viscosity (η),,,float,,rheological_and_physical_properties,"Defines pourability. In cold weather, detergents can thicken; viscosity must be extracted across a temperature range to ensure usability.",Pa·s
+Dissolution Time,Formulation Form,,string,,,,
+Dissolution Time,Water Volume,,float,,,,L
+Dissolution Time,Agitation Speed,,float,,,,rad/s
+Dissolution Time,Temperature,,float,,,,K
+Dissolution Time,,,float,,rheological_and_physical_properties,"Speed of solubility. In cold HE washes, if dissolution takes >45 seconds, it can leave white residues on clothing.",s
+Pour Point,Formulation ID,,string,,,,
+Pour Point,Hydrotrope/Solvent Concentration,,float,,,,mol/L
+Pour Point,,,float,,rheological_and_physical_properties,The lowest temperature at which the liquid flows. Crucial for products stored in unheated environments.,K
+Foam Height,Surfactant Blend,,string,,,,
+Foam Height,Water Hardness,,float,,,,mg/L CaCO₃
+Foam Height,Concentration,,float,,,,mol/L
+Foam Height,Temperature,,float,,,,K
+Foam Height,,,float,,rheological_and_physical_properties,"Measures sudsing. Excess foam in a cold wash can cause 'sudslock' in HE machines, stopping mechanical cleaning action.",m

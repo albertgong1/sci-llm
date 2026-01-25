@@ -32,6 +32,7 @@ dependencies = [
     "pymupdf",
     "scikit-learn>=1.8.0",
     "python-slugify>=8.0.4",
+    "tabulate",
 ]
 
 [dependency-groups]
@@ -53,6 +54,9 @@ pbench-filter = "pbench.filter_candidates:main"
 pbench-eval = "pbench_eval.zeroshot:main"
 pbench-gt-embeddings = "pbench.generate_gt_embeddings:main"
 pbench-pred-embeddings = "pbench_eval.generate_pred_embeddings:main"
+pbench-generate-matches = "pbench_eval.generate_matches_cli:cli_main"
+pbench-score-precision = "pbench_eval.score_precision_cli:cli_main"
+pbench-score-recall = "pbench_eval.score_recall_cli:cli_main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

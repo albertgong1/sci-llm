@@ -46,20 +46,24 @@ uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prom
 
 2. Compute task-average precision and recall by model:
 
-TODO:
-- [ ] Make domain-agnostic version of generate_property_name_matches.py, score_precision.py, and score_recall.py.
 ```bash
+# Generate embeddings for predicted property names
 uv run pbench-pred-embeddings -od OUTPUT_DIR
-# Old command (deprecated): uv run python generate_pred_embeddings.py -od OUTPUT_DIR
-# Query LLM to determine best match between generated and ground-truth property name:
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
-# Compute precision
-uv run python score_precision.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
-# Compute recall
-uv run python score_recall.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+
+# Query LLM to determine best match between generated and ground-truth property name
+uv run pbench-generate-matches -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (condition-based matching for biosurfactants)
+uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
+
+# Compute recall (condition-based matching for biosurfactants)
+uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions
 ```
 
 6. Compute task-average token usage, steps, and cost:
