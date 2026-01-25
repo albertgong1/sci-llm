@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run harbor extraction for multiple agent/model combinations
-# Usage (local): ./run_harbor.sh JOBS_DIR [extra args...]
-# Usage (Modal): ./run_harbor.sh JOBS_DIR --modal [extra args...]
+# Run from examples/biosurfactants-extraction/, not from scripts/
+# Usage (local): ./scripts/run_harbor.sh JOBS_DIR [extra args...]
+# Usage (Modal): ./scripts/run_harbor.sh JOBS_DIR --modal [extra args...]
 
 # Exit entire script on Ctrl+C
 trap "echo ' Interrupted, exiting...'; exit 130" INT
@@ -18,13 +19,13 @@ cmd_args=$@
 
 # Agent/model combinations
 # Format: "agent:model" or "agent:model:kwarg1=value1,kwarg2=value2"
+# TODO: add qwen-code with qwen3-max via OpenRouter
 combinations=(
   "gemini-cli:gemini/gemini-3-pro-preview"
-  # "codex:openai/gpt-5.1-2025-11-13"
+  "codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
   "gemini-cli:gemini/gemini-3-flash-preview"
-  # "codex:openai/gpt-5-mini-2025-08-07:reasoning_effort=high"
   "terminus-2:gemini/gemini-3-pro-preview"
-  # "terminus-2:openai/gpt-5.1-2025-11-13"
+  "terminus-2:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
 )
 BATCH_SIZE=50
 NUM_BATCHES=1

@@ -15,7 +15,7 @@
 
 ```bash
 uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
-  --hf-tasks-repo kilian-group/biosurfactants-extraction-harbor-tasks --hf-tasks-version main \
+  --hf-tasks-repo kilian-group/biosurfactants-extraction-harbor-tasks --hf-tasks-version head \
   -a gemini-cli -m gemini/gemini-3-flash-preview \
   --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 50
 ```
@@ -26,8 +26,8 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 ```bash
 uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
   --registry-path OUTPUT_DIR/ground-template/registry.json --dataset biosurfactants-extraction@v0.0.0 \
-  -a gemini-cli -m gemini/gemini-3-flash-preview --modal --n-concurrent 4
-  --seed 1 --jobs-dir JOBS_DIR
+  -a gemini-cli -m gemini/gemini-3-flash-preview \
+  --workspace . --jobs-dir JOBS_DIR --seed 1 --batch-size 10
 ```
 
 </details>
