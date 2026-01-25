@@ -13,7 +13,7 @@ from pbench_eval.utils import scorer_pymatgen, score_value
 logger = logging.getLogger(__name__)
 
 SERVER = "gemini"
-MODEL_NAME = "gemini-3-flash-preview"
+MODEL_NAME = "gemini-2.5-flash"
 MAX_OUTPUT_TOKENS = 4096
 
 
