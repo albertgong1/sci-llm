@@ -127,7 +127,7 @@ def cli_main() -> None:
     dfs = []
     for csv_file in csv_files:
         logger.debug(f"Loading {csv_file.name}")
-        df = pd.read_csv(csv_file)
+        df = pd.read_csv(csv_file, dtype=str)
         dfs.append(df)
 
     df_matches = pd.concat(dfs, ignore_index=True)
