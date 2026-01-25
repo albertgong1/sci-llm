@@ -227,6 +227,16 @@ class GeminiChat(LLMChat):
             if part.thought:
                 thought = part.text
                 break
+        # Reference: https://ai.google.dev/api/generate-content#UsageMetadata
+        usage = {
+            "prompt_tokens": response.usage_metadata.prompt_token_count,
+            "cached_tokens": response.usage_metadata.cached_content_token_count
+            if response.usage_metadata.cached_content_token_count
+            else 0,
+            "completion_tokens": response.usage_metadata.candidates_token_count,
+            "thinking_tokens": response.usage_metadata.thoughts_token_count,
+            "total_tokens": response.usage_metadata.total_token_count,
+        }
         try:
             if inf_gen_config.output_format == "json":
                 pred = json.loads(response.text)
@@ -236,16 +246,6 @@ class GeminiChat(LLMChat):
                 raise ValueError(
                     f"Invalid output format: {inf_gen_config.output_format}"
                 )
-            # Reference: https://ai.google.dev/api/generate-content#UsageMetadata
-            usage = {
-                "prompt_tokens": response.usage_metadata.prompt_token_count,
-                "cached_tokens": response.usage_metadata.cached_content_token_count
-                if response.usage_metadata.cached_content_token_count
-                else 0,
-                "completion_tokens": response.usage_metadata.candidates_token_count,
-                "thinking_tokens": response.usage_metadata.thoughts_token_count,
-                "total_tokens": response.usage_metadata.total_token_count,
-            }
 
             # Extract grounding metadata if web search was used
             # https://ai.google.dev/gemini-api/docs/google-search
@@ -274,7 +274,7 @@ class GeminiChat(LLMChat):
             # Handle cases where Gemini refuses to generate
             return LLMChatResponse(
                 pred="",
-                usage={},
+                usage=usage,
                 error=str(e),
                 thought=None,
                 web_search_metadata=None,

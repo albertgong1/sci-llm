@@ -214,16 +214,15 @@ class OpenAIChat(LLMChat):
         #     if part["type"] != "reasoning":
         #         continue
         #     thought = part["summary"][0]["text"]
+        # Reference: https://platform.openai.com/docs/api-reference/responses/object#responses-object-usage
+        usage = {
+            "prompt_tokens": response.usage.input_tokens,
+            "cached_tokens": response.usage.input_tokens_details.cached_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "reasoning_tokens": response.usage.output_tokens_details.reasoning_tokens,
+            "total_tokens": response.usage.total_tokens,
+        }
         try:
-            # Reference: https://platform.openai.com/docs/api-reference/responses/object#responses-object-usage
-            usage = {
-                "prompt_tokens": response.usage.input_tokens,
-                "cached_tokens": response.usage.input_tokens_details.cached_tokens,
-                "output_tokens": response.usage.output_tokens,
-                "reasoning_tokens": response.usage.output_tokens_details.reasoning_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
-
             if inf_gen_config.output_format == "json":
                 pred = json.loads(response.output_text)
             elif inf_gen_config.output_format == "text":
@@ -239,7 +238,7 @@ class OpenAIChat(LLMChat):
             )
         except Exception as e:
             return LLMChatResponse(
-                pred="", usage={}, error=str(e), web_search_metadata=None
+                pred="", usage=usage, error=str(e), web_search_metadata=None
             )
 
     def upload_file(self, file: File) -> None:
