@@ -26,7 +26,7 @@ def mean_sem_with_n(x: list, n: int) -> str:
     """Format mean +/- SEM as a string.
 
     Args:
-        x: List of sample values
+        x: List of sample values (None values are treated as zeros)
         n: Total number of samples (including missing). If n > len(x),
            missing values are treated as zeros.
 
@@ -34,4 +34,5 @@ def mean_sem_with_n(x: list, n: int) -> str:
         Formatted string "mean +/- sem" with 2 decimal places
 
     """
+    x = [0 if v is None else v for v in x]
     return f"{sum(x) / n:.2f} +/- {sem(x, n):.2f}"
