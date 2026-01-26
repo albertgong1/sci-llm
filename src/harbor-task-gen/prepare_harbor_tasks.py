@@ -40,6 +40,7 @@ import csv
 import io
 import json
 import os
+import random
 import re
 import shutil
 import sys
@@ -572,6 +573,12 @@ def main() -> None:
         help="Overwrite the output task directory if it already exists.",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for shuffling task order in the registry. If not set, tasks are sorted alphabetically.",
+    )
+    parser.add_argument(
         "--write-job-config",
         action="store_true",
         help="Also emit a Harbor job config pointing at the generated tasks.",
@@ -813,6 +820,8 @@ def main() -> None:
     generated_task_dirs = _collect_task_dirs(
         tasks_dir, disable_verification=bool(args.no_score)
     )
+    if args.seed is not None:
+        generated_task_dirs = _shuffle_task_dirs(generated_task_dirs, args.seed)
     if generated_task_dirs:
         registry_path = task_root / "registry.json"
         dataset_short_name = dataset_name.split("/")[-1]
@@ -859,13 +868,6 @@ def _prompt_value(label: str, default: str | None = None) -> str:
     return value or (default or "")
 
 
-def _resolve_tasks_root(path: Path) -> Path:
-    """Allow passing either the tasks root or its parent directory."""
-    if (path / "tasks").is_dir():
-        return path / "tasks"
-    return path
-
-
 def _collect_task_dirs(
     tasks_root: Path, *, disable_verification: bool = False
 ) -> list[Path]:
@@ -876,6 +878,13 @@ def _collect_task_dirs(
         if child.is_dir()
         and TaskPaths(child).is_valid(disable_verification=disable_verification)
     ]
+
+
+def _shuffle_task_dirs(task_dirs: list[Path], seed: int) -> list[Path]:
+    """Shuffle task directories with a deterministic seed."""
+    shuffled = list(task_dirs)
+    random.Random(seed).shuffle(shuffled)
+    return shuffled
 
 
 def _hf_repo_url(repo_id: str, repo_type: str) -> str:
@@ -944,6 +953,7 @@ def upload_tasks_to_hf(
     private: bool | None = None,
     token: str | None = None,
     disable_verification: bool = False,
+    seed: int | None = None,
 ) -> dict[str, str]:
     """Upload Harbor tasks and registry.json to a Hugging Face repo.
 
@@ -952,6 +962,8 @@ def upload_tasks_to_hf(
     task_dirs = _collect_task_dirs(
         tasks_root / "tasks", disable_verification=disable_verification
     )
+    if seed is not None:
+        task_dirs = _shuffle_task_dirs(task_dirs, seed)
 
     dataset_name = dataset_name or repo_id
     registry_path = str(registry_path).strip("/")
@@ -1043,6 +1055,7 @@ def _upload_tasks_after_build(*, args: argparse.Namespace, tasks_root: Path) -> 
         create=bool(args.hf_create),
         private=private,
         disable_verification=bool(getattr(args, "no_score", False)),
+        seed=getattr(args, "seed", None),
     )
 
     print(
