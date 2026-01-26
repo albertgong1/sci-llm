@@ -21,14 +21,14 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--output_dir",
         "-od",
         type=Path,
-        default=None,
+        default=Path("out"),
         help="Output directory (default: out)",
     )
     parser.add_argument(
         "--jobs_dir",
         "-jd",
         type=Path,
-        default=None,
+        default=Path("jobs"),
         help="Jobs directory for Harbor runs (default: jobs)",
     )
     parser.add_argument(
@@ -73,6 +73,13 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         type=str,
         default="gemini-3-flash-preview",
         help="Model name (e.g., 'gemini-3-flash-preview').",
+    )
+    parser.add_argument(
+        "--reasoning_effort",
+        type=str,
+        default=None,
+        choices=["none", "low", "medium", "high", "xhigh"],
+        help="Reasoning effort for OpenAI models (default: None)",
     )
     parser.add_argument(
         "--force",
