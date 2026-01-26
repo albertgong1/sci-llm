@@ -79,12 +79,9 @@ uv run --env-file=.env pbench-extract --server gemini --model_name gemini-3-pro-
 uv run pbench-filter -od OUTPUT_DIR
 ```
 
-> \[!STOP\]
-> Send the file at `OUTPUT_DIR/candidates/extracted_properties_combined.csv` on Slack to Albert.
-
 3. Launch the validator app and accept/reject the candidates:
 
-> \[!NOTE\]
+> \[!WARNING\]
 > This step requires manual effort and is not fully reproducibile.
 
 ```bash
@@ -92,21 +89,52 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od OUTPUT_DIR
 ```
 
-4. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `data/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/cdw-extraction.
+4. Combine validation results from multiple annotators:
+
+> \[!WARNING\]
+> A CSV file will be created at `data/new-supercon-papers` with a column "validated_resolved". This will be auto-resolved if possible and set to "RESOLVE" if manual resolution is needed.
+
+```bash
+uv run python combine_validation_results.py \
+    --output_dir1 out-0125-for-chao \
+    --output_dir2 out-0125-for-fatmagul \
+    --data_dir data
+```
+
+5. Create a local HuggingFace dataset `OUTPUT_DIR/SPLIT` for the papers that have PDFS in `data/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/cdw-extraction.
 
 > \[!NOTE\]
 > Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
 
 ```bash
-uv run python create_huggingface_dataset.py -od OUTPUT_DIR --filter_pdf \
-    --tag_name v0.0.0 --repo_name kilian-group/cdw-extraction --split SPLIT
+uv run python create_huggingface_dataset.py \
+    --data_dir data \
+    --output_dir OUTPUT_DIR \
+    --hf_repo kilian-group/cdw-extraction \
+    --hf_split SPLIT \
+    --hf_revision v0.0.0 \
+    --filter_pdf
 ```
 
-5. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `data/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/cdw-extraction-harbor-tasks.
+6. Generate embeddings for the ground-truth property names for scoring:
+
+```bash
+uv run pbench-gt-embeddings --hf_repo kilian-group/cdw-extraction --hf_revision v0.0.0 --hf_split full
+```
+
+7. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `data/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/cdw-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
-    --pdf-dir data/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-template \
+    --pdf-dir data/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-stoichiometric-template \
     --gt-hf-repo kilian-group/cdw-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/cdw-extraction-harbor-tasks
+```
+
+### Evaluating Validation Accuracy
+
+1. To compute the validation accuracy of a single annotator, please run the following command. This script assumes the validation results are at `OUTPUT_DIR`:
+
+```bash
+uv run python format_validation_accuracy.py -od OUTPUT_DIR
 ```
