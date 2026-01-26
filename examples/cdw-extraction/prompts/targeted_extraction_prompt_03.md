@@ -202,7 +202,7 @@ Return a SINGLE valid JSON payload containing an array of properties. Below is t
       "conditions": {
         "temperature": "...",
         "pressure": "...",
-        "magentic_field": "...",
+        "magnetic_field": "...",
         "electric_field": "...",
         "frequency": "...",
         "orientation": "...",
