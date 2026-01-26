@@ -34,6 +34,7 @@ _retry_decorator = retry(
     reraise=True,
 )
 
+
 class OpenAIChat(LLMChat):
     """Chat interface for OpenAI models."""
 
@@ -114,6 +115,8 @@ class OpenAIChat(LLMChat):
 
         # Add optional parameters
         if inf_gen_config.reasoning_effort:
+            # TODO: add reasoning summary after verifying organization
+            # 2026-01-24 22:17:13 - pbench_eval.zeroshot - ERROR - Error processing 60c74e7e337d6c10b9e27fad: Error code: 400 - {'error': {'message': 'Your organization must be verified to generate reasoning summaries. Please go to: https://platform.openai.com/settings/organization/general and click on Verify Organization. If you just verified, it can take up to 15 minutes for access to propagate.', 'type': 'invalid_request_error', 'param': 'reasoning.summary', 'code': 'unsupported_value'}}
             gen_kwargs["reasoning"] = {"effort": inf_gen_config.reasoning_effort}
         if inf_gen_config.temperature:
             gen_kwargs["temperature"] = inf_gen_config.temperature
@@ -213,6 +216,20 @@ class OpenAIChat(LLMChat):
             Parsed LLM chat response.
 
         """
+        # import pdb; pdb.set_trace()
+        # thought = None
+        # for part in response.output:
+        #     if part["type"] != "reasoning":
+        #         continue
+        #     thought = part["summary"][0]["text"]
+        # Reference: https://platform.openai.com/docs/api-reference/responses/object#responses-object-usage
+        usage = {
+            "prompt_tokens": response.usage.input_tokens,
+            "cached_tokens": response.usage.input_tokens_details.cached_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "reasoning_tokens": response.usage.output_tokens_details.reasoning_tokens,
+            "total_tokens": response.usage.total_tokens,
+        }
         try:
             # Check response status (especially important for reasoning models and Beta API)
             if hasattr(response, "status") and response.status != "completed":
@@ -261,7 +278,9 @@ class OpenAIChat(LLMChat):
             elif inf_gen_config.output_format == "text":
                 pred = response.output_text
             else:
-                raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
+                raise ValueError(
+                    f"Invalid output format: {inf_gen_config.output_format}"
+                )
 
             # Extract web search metadata if available
             # The Responses API returns a list of items (web_search_call, message, etc.)

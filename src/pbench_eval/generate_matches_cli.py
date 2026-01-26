@@ -1,16 +1,20 @@
-"""Script to match property names to ground truth labels
+"""Domain-agnostic CLI to match property names to ground truth labels.
 
-Below is our two-stage approach:
-1. We first use the embeddings to obtain the top-k matches for each property name.
-2. We then query an LLM to check if the property names are the same.
+This script uses a two-stage approach:
+1. First use embeddings to obtain the top-k matches for each property name.
+2. Then query an LLM to check if the property names are the same.
 
 Example usage:
 ```bash
-uv run python generate_property_name_matches.py -m gemini-3-pro-preview -od out/
+uv run pbench-generate-matches \
+    --output_dir ./out \
+    --hf_repo kilian-group/supercon-extraction \
+    --hf_split full \
+    --prompt_path prompts/property_matching_prompt.md \
+    --model_name gemini-3-pro-preview
 ```
 """
 
-# standard imports
 import argparse
 import json
 import os
@@ -22,25 +26,11 @@ from datasets import load_dataset
 from pathlib import Path
 from slugify import slugify
 
-# llm imports
-from llm_utils import (
-    get_llm,
-    InferenceGenerationConfig,
-)
-
-
-# pbench imports
+from llm_utils import get_llm, InferenceGenerationConfig
 from llm_utils.common import LLMChat
 import pbench
 from pbench_eval.match import generate_property_name_matches
-
-# local imports
-from utils import (
-    HF_DATASET_NAME,
-    HF_DATASET_REVISION,
-    HF_DATASET_SPLIT,
-    get_harbor_data,
-)
+from pbench_eval.harbor_utils import get_harbor_data
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +56,7 @@ async def process_single_group(
     top_k: int,
     force: bool,
     semaphore: asyncio.Semaphore,
+    context_column: str,
 ) -> None:
     """Process a single (agent, model, refno) group."""
     async with semaphore:
@@ -81,7 +72,11 @@ async def process_single_group(
             on="property_name",
             how="left",
         )
-        df_pred["context"] = df_pred["location.evidence"]
+        # Use configurable context column
+        if context_column in df_pred.columns:
+            df_pred["context"] = df_pred[context_column]
+        else:
+            df_pred["context"] = ""
 
         # Prepare ground truth data for this refno
         df_gt_refno = df_gt[df_gt["refno"].str.lower() == refno.lower()].drop(
@@ -200,20 +195,19 @@ def construct_context(row: pd.Series) -> str:
 
 
 async def main(args: argparse.Namespace) -> None:
-    """Main function to verify alias candidates using Gemini LLM."""
+    """Main function to match property names using LLM."""
     output_dir = args.output_dir
     model_name = args.model_name
     top_k = args.top_k
     force = args.force
     jobs_dir = args.jobs_dir
     preds_dirname = args.preds_dirname
+    context_column = args.context_column
 
     # Load prompt template from markdown file
-    if True:
-        prompt_path = Path("prompts") / "property_matching_prompt.md"
-    else:
-        # NOTE: this prompt lead to less reliable results with gemini-2.5-flash-lite on Refno JAC2980051
-        prompt_path = Path("prompts") / "property_matching_prompt_cache_friendly.md"
+    prompt_path = Path(args.prompt_path)
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
     with open(prompt_path, "r") as f:
         prompt_template = f.read()
 
@@ -227,14 +221,16 @@ async def main(args: argparse.Namespace) -> None:
     if not pred_embeddings_files:
         raise FileNotFoundError(f"No embeddings files found in {pred_embeddings_dir}")
 
-    # Construct GT embeddings path from HF dataset parameters
-    hf_dataset_name = args.hf_repo or HF_DATASET_NAME
-    hf_split_name = args.hf_split or HF_DATASET_SPLIT
-    hf_revision = args.hf_revision or HF_DATASET_REVISION
-    gt_embeddings_filename = (
-        f"embeddings_{slugify(f'{hf_dataset_name}_{hf_split_name}_{hf_revision}')}.json"
-    )
-    gt_embeddings_path = Path("scoring") / gt_embeddings_filename
+    # Load or compute GT embeddings path
+    if args.gt_embeddings_path:
+        gt_embeddings_path = Path(args.gt_embeddings_path)
+    else:
+        # Construct GT embeddings path from HF dataset parameters
+        hf_dataset_name = args.hf_repo
+        hf_split_name = args.hf_split
+        hf_revision = args.hf_revision or "main"
+        gt_embeddings_filename = f"embeddings_{slugify(f'{hf_dataset_name}_{hf_split_name}_{hf_revision}')}.json"
+        gt_embeddings_path = Path("scoring") / gt_embeddings_filename
 
     logger.info(f"Loading ground truth embeddings from {gt_embeddings_path}...")
     df_gt_embeddings = pd.read_json(gt_embeddings_path)
@@ -262,6 +258,10 @@ async def main(args: argparse.Namespace) -> None:
     #
     # Load ground truth properties
     #
+    hf_dataset_name = args.hf_repo
+    hf_split_name = args.hf_split
+    hf_revision = args.hf_revision or "main"
+
     logger.info(
         f"Loading dataset from HuggingFace: {hf_dataset_name} "
         f"(revision={hf_revision}, split={hf_split_name})"
@@ -331,6 +331,7 @@ async def main(args: argparse.Namespace) -> None:
                 top_k=top_k,
                 force=force,
                 semaphore=semaphore,
+                context_column=context_column,
             )
         )
 
@@ -340,14 +341,34 @@ async def main(args: argparse.Namespace) -> None:
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
-if __name__ == "__main__":
-    #
-    # Parse arguments
-    #
+def cli_main() -> None:
+    """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Verify alias candidates using Gemini LLM."
+        description="Match property names to ground truth labels using LLM."
     )
     parser = pbench.add_base_args(parser)
+
+    # Required arguments
+    parser.add_argument(
+        "--prompt_path",
+        type=str,
+        required=True,
+        help="Path to the property matching prompt template (markdown file)",
+    )
+
+    # Optional arguments
+    parser.add_argument(
+        "--gt_embeddings_path",
+        type=str,
+        default=None,
+        help="Path to ground truth embeddings JSON file. If not provided, will be auto-computed from HF params.",
+    )
+    parser.add_argument(
+        "--context_column",
+        type=str,
+        default="location.evidence",
+        help="Column name for context extraction from predictions (default: location.evidence)",
+    )
     parser.add_argument(
         "--refno",
         type=str,
@@ -377,6 +398,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Validate required arguments
+    if args.hf_repo is None:
+        parser.error("--hf_repo is required")
+    if args.hf_split is None:
+        parser.error("--hf_split is required")
+
     # Setup logging
     pbench.setup_logging(args.log_level)
     # Load env variables
@@ -387,3 +414,7 @@ if __name__ == "__main__":
 
     # Run main
     asyncio.run(main(args))
+
+
+if __name__ == "__main__":
+    cli_main()

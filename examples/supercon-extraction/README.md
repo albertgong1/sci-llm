@@ -60,10 +60,24 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 </details>
 
-2. Compute accuracy across tasks:
+2. Compute task-average precision and recall by agent and model:
 
 ```bash
-uv run python format_accuracy.py -jd JOBS_DIR
+# Generate property name embeddings
+uv run pbench-pred-embeddings -jd JOBS_DIR -od OUTPUT_DIR
+# Old command (deprecated): uv run python generate_pred_embeddings.py -jd JOBS_DIR -od OUTPUT_DIR
+# Generate property name matches using top-3 (cosine similarity) followed by gemini-2.5-flash to determine a match
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -jd JOBS_DIR --model_name gemini-2.5-flash --top_k 3 --log_level INFO
+# Compute average precision
+uv run python score_precision.py -od OUPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
+# Compute average recall
+uv run python score_recall.py -od OUTPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
+```
+
+3. Compute task-average token usage, steps, and cost:
+
+```bash
+uv run python format_tokens.py -jd JOBS_DIR
 ```
 
 ### Using the LLM API (no Harbor)
@@ -75,33 +89,71 @@ uv run python format_accuracy.py -jd JOBS_DIR
 > Remove these flags to process the full dataset in DATA_DIR=data.
 
 ```bash
-uv run --env-file=.env pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/targeted_stoic_extraction_prompt.md \
+uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/targeted_stoic_extraction_prompt.md \
     --harbor_task_ordering_registry_path registry_data.json --max_num_papers 50 -od OUTPUT_DIR
 ```
 
-2. Generate embeddings for the predicted and ground-truth properties in SuperCon:
+2. Compute task-average precision and recall by model:
 
 ```bash
-uv run --env-file=.env python generate_pred_embeddings.py -od OUTPUT_DIR
+# Generate embeddings for predicted property names
+uv run pbench-pred-embeddings -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-extraction --hf_split full --hf_revision v0.2.1 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (material-based matching for supercon)
+uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material
+
+# Compute recall (condition-based matching for biosurfactants)
+uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material
+```
+<!-- ```bash
+# Generate embeddings for predicted property names
+uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash
+# Compute precision:
+uv run python score_precision.py -od OUTPUT_DIR
+# Compute recall:
+uv run python score_recall.py -od OUTPUT_DIR
+``` -->
+
+<details>
+    <summary>Instructions for SuperCon Post-2021</summary>
+
+TODO:
+- [ ] Update these instructions with new domain-agnostic eval scripts
+- [ ] Ensure that the results are similar as before using the preds at `/Users/ag2435/sci_llm/src/sci-llm/examples/supercon-extraction/out-0123`
+
+```bash
+uv run pbench-pred-embeddings -od OUTPUT_DIR
+# Old command (deprecated): uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+# Compute precision
+uv run python score_precision.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+# Compute recall
+uv run python score_recall.py -od OUTPUT_DIR \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
 ```
 
-3. Query LLM to determine best match between generated and ground-truth property name:
+</details>
+
+6. Compute task-average token usage, steps, and cost:
 
 ```bash
-uv run --env-file=.env generate_gt_embeddings.py
-uv run --env-file=.env python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-3-flash-preview
-```
-
-4. Compute precision:
-
-```bash
-uv run --env-file=.env python score_precision.py -od OUTPUT_DIR
-```
-
-5. Compute recall:
-
-```bash
-uv run --env-file=.env python score_recall.py -od OUTPUT_DIR
+uv run python format_tokens.py -od OUTPUT_DIR
 ```
 
 ## Constructing the Dataset from SuperCon original
@@ -153,8 +205,14 @@ uv run python create_huggingface_dataset.py -dd data-arxiv -od out-0122-harbor -
 5. Generate embeddings for the ground-truth property names for scoring:
 
 ```bash
+uv run pbench-gt-embeddings --hf_repo kilian-group/supercon-extraction --hf_revision v0.2.1 --hf_split full
+```
+
+<!-- Old command (deprecated):
+```bash
 uv run python generate_gt_embeddings.py
 ```
+-->
 
 6. Create the Harbor tasks at `OUTPUT_DIR` by instantiating the Harbor template with the papers in `DATA_DIR/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-extraction-harbor-tasks.
 
@@ -203,7 +261,7 @@ uv run pbench-filter -dd data/new-supercon-papers -od out-new-supercon-papers
 
 3. Launch the validator app and accept/reject the candidates:
 
-> \[!NOTE\]
+> \[!WARNING\]
 > This step requires manual effort and is not fully reproducibile.
 
 ```bash
@@ -213,17 +271,38 @@ uv sync --group validator
 uv run streamlit run ../../src/pbench_validator_app/app.py -- -od out-new-supercon-papers
 ```
 
-4. Create a local HuggingFace dataset `out-new-supercon-papers/SPLIT` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
+4. Combine validation results from multiple human experts:
 
-> \[!NOTE\]
-> Replace `SPLIT` with `lite` or `full` depending on the version of the dataset you want to create.
+> \[!WARNING\]
+> A CSV file will be created at `data/new-supercon-papers` with a column "validated_resolved". This will be auto-resolved if possible and set to "RESOLVE" if manual resolution is needed.
 
 ```bash
-uv run python create_huggingface_dataset.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
-    --tag_name v0.0.0 --repo_name kilian-group/supercon-post-2021-extraction --split SPLIT
+uv run python combine_validation_results.py \
+    --output_dir1 out-new-supercon-papers-stoic__for_validation-joshua \
+    --output_dir2 out-new-supercon-papers-stoic__for_validation-aaditya \
+    --data_dir data/new-supercon-papers
 ```
 
-5. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
+5. Create a local HuggingFace dataset `out-new-supercon-papers/full` for the papers that have PDFS in `data/new-supercon-papers/Paper_DB`. Note: the dataset will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction.
+
+```bash
+uv run python create_huggingface_dataset_post-2021.py -dd data/new-supercon-papers -od out-new-supercon-papers --filter_pdf \
+    --hf_revision v0.0.0 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
+```
+
+6. Generate embeddings for the ground-truth property names for scoring:
+
+```bash
+uv run pbench-gt-embeddings --hf_repo kilian-group/supercon-post-2021-extraction --hf_revision v0.0.1 --hf_split full
+```
+
+<!-- Old command (deprecated):
+```bash
+uv run python generate_gt_embeddings.py --hf_revision v0.0.1 --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full
+```
+-->
+
+7. Create the Harbor tasks at `out-new-supercon-papers` by instantiating the Harbor template with the papers in `data/new-supercon-papers/Paper_DB`. Note: the tasks will also be shared at https://huggingface.co/datasets/kilian-group/supercon-post-2021-extraction-harbor-tasks.
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
@@ -255,8 +334,17 @@ uv run python compute_cohens_kappa.py -od1 OUTPUT_DIR_HUMAN_1 -od2 OUTPUT_DIR_HU
 
 ### Validation Accuracy
 
-Assuming the validation results are at `OUTPUT_DIR`, please run the following command:
+TODO:
+- [ ] Combine the below two steps into a single script.
+
+1. To compute the validation accuracy of a single annotator, please run the following command. This script assumes the validation results are at `OUTPUT_DIR`:
 
 ```bash
 uv run python format_validation_accuracy.py -od OUTPUT_DIR
+```
+
+2. To compute the validation accuracy of the resolved validation results, please run the following command:
+
+```bash
+uv run python format_validation_accuracy_resolved.py -dd data/new-supercon-papers
 ```

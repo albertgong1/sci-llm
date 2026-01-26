@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 # Supported LLM servers
-SUPPORTED_SERVERS = ["gemini", "openai"]
+SUPPORTED_SERVERS = ["gemini", "openai", "qwen"]
 
 
 def calculate_cost(
@@ -39,6 +39,7 @@ def calculate_cost(
     completion_tokens: int,
     cached_tokens: int = 0,
     thinking_tokens: int = 0,
+    thinking_included_in_completion: bool = False,
 ) -> float | None:
     """Calculate dollar cost based on token usage.
 
@@ -48,6 +49,9 @@ def calculate_cost(
         completion_tokens: Completion/output tokens.
         cached_tokens: Cached input tokens (subtracted from prompt_tokens for pricing).
         thinking_tokens: Thinking/reasoning tokens (priced as output).
+        thinking_included_in_completion: If True (OpenAI models), thinking_tokens are
+            already included in completion_tokens and should not be added separately.
+            If False (Gemini models), thinking_tokens are separate and should be added.
 
     Returns:
         Total cost in USD, or None if model pricing is unavailable.
@@ -75,8 +79,14 @@ def calculate_cost(
     # Calculate cost (divide by 1M since prices are per 1M tokens)
     prompt_cost = (prompt_tokens - cached_tokens) * input_price / 1_000_000
     cache_cost = cached_tokens * (cache_price or 0) / 1_000_000
-    thinking_cost = thinking_tokens * output_price / 1_000_000
     completion_cost = completion_tokens * output_price / 1_000_000
+
+    # For Gemini, thinking_tokens are separate from completion_tokens
+    # For OpenAI, thinking_tokens are already included in completion_tokens
+    if thinking_included_in_completion:
+        thinking_cost = 0
+    else:
+        thinking_cost = thinking_tokens * output_price / 1_000_000
 
     return prompt_cost + cache_cost + thinking_cost + completion_cost
 
@@ -104,6 +114,10 @@ def get_llm(server: str, model_name: str) -> LLMChat:
             from llm_utils.openai import OpenAIChat
 
             return OpenAIChat(model_name)
+        case "qwen":
+            from llm_utils.qwen import QwenChat
+
+            return QwenChat(model_name)
         case _:
             raise ValueError(
                 f"Unsupported server: {server}. "

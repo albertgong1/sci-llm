@@ -7,7 +7,7 @@ You must search for experimental evidence in scientific literature.
 Please answer the following questions:
 Q1. Has **{material}** been reported grown with flux growth? (Answer "Yes" or "No" or "Unknown")
 
-**Output Format:**
+**Output Format (WRITE TO {predictions_path}):**
 
 You must output a SINGLE JSON object exactly matching this structure:
 
@@ -34,8 +34,6 @@ You must output a SINGLE JSON object exactly matching this structure:
 ```
 
 **Rules & Constraints:**
-
-**Rules & Constraints:**
 1. **Core Flux Growth Check**
     - Find whether the material has even been grown or synthesized with flux/molten solution/self flux growth.
     - Check all relevant permutations of the compound formula.
@@ -47,4 +45,7 @@ You must output a SINGLE JSON object exactly matching this structure:
     - Use ONLY information explicitly present in the search results.
     - Do NOT infer flux growth of the material even if it is typical for similar compounds in the material class.
     - **Source DOIs**: For each source, provide an object with: `title`, `authors` (list), `year` (int), `doi`, and `quoted_span` (relevant text snippet supporting the extraction).
-    - Provide ONLY the JSON. No Markdown fencing or explanation.
+
+## FINAL INSTRUCTIONS:
+1. Provide ONLY the JSON. No Markdown fencing or explanation.
+2. Save this JSON to `{predictions_path}` as your final response.

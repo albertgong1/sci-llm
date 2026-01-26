@@ -139,7 +139,8 @@ else:
         raise SystemExit(f"Usage directory not found: {usage_dir}")
 
     # Parse usage JSON files: usage__model=<model>__refno=<refno>.json
-    usage_pattern = re.compile(r"usage__model=(.+?)__refno=(.+)\.json")
+    # or usage__agent=<agent>__model=<model>__refno=<refno>.json
+    usage_pattern = re.compile(r"usage__(?:agent=.+__)?model=(.+?)__refno=(.+)\.json")
 
     for usage_file in tqdm(sorted(usage_dir.glob("*.json")), desc="Usage files"):
         match = usage_pattern.match(usage_file.name)

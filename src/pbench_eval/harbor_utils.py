@@ -1,129 +1,21 @@
-"""Utility constants and functions for supercon-extraction scripts.
+"""Utility functions for loading predictions from Harbor jobs.
 
-Reference for SuperCon integer codes: https://mdr.nims.go.jp/filesets/28e52e3f-8f92-4656-abb6-354e4cef11a1/download
+Usage:
+    from pbench_eval.harbor_utils import get_harbor_data
+    df = get_harbor_data(jobs_dir)
 """
 
 import json
+import logging
 import re
 import uuid
 from json import JSONDecoder
 from pathlib import Path
 from typing import Any
+
 import pandas as pd
-import numpy as np
-import logging
 
 logger = logging.getLogger(__name__)
-
-# Single column figures
-TICK_FONT_SIZE = 6
-MINOR_TICK_FONT_SIZE = 3
-LABEL_FONT_SIZE = 10
-LEGEND_FONT_SIZE = 7
-MARKER_ALPHA = 1
-MARKER_SIZE = 3
-LINE_ALPHA = 0.75
-OUTWARD = 4
-
-# Dataset configuration
-HF_DATASET_NAME = "kilian-group/supercon-extraction"
-HF_DATASET_REVISION = "main"  # "v0.0.0"
-HF_DATASET_SPLIT = "full"
-GT_EMBEDDINGS_PATH = Path("scoring/gt_property_name_gemini-embedding-001.json")
-
-RUBRIC_PATH = Path("scoring") / "rubric_4.csv"
-
-# Crystal structure symmetry mapping
-CRYSTAL_SYMMETRY: dict[int, str] = {
-    1: "cubic",
-    2: "tetragonal",
-    3: "orthorhombic",
-    4: "monoclinic",
-    5: "triclinic",
-    6: "trigonal",
-    7: "hexagonal",
-}
-
-# Shape mapping
-# NOTE: we insert space before parentheses for formatting consistency
-SHAPE: dict[int, str] = {
-    1: "single phase (bulk)",
-    2: "multi phase (bulk)",
-    3: "single crystal (bulk)",
-    4: "film",
-    5: "film (single)",
-}
-
-# Method mapping
-METHOD: dict[int, str] = {
-    1: "powder sintering method",
-    2: "doctor blade method",
-    3: "screen printing method",  # typo in original source "screen printing metod"
-    4: "extrusion method",
-    5: "flux method",
-    6: "Top Seeded Solution Growth method",
-    7: "floating zone method",
-    8: "Liquid Phase epitaxy",
-    9: "melt-quench method",
-    10: "Bridgeman",
-    11: "sol-gel method",
-    12: "organic acid base method",
-    13: "suspension method",
-    14: "spray coating method",
-    15: "plasma spray method",
-    16: "sputter deposition",
-    17: "vacuum deposition",
-    18: "CVD method",
-    19: "Metal-Organic Chemical Vapor Deposition",
-    20: "Vapor Growth method",
-    21: "Molecular Beam Epitaxy method",
-}
-
-# Analysis method mapping
-ANALM: dict[int, str] = {
-    1: "X-ray crystallography",
-    2: "Neutron crystallography",
-    3: "Powder x-ray diffraction",
-    4: "Powder neutron diffraction",
-    5: "Electron diffraction",
-}
-
-# Gap measurement method mapping
-GAPMETH: dict[int, str] = {
-    1: "tunneling",
-    2: "infrared spectroscopy",
-    3: "thermal conductivity",
-    4: "Raman spectroscopy",
-    5: "AC susceptibility",
-    6: "nuclear magnetic resonance",
-    7: "surface impedance",
-    8: "neutron diffraction",
-    9: "ultraviolet photoemission spectroscopy",
-    10: "microwave transmission",
-}
-
-# TC measurement method mapping
-TC_MEASUREMENT_METHOD: dict[int, str] = {
-    1: "magnetization",
-    2: "ac susceptibility",
-    3: "resistivity",
-    4: "heat capacity",
-    5: "tunneling",
-    6: "infrared spectroscopy",
-    7: "thermal conductivity",
-    8: "Raman spectroscopy",
-    9: "nuclear magnetic resonance",
-    10: "surface impedance",
-    11: "neutron diffraction",
-    12: "photoemission spectroscopy",
-    13: "microwave transmission",
-    14: "Others",
-}
-
-
-#
-# Helper functions to load predictions from Harbor jobs
-#
 
 
 def _extract_text_from_jsonlines_log(text: str) -> str | None:
@@ -222,9 +114,6 @@ def _load_trial_predictions(
     Returns:
         Parsed JSON data (either dict or list), or None if not found
 
-    Raises:
-        ValueError: If JSON parsing fails
-
     """
     # Try to load from predictions.json first
     log_path = trial_dir / "verifier" / "app_output" / "predictions.json"
@@ -235,8 +124,7 @@ def _load_trial_predictions(
         content = log_path.read_text()
     except Exception:
         return None
-    # if trial_dir.name == "prb076212504__2s8uVnW":
-    # import pdb; pdb.set_trace()
+
     # First try to extract text from JSONL format
     decoded = _extract_text_from_jsonlines_log(content)
     text = decoded or content
@@ -328,7 +216,6 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
 
     dfs = []
-    refnos = []
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
@@ -347,8 +234,6 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         for trial_dir in sorted(batch_dir.iterdir()):
             if not trial_dir.is_dir():
                 continue
-            # if trial_dir == Path("/Users/ag2435/sci_llm/src/sci-llm/examples/supercon-extraction/jobs-0119-2/bn4-bs10-gemini-cli-gemini-3-flash-preview-s1/epl10417003__N7A2Qhh"):
-            #     import pdb; pdb.set_trace()
             predictions = _load_trial_predictions(trial_dir)
             if predictions is None:
                 logger.warning(f"No valid predictions found in trial: {trial_dir}")
@@ -386,36 +271,7 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             df_properties = pd.json_normalize(df["properties"])
             df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
             dfs.append(df)
-            refnos.append(refno)
     if not dfs:
         raise ValueError(f"No valid trials found in jobs directory: {jobs_dir}")
     df = pd.concat(dfs, ignore_index=True)
     return df
-
-
-def sem(x: list, n: int) -> float:
-    """Standard error of the mean.
-
-    Args:
-        x: List of sample values
-        n: Total number of samples (including missing)
-
-    Returns:
-        Standard error of the mean
-
-    """
-    return np.std(np.concatenate((x, np.zeros(n - len(x)))), ddof=1) / (n**0.5)
-
-
-def mean_sem_with_n(x: list, n: int) -> str:
-    """Format mean ± SEM as a string.
-
-    Args:
-        x: List of sample values
-        n: Total number of samples (including missing)
-
-    Returns:
-        Formatted string "mean ± sem"
-
-    """
-    return f"{sum(x) / n:.2f} ± {sem(x, n):.2f}"

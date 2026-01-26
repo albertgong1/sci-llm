@@ -29,10 +29,6 @@ for csv_file in csv_files:
     dfs.append(df)
 df = pd.concat(dfs, ignore_index=True)
 logger.info(f"Loaded {len(df)} total rows from validated candidates")
-# HACK: Filter for specific refnos that are known to have been validated by both annotators
-df = df[
-    df["refno"].isin(["10.1002--advs.202506089", "10.1016--j.intermet.2025.108748"])
-]
 
 # Filter for rows where "validated" is not nan
 df_validated = df[~df["validated"].isna()]
