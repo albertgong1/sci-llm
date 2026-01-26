@@ -204,23 +204,16 @@ async def process_paper(
             Message(role="user", content=[file, prompt]),
         ]
     )
+    # Get LLM response (NOTE: 429 errors will be raised as exceptions here)
+    response = await llm.generate_response_async(conv, inf_gen_config)
+    # Check for errors
+    if response.error:
+        logger.warning(f"LLM error for {refno}: {response.error}")
 
-    properties = []
-    response: LLMChatResponse | None = None
+    # Extract properties from response JSON
     try:
-        # Get LLM response
-        response = await llm.generate_response_async(conv, inf_gen_config)
-        # Check for errors
-        if response.error:
-            logger.warning(f"LLM error for {refno}: {response.error}")
-        if False:
-            # Parse JSON from response
-            json_data = parse_json_response(response.pred)
-            if json_data is None:
-                logger.warning(f"Failed to parse JSON from {refno}")
-        else:
-            # Since we specified output_format="json", response.pred is already parsed JSON
-            json_data = response.pred
+        # NOTE: Since we specified output_format="json", response.pred is already parsed JSON
+        json_data = response.pred
         # Check for properties array
         if "properties" not in json_data:
             logger.warning(f"No 'properties' key in JSON for {refno}")
@@ -229,6 +222,7 @@ async def process_paper(
             logger.warning(f"'properties' is not a list for {refno}")
     except Exception as e:
         logger.error(f"Error processing {refno}: {e}")
+        properties = []
 
     # Flatten results and convert to CSV rows
     all_rows: list[pd.Series] = []
@@ -525,8 +519,8 @@ def main() -> None:
     parser.add_argument(
         "--openai_reasoning_effort",
         type=str,
-        default="high",
-        help="Reasoning effort for OpenAI models (default: high)",
+        default=None,
+        help="Reasoning effort for OpenAI models (default: None)",
     )
     parser.add_argument(
         "--max_concurrent",
