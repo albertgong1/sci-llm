@@ -119,8 +119,16 @@ class OpenAIChat(LLMChat):
             gen_kwargs["temperature"] = inf_gen_config.temperature
         if inf_gen_config.top_p:
             gen_kwargs["top_p"] = inf_gen_config.top_p
+        
         if inf_gen_config.use_web_search:
             gen_kwargs["tools"] = [{"type": "web_search"}]
+            if inf_gen_config.tool_choice:
+                gen_kwargs["tool_choice"] = inf_gen_config.tool_choice
+        elif inf_gen_config.tool_choice:
+             gen_kwargs["tool_choice"] = inf_gen_config.tool_choice
+            
+        if inf_gen_config.reasoning_effort:
+            gen_kwargs["reasoning"] = {"effort": inf_gen_config.reasoning_effort}
 
         # https://platform.openai.com/docs/api-reference/responses/create#responses_create-text
         if inf_gen_config.output_format == "json":
@@ -206,23 +214,199 @@ class OpenAIChat(LLMChat):
 
         """
         try:
+            # Check response status (especially important for reasoning models and Beta API)
+            if hasattr(response, "status") and response.status != "completed":
+                error_msg = f"API request status: {response.status}"
+                if hasattr(response, "error") and response.error:
+                    error_msg += f". Error: {response.error}"
+                return LLMChatResponse(
+                    pred="", usage={}, error=error_msg, web_search_metadata=None
+                )
+
             usage = {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
                 "total_tokens": response.usage.total_tokens,
             }
 
+            # Extract cached tokens if available
+            # Note: The field name might vary slightly in SDK versions, checking both common patterns
+            if hasattr(response.usage, "input_token_details") and response.usage.input_token_details:
+                usage["cached_tokens"] = getattr(response.usage.input_token_details, "cached_tokens", 0)
+            elif hasattr(response.usage, "input_tokens_details") and response.usage.input_tokens_details:
+                 usage["cached_tokens"] = getattr(response.usage.input_tokens_details, "cached_tokens", 0)
+
+            # Extract reasoning tokens if available (for o1/o3 reasoning models)
+            # Both Chat Completion and Responses API usually have this in output_tokens_details
+            if (
+                hasattr(response.usage, "output_token_details")
+                and response.usage.output_token_details
+            ):
+                usage["thinking_tokens"] = response.usage.output_token_details.reasoning_tokens
+
+            if not response.output_text and usage.get("completion_tokens", 0) > 0:
+                # This could happen if all tokens were spent on reasoning
+                return LLMChatResponse(
+                    pred="", 
+                    usage=usage, 
+                    error="LLM generated reasoning tokens but no output text. Try increasing max_output_tokens.", 
+                    web_search_metadata=None
+                )
+
             if inf_gen_config.output_format == "json":
-                pred = json.loads(response.output_text)
+                # Note: parse_json_response will be called in the script, 
+                # but we handle direct JSON parsing here if requested in config.
+                import json as json_mod
+                pred = json_mod.loads(response.output_text)
             elif inf_gen_config.output_format == "text":
                 pred = response.output_text
             else:
                 raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
 
-            # TODO: Difficult to get web_search_metadata extraction from the Responses API response, do it later.
-            return LLMChatResponse(pred=pred, usage=usage, error=None, web_search_metadata=None)
+            # Extract web search metadata if available
+            # The Responses API returns a list of items (web_search_call, message, etc.)
+            # We look for "web_search_call" items to extract queries.
+            web_search_metadata = None
+            queries = []
+            uris = []
+            
+            # Extract web search metadata if available
+            # Helper to safely get the list of output items
+            output_items = []
+            
+            # Pydantic serialization might warn/fail for Beta features like web_search tools
+            # We try flexible access
+            try:
+                if hasattr(response, "model_dump"):
+                    response_dict = response.model_dump()
+                    output_items = response_dict.get("output", [])
+                elif hasattr(response, "dict"):
+                     response_dict = response.dict()
+                     output_items = response_dict.get("output", [])
+                else:
+                    output_items = getattr(response, "output", [])
+            except Exception as e:
+                logger.debug(f"Pydantic serialization failed: {e}. Falling back to getattr.")
+                # Try accessing internal __dict__ or raw attributes if possible
+                try: 
+                    response_dict = response.__dict__
+                    output_items = response_dict.get("output", [])
+                except:
+                    output_items = getattr(response, "output", [])
+
+            # If response is a list itself
+            if isinstance(response, list):
+                output_items = response
+            
+            # Ensure output_items is iterable
+            if not isinstance(output_items, list):
+                output_items = []
+
+            # Debug: Log output items count and types
+            logger.debug(f"Found {len(output_items)} output items")
+            for i, item in enumerate(output_items):
+                it = item.get("type", "unknown") if isinstance(item, dict) else getattr(item, "type", "unknown")
+                logger.debug(f"Item {i}: {it}")
+                
+            web_search_metadata = None
+            queries = []
+            uris = []
+            num_tool_calls = 0
+
+            for item in output_items:
+                # Check for web_search_call items
+                if isinstance(item, dict):
+                     item_type = item.get("type")
+                else:
+                     item_type = getattr(item, "type", None)
+
+                if item_type == "web_search_call":
+                   num_tool_calls += 1
+                   try:
+                       logger.debug(f"Full WebSearchCall Item: {item}")
+                       
+                       # Extract action
+                       # Extract action
+                       if isinstance(item, dict):
+                           # Check for flattened 'action'
+                           if "action" in item:
+                               action = item["action"]
+                           else:
+                               # Check for nested 'web_search_call'
+                               ws_call = item.get("web_search_call", {})
+                               action = ws_call.get("action", {}) if isinstance(ws_call, dict) else getattr(ws_call, "action", {})
+                       else:
+                           # Object access
+                           if hasattr(item, "action"):
+                               action = item.action
+                           else:
+                               ws_call = getattr(item, "web_search_call", None)
+                               if ws_call:
+                                   action = getattr(ws_call, "action", None)
+                               else:
+                                   action = None
+
+                       if action:
+                           logger.debug(f"Action: {action}")
+                           # Try to extract queries from action object or dict
+                           if isinstance(action, dict):
+                               q = action.get("query")
+                               if q: queries.append(q)
+                               qs = action.get("queries")
+                               if qs: queries.extend(qs)
+                           else:
+                               # Try attribute access first
+                               q = getattr(action, "query", None)
+                               if q: queries.append(q)
+                               qs = getattr(action, "queries", None)
+                               if qs: queries.extend(qs)
+                               
+                               # If attributes failed, try __dict__ if available
+                               if not q and not qs and hasattr(action, "__dict__"):
+                                   ad = action.__dict__
+                                   q = ad.get("query")
+                                   if q: queries.append(q)
+                                   qs = ad.get("queries")
+                                   if qs: queries.extend(qs)
+                   except Exception as e:
+                       logger.debug(f"Failed to extract info from web_search_call: {e}")
+
+                # Also check for message annotations for citations
+                if item_type == "message":
+                    try:
+                        content = item.get("content", []) if isinstance(item, dict) else getattr(item, "content", [])
+                        for part in content:
+                            annotations = part.get("annotations", []) if isinstance(part, dict) else getattr(part, "annotations", [])
+                            for ano in annotations:
+                                ano_type = ano.get("type") if isinstance(ano, dict) else getattr(ano, "type", None)
+                                if ano_type == "url_citation":
+                                    url = ano.get("url") if isinstance(ano, dict) else getattr(ano, "url", None)
+                                    if url:
+                                        uris.append(url)
+                    except Exception as e:
+                         logger.debug(f"Failed to extract citation: {e}")
+
+            if queries or uris:
+                from llm_utils.common import WebSearchMetadata
+                web_search_metadata = WebSearchMetadata(queries=queries, uris=uris, num_tool_calls=num_tool_calls)
+
+            finish_reason = getattr(response, "finish_reason", None)
+            
+            return LLMChatResponse(
+                pred=pred, 
+                usage=usage, 
+                error=None, 
+                web_search_metadata=web_search_metadata,
+                finish_reason=finish_reason
+            )
         except Exception as e:
-            return LLMChatResponse(pred="", usage={}, error=str(e), web_search_metadata=None)
+            return LLMChatResponse(
+                pred="", 
+                usage={}, 
+                error=str(e), 
+                web_search_metadata=None,
+                finish_reason=None
+            )
 
     def upload_file(self, file: File) -> None:
         """Upload a file to OpenAI server.

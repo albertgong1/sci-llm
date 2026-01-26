@@ -233,6 +233,7 @@ class GeminiChat(LLMChat):
                 raise ValueError(
                     f"Invalid output format: {inf_gen_config.output_format}"
                 )
+            # https://ai.google.dev/gemini-api/docs/tokens?lang=python
             usage = {
                 "prompt_tokens": response.usage_metadata.prompt_token_count,
                 "cached_tokens": response.usage_metadata.cached_content_token_count
@@ -246,22 +247,51 @@ class GeminiChat(LLMChat):
             # Extract grounding metadata if web search was used
             # https://ai.google.dev/gemini-api/docs/google-search
             if grounding_metadata := response.candidates[0].grounding_metadata:
+                logger.debug(f"Grounding Metadata: {grounding_metadata}")
                 # Convert GroundingChunk objects to serializable dicts
                 queries = grounding_metadata.web_search_queries
                 uris = []
+                titles = []
                 for chunk in grounding_metadata.grounding_chunks or []:
                     if hasattr(chunk, "web") and chunk.web:
                         uris.append(chunk.web.uri)
+                        titles.append(chunk.web.title)
+                
+                # Convert GroundingSupport objects to dicts
+                grounding_supports = []
+                for support in grounding_metadata.grounding_supports or []:
+                    support_dict = {
+                        "grounding_chunk_indices": list(support.grounding_chunk_indices),
+                        "segment": {
+                            "text": support.segment.text,
+                            "start_index": support.segment.start_index,
+                            "end_index": support.segment.end_index,
+                        } if support.segment else None,
+                    }
+                    grounding_supports.append(support_dict)
+
                 web_search_metadata = WebSearchMetadata(
                     queries=queries,
                     uris=uris,
+                    titles=titles,
+                    grounding_supports=grounding_supports,
+                    num_tool_calls=1,
                 )
             else:
                 web_search_metadata = None
 
+            finish_reason = None
+            if response.candidates and response.candidates[0].finish_reason:
+                # Convert enum to string (e.g. FinishReason.STOP -> "STOP")
+                finish_reason = str(response.candidates[0].finish_reason)
 
             return LLMChatResponse(
-                pred=pred, usage=usage, error=None, thought=thought, web_search_metadata=web_search_metadata
+                pred=pred, 
+                usage=usage, 
+                error=None, 
+                thought=thought, 
+                web_search_metadata=web_search_metadata,
+                finish_reason=finish_reason
             )
         except Exception as e:
             # Handle cases where Gemini refuses to generate

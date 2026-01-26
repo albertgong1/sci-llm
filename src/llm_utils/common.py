@@ -36,6 +36,10 @@ class InferenceGenerationConfig(BaseModel):
     # Gemini: https://ai.google.dev/gemini-api/docs/google-search
     # OpenAI: https://platform.openai.com/docs/guides/tools-web-search
     use_web_search: bool = Field(default=False)
+    
+    # Tool choice
+    # OpenAI: "auto", "required", or {"type": "function", "function": {"name": "my_function"}}
+    tool_choice: str | dict | None = Field(default=None)
 
 
 class File(BaseModel):
@@ -72,6 +76,9 @@ class WebSearchMetadata(BaseModel):
 
     queries: list[str]
     uris: list[str]
+    titles: list[str] = Field(default_factory=list)
+    grounding_supports: list[dict[str, Any]] = Field(default_factory=list)
+    num_tool_calls: int = 0
 
 
 class LLMChatResponse(BaseModel):
@@ -80,6 +87,7 @@ class LLMChatResponse(BaseModel):
     pred: str | dict[str, Any]
     usage: dict[str, Any]
     error: str | None
+    finish_reason: str | None = None
     thought: str | None = None
     web_search_metadata: WebSearchMetadata | None = None
 
@@ -228,24 +236,41 @@ def parse_json_response(response_text: str | dict[str, Any]) -> dict[str, Any]:
         ValueError: If the response text is not a valid JSON or if the string
             does not contain a JSON code block.
     """
+    if not response_text:
+        raise ValueError("Empty response from LLM")
+
     if isinstance(response_text, dict):
         return response_text
     
-    # Try to parse as JSON
+    # Try to parse the entire text as JSON
     try:
-        return json.loads(response_text)
+        return json.loads(response_text.strip())
     except json.JSONDecodeError:
         pass
     
-    # Try to find JSON in the text then parse it
+    # Try to find JSON in Markdown code block then parse it
     try:
-        json_match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
+        json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", response_text, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group(1))
+            return json.loads(json_match.group(1).strip())
+    except json.JSONDecodeError:
+        pass
+
+    # Try to find something that looks like a JSON object (starts with { and ends with })
+    # This is a fallback for when the model includes chatter but no backticks
+    try:
+        # Find the first { and the last }
+        start = response_text.find("{")
+        end = response_text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            potential_json = response_text[start : end + 1]
+            return json.loads(potential_json.strip())
     except json.JSONDecodeError:
         pass
     
-    raise ValueError(f"Failed to parse JSON response: {response_text}")
+    # If all above fails, raise error with a snippet of the response
+    snippet = response_text[:200] + "..." if len(response_text) > 200 else response_text
+    raise ValueError(f"Failed to parse JSON response: {snippet}")
 
 
 def aggregate_usage(usage_list: list[dict]) -> dict:
