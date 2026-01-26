@@ -129,7 +129,7 @@ def cli_main() -> None:
     dfs = []
     for csv_file in csv_files:
         logger.debug(f"Loading {csv_file.name}")
-        df = pd.read_csv(csv_file, dtype=str)
+        df = pd.read_csv(csv_file, dtype={"refno": str})
         dfs.append(df)
 
     df_matches = pd.concat(dfs, ignore_index=True)
@@ -274,6 +274,7 @@ def cli_main() -> None:
     for (agent, model, refno), group in df_results.groupby(
         ["agent", "model", "refno"], dropna=False
     ):
+        # import pdb; pdb.set_trace()
         scores_dir = args.output_dir / "scores" / agent / model
         scores_dir.mkdir(parents=True, exist_ok=True)
         output_csv_path = (
@@ -344,6 +345,56 @@ def cli_main() -> None:
     )
     # Print results as table
     print(tabulate(acc, headers="keys", tablefmt="github", showindex=False))
+
+    # Compute average precision per property_name
+    # Rows: agent, model, reasoning_effort (if applicable)
+    # Columns: property names
+    property_group_cols = group_cols + ["refno", "property_name_pred"]
+    precision_by_property = (
+        df_results.groupby(property_group_cols, dropna=False)
+        .agg(precision_score=pd.NamedAgg(column="precision_score", aggfunc="mean"))
+        .reset_index()
+    )
+
+    # Add trial counts
+    precision_by_property["num_trials"] = precision_by_property.apply(
+        get_trials_count, axis=1
+    )
+
+    # Aggregate across refnos for each group and property
+    property_agg_cols = group_cols + ["property_name_pred"]
+    precision_by_property_agg = (
+        precision_by_property.groupby(property_agg_cols, dropna=False)
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "avg_precision": mean_sem_with_n(
+                        g["precision_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                }
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+    )
+
+    # Pivot to get property names as columns
+    precision_pivot = precision_by_property_agg.pivot(
+        index=group_cols, columns="property_name_pred", values="avg_precision"
+    ).reset_index()
+
+    # Sort property columns by descending occurrence count
+    property_counts = df_results["property_name_pred"].value_counts()
+    property_cols = [c for c in precision_pivot.columns if c not in group_cols]
+    sorted_property_cols = sorted(
+        property_cols, key=lambda x: property_counts.get(x, 0), reverse=True
+    )
+    precision_pivot = precision_pivot[group_cols + sorted_property_cols]
+
+    # Save precision per property to CSV
+    precision_per_property_path = args.output_dir / "precision_per_property.csv"
+    precision_pivot.to_csv(precision_per_property_path, index=False)
+    print(f"Saved precision per property to {precision_per_property_path}")
 
 
 if __name__ == "__main__":

@@ -129,7 +129,7 @@ def cli_main() -> None:
     dfs = []
     for csv_file in csv_files:
         logger.debug(f"Loading {csv_file.name}")
-        df = pd.read_csv(csv_file, dtype=str)
+        df = pd.read_csv(csv_file, dtype={"refno": str})
         dfs.append(df)
 
     df_matches = pd.concat(dfs, ignore_index=True)
@@ -340,6 +340,56 @@ def cli_main() -> None:
     )
     # Print results as table
     print(tabulate(acc, headers="keys", tablefmt="github", showindex=False))
+
+    # Compute average recall per property_name
+    # Rows: agent, model, reasoning_effort (if applicable)
+    # Columns: property names
+    property_group_cols = group_cols + ["refno", "property_name_gt"]
+    recall_by_property = (
+        df_results.groupby(property_group_cols, dropna=False)
+        .agg(recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"))
+        .reset_index()
+    )
+
+    # Add trial counts
+    recall_by_property["num_trials"] = recall_by_property.apply(
+        get_trials_count, axis=1
+    )
+
+    # Aggregate across refnos for each group and property
+    property_agg_cols = group_cols + ["property_name_gt"]
+    recall_by_property_agg = (
+        recall_by_property.groupby(property_agg_cols, dropna=False)
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "avg_recall": mean_sem_with_n(
+                        g["recall_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                }
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+    )
+
+    # Pivot to get property names as columns
+    recall_pivot = recall_by_property_agg.pivot(
+        index=group_cols, columns="property_name_gt", values="avg_recall"
+    ).reset_index()
+
+    # Sort property columns by descending occurrence count
+    property_counts = df_results["property_name_gt"].value_counts()
+    property_cols = [c for c in recall_pivot.columns if c not in group_cols]
+    sorted_property_cols = sorted(
+        property_cols, key=lambda x: property_counts.get(x, 0), reverse=True
+    )
+    recall_pivot = recall_pivot[group_cols + sorted_property_cols]
+
+    # Save recall per property to CSV
+    recall_per_property_path = args.output_dir / "recall_per_property.csv"
+    recall_pivot.to_csv(recall_per_property_path, index=False)
+    print(f"Saved recall per property to {recall_per_property_path}")
 
 
 if __name__ == "__main__":
