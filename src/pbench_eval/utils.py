@@ -339,14 +339,14 @@ def scorer_space_group(pred: str, answer: str) -> bool:
 
     # Adding these two checks in case there's some alias we missed or haven't heard of
     if pred_id is None:
-        print(
-            f"Warning: Predicted space group '{pred}' (clean: '{pred_norm}') not found in allowed keys."
+        logger.warning(
+            f"Predicted space group '{pred}' (clean: '{pred_norm}') not found in allowed keys."
         )
         return False
 
     if answer_id is None:
-        print(
-            f"Warning: Answer space group '{answer}' (clean: '{answer_norm}') not found in allowed keys."
+        logger.warning(
+            f"Answer space group '{answer}' (clean: '{answer_norm}') not found in allowed keys."
         )
         return False
 
