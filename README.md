@@ -19,3 +19,16 @@ OPENAI_API_KEY=xxxxx
 ```
 
 For example tasks, see our [SuperCon Extraction task](examples/supercon-extraction/README.md), [Biosurfactants Extraction task](examples/biosurfactants-extraction/README.md), and [Tc Precedent Search task](examples/tc-precedent-search/README.md).
+
+## Figures
+
+1. To generate accuracy vs. total tokens/dollar cost:
+- [ ] TODO:
+```bash
+
+```
+
+2. To generate bar plots of failure rate:
+
+```bash
+```
