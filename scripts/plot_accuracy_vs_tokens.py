@@ -52,11 +52,14 @@ group_cols = ["agent", "model_name"]
 
 # Read merged table from examples subdirectories
 output_dirs = [
-    ("supercon", Path("examples/supercon-extraction/out-post-2021")),
+    ("supercon", Path("examples/supercon-extraction/out-post-2021")),  # harbor
     ("supercon", Path("examples/supercon-extraction/out-post-2021-no-agent")),
-    ("biosurfactants", Path("examples/biosurfactants-extraction/out-biosurfactants")),
+    (
+        "biosurfactants",
+        Path("examples/biosurfactants-extraction/out-biosurfactants"),
+    ),  # harbor
     ("biosurfactants", Path("examples/biosurfactants-extraction/out-no-agent")),
-    # ("cdw", Path("examples/cdw-extraction/out-cdw")),
+    ("cdw", Path("examples/cdw-extraction/out-cdw")),  # harbor
 ]
 
 # Set x-axis label based on metric
