@@ -33,8 +33,6 @@ Example (from repo root):
       --no-score --force
 """
 
-from __future__ import annotations
-
 import argparse
 import csv
 import io
@@ -53,6 +51,10 @@ from datasets import load_dataset
 from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
 from slugify import slugify
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def repo_root() -> Path:
@@ -882,9 +884,47 @@ def _collect_task_dirs(
 
 def _shuffle_task_dirs(task_dirs: list[Path], seed: int) -> list[Path]:
     """Shuffle task directories with a deterministic seed."""
-    shuffled = list(task_dirs)
-    random.Random(seed).shuffle(shuffled)
-    return shuffled
+    if True:
+        logger.warning("Using custom shuffling with always-include papers.")
+        # HACK: include papers that Chao and Fatmagul have already validated at the start.
+        REFNOS_ALWAYS_INCLUDE = [
+            "0304328",
+            "0505463",
+            "0804.1930",
+            "0807.2541",
+            "0811.0342",
+            "0812.1214",
+            "0903.4018",
+            "0908.0518",
+            "1312.5475",
+            "1401.0712",
+            "1401.1975",
+            "1602.07983",
+            "1612.04105",
+            "1711.09143",
+            "1906.07149",
+            "1910.05526",
+            "2001.05649",
+            "2111.01152",
+            "2302.10031",
+            "9902061",
+            "9907030",
+            "9912178",
+        ]
+        always_include_dirs = [
+            d for d in task_dirs if d.name.replace("-", ".") in REFNOS_ALWAYS_INCLUDE
+        ]
+        remaining_dirs = [
+            d
+            for d in task_dirs
+            if d.name.replace("-", ".") not in REFNOS_ALWAYS_INCLUDE
+        ]
+        random.Random(seed).shuffle(remaining_dirs)
+        return always_include_dirs + remaining_dirs
+    else:
+        shuffled = list(task_dirs)
+        random.Random(seed).shuffle(shuffled)
+        return shuffled
 
 
 def _hf_repo_url(repo_id: str, repo_type: str) -> str:

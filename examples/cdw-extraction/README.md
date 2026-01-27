@@ -127,7 +127,7 @@ uv run pbench-gt-embeddings --hf_repo kilian-group/cdw-extraction --hf_revision 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir data/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-stoichiometric-template \
-    --gt-hf-repo kilian-group/cdw-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
+    --gt-hf-repo kilian-group/cdw-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.1 \
     --force --upload-hf --hf-repo-id kilian-group/cdw-extraction-harbor-tasks
 ```
 
