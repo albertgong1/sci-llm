@@ -6,7 +6,7 @@ This directory contains the workflow for evaluating the "Precedent Search" task,
 
 ### 1. Download Development Set (One-Time Setup)
 
-Download [flux-material_dev-set.csv](https://drive.google.com/file/d/1lJrRh6D8Cj1Wq5Ta8w0_rUUSGh0wTtS3/view?usp=drive_link) and save to `examples/flux-precedent-search/`.
+Download [flux-material_dev-set.csv](https://drive.google.com/file/d/1LW540QNzLCP2Qo8ha-nYhjNWPoM5xY2p/view?usp=sharing) and save to `examples/flux-precedent-search/`.
 
 ## LLM API Workflow
 
