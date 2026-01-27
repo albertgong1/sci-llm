@@ -65,14 +65,51 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 ```bash
 # Generate property name embeddings
 uv run pbench-pred-embeddings -jd JOBS_DIR -od OUTPUT_DIR
-# Old command (deprecated): uv run python generate_pred_embeddings.py -jd JOBS_DIR -od OUTPUT_DIR
-# Generate property name matches using top-3 (cosine similarity) followed by gemini-2.5-flash to determine a match
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -jd JOBS_DIR --model_name gemini-2.5-flash --top_k 3 --log_level INFO
-# Compute average precision
-uv run python score_precision.py -od OUPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
-# Compute average recall
-uv run python score_recall.py -od OUTPUT_DIR --model gemini-2.5-flash -jd JOBS_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-extraction --hf_split full --hf_revision v0.2.1 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (material-based matching for supercon)
+uv run pbench-score-precision -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
+
+# Compute recall (condition-based matching for supercon)
+uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
 ```
+
+<details>
+    <summary>Instructions for SuperCon Post-2021</summary>
+
+```bash
+# Generate property name embeddings
+uv run pbench-pred-embeddings -jd JOBS_DIR -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (material-based matching for supercon)
+uv run pbench-score-precision -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
+
+# Compute recall (condition-based matching for supercon)
+uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
+```
+
+</details>
 
 3. Compute task-average token usage, steps, and cost:
 
@@ -110,7 +147,7 @@ uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
     --conversion_factors_path scoring/si_conversion_factors.csv \
     --matching_mode material
 
-# Compute recall (condition-based matching for biosurfactants)
+# Compute recall (condition-based matching for supercon)
 uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric_4.csv \
     --conversion_factors_path scoring/si_conversion_factors.csv \
@@ -131,21 +168,28 @@ uv run python score_recall.py -od OUTPUT_DIR
     <summary>Instructions for SuperCon Post-2021</summary>
 
 TODO:
-- [ ] Update these instructions with new domain-agnostic eval scripts
+- [X] Update these instructions with new domain-agnostic eval scripts
 - [ ] Ensure that the results are similar as before using the preds at `/Users/ag2435/sci_llm/src/sci-llm/examples/supercon-extraction/out-0123`
 
 ```bash
 uv run pbench-pred-embeddings -od OUTPUT_DIR
-# Old command (deprecated): uv run python generate_pred_embeddings.py -od OUTPUT_DIR
+
 # Query LLM to determine best match between generated and ground-truth property name:
-uv run python generate_property_name_matches.py -od OUTPUT_DIR -m gemini-2.5-flash \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+uv run pbench-generate-matches -od out-post-2021-no-agent -m gemini-2.5-flash \
+    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1 \
+    --prompt_path prompts/property_matching_prompt.md
+
 # Compute precision
-uv run python score_precision.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+uv run pbench-score-precision -od out-post-2021-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
+
 # Compute recall
-uv run python score_recall.py -od OUTPUT_DIR \
-    --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+uv run pbench-score-recall -od out-post-2021-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR
 ```
 
 </details>
@@ -154,6 +198,18 @@ uv run python score_recall.py -od OUTPUT_DIR \
 
 ```bash
 uv run python format_tokens.py -od OUTPUT_DIR
+```
+
+7. Aggregate accuracy and token cost:
+
+TODO:
+- [ ] Allow user to specify precision, recall, or F1. Currently, it will compute F1 scores.
+
+```bash
+uv run python format_accuracy_tokens.py -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_4.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR --x-axis cost
 ```
 
 ## Constructing the Dataset from SuperCon original
@@ -306,8 +362,8 @@ uv run python generate_gt_embeddings.py --hf_revision v0.0.1 --hf_repo kilian-gr
 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
-    --pdf-dir data/new-supercon-papers/Paper_DB --output-dir out-new-supercon-papers --workspace . \
-    --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
+    --pdf-dir data/new-supercon-papers/Paper_DB --output-dir out-0125-harbor-post-2021 --workspace . --template targeted-stoichiometric-template \
+    --gt-hf-repo kilian-group/supercon-post-2021-extraction --gt-hf-split full --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/supercon-post-2021-extraction-harbor-tasks
 ```
 
