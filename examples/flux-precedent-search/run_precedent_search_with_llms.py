@@ -19,6 +19,7 @@ import argparse
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -138,19 +139,43 @@ async def process_material(
         "missing_or_notable_information": None,
         "web_search_queries": None,
         "web_search_uris": None,
+        "web_search_num_tool_calls": None,
         "raw_response": None,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+        "cached_tokens": None,
+        "thinking_tokens": None,
+        "time_taken_seconds": None,
+        "finish_reason": None,
+        "web_search_titles": None,
+        "web_search_grounding_supports": None,
         "error": None,
     }
 
     try:
+        start_time = time.time()
         response: LLMChatResponse = await llm.generate_response_async(
             conv, inf_gen_config
         )
+        end_time = time.time()
+        result["time_taken_seconds"] = end_time - start_time
+        
+        # Extract usage
+        if response.usage:
+            result["prompt_tokens"] = response.usage.get("prompt_tokens")
+            result["completion_tokens"] = response.usage.get("completion_tokens")
+            result["total_tokens"] = response.usage.get("total_tokens")
+            result["cached_tokens"] = response.usage.get("cached_tokens")
+            result["thinking_tokens"] = response.usage.get("thinking_tokens")
 
         if response.error:
             result["error"] = response.error
             logger.error(f"Error processing {material}: {response.error}")
             return result
+
+        if str(getattr(response, "finish_reason", "")):
+             result["finish_reason"] = response.finish_reason
 
         result["raw_response"] = response.pred
 
@@ -158,6 +183,9 @@ async def process_material(
         if web_search_metadata := response.web_search_metadata:
             result["web_search_queries"] = json.dumps(web_search_metadata.queries)
             result["web_search_uris"] = json.dumps(web_search_metadata.uris)
+            result["web_search_titles"] = json.dumps(web_search_metadata.titles)
+            result["web_search_grounding_supports"] = json.dumps(web_search_metadata.grounding_supports)
+            result["web_search_num_tool_calls"] = web_search_metadata.num_tool_calls
 
         # Extract predictions
         json_data = parse_json_response(response.pred)
@@ -190,6 +218,15 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
     if args.limit:
         materials = materials[: args.limit]
 
+    if args.material:
+        # materials list already has spaces removed
+        target_material = args.material.replace(" ", "")
+        if target_material in materials:
+            materials = [target_material]
+        else:
+            logger.warning(f"Material {args.material} (cleaned: {target_material}) not found in dataset")
+            materials = []
+
     logger.info(f"Processing {len(materials)} materials")
 
     # Load instruction template
@@ -214,6 +251,7 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
         max_output_tokens=args.max_output_tokens,
         output_format=output_format,
         use_web_search=args.use_web_search,
+        reasoning_effort=args.reasoning_effort,
     )
 
     # Setup output directory
@@ -223,7 +261,8 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
     # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
     web_search_suffix = "__websearch" if args.use_web_search else ""
-    output_filename = f"precedent_search__model={model_name_safe}{web_search_suffix}.csv"
+    run_suffix = args.run
+    output_filename = f"precedent_search__model={model_name_safe}{web_search_suffix}_{run_suffix}.csv"
     output_path = output_dir / output_filename
 
     # Check if output already exists
@@ -285,6 +324,16 @@ async def run_precedent_search(args: argparse.Namespace) -> None:
         "missing_or_notable_information",
         "web_search_queries",
         "web_search_uris",
+        "web_search_titles",
+        "web_search_grounding_supports",
+        "web_search_num_tool_calls",
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "cached_tokens",
+        "thinking_tokens",
+        "time_taken_seconds",
+        "finish_reason",
         "raw_response",
         "error",
     ]
@@ -324,6 +373,12 @@ if __name__ == "__main__":
         help="Limit the number of materials to process (default: None = all)",
     )
     parser.add_argument(
+        "--material",
+        type=str,
+        default=None,
+        help="Specific material to process (default: None)",
+    )
+    parser.add_argument(
         "--max_output_tokens",
         type=int,
         default=8192,
@@ -340,6 +395,12 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
         help="Enable web search grounding (default: False)",
+    )
+    parser.add_argument(
+        "--run",
+        type=str,
+        default="",
+        help="Suffix to add to the output filename (default: '')",
     )
 
     args = parser.parse_args()
