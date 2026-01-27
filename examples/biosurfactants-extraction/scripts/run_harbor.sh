@@ -21,14 +21,14 @@ cmd_args=$@
 # Format: "agent:model" or "agent:model:kwarg1=value1,kwarg2=value2"
 # TODO: add qwen-code with qwen3-max via OpenRouter
 combinations=(
-  "gemini-cli:gemini/gemini-3-pro-preview"
-  "codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
-  "gemini-cli:gemini/gemini-3-flash-preview"
+  # "gemini-cli:gemini/gemini-3-pro-preview"
+  # "codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
+  # "gemini-cli:gemini/gemini-3-flash-preview"
   "terminus-2:gemini/gemini-3-pro-preview"
-  "terminus-2:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
+  # "terminus-2:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
 )
-BATCH_SIZE=50
-NUM_BATCHES=1
+BATCH_SIZE=10
+NUM_BATCHES=3
 
 for combo in "${combinations[@]}"; do
   # Parse agent:model:kwargs format
