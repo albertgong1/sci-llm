@@ -35,6 +35,10 @@ import logging
 import pbench
 from pbench_eval.metrics import compute_precision_per_material_property
 from pbench_eval.harbor_utils import count_trials_per_agent_model
+from pbench_eval.token_utils import (
+    count_trials_per_group,
+    count_zeroshot_trials_per_group,
+)
 from pbench_eval.stats import mean_sem_with_n
 
 logger = logging.getLogger(__name__)
@@ -148,76 +152,88 @@ def cli_main() -> None:
     ] = {}  # (agent, model, refno) -> reasoning_effort
     has_reasoning_effort = False
     if args.jobs_dir is None:
-        trajectory_dir = args.output_dir / "trajectories"
-        trials_lookup: dict[tuple, int] = {}
-        if trajectory_dir.exists():
-            # First pass: check if any trajectory has reasoning_effort and extract values
-            # Pattern: trajectory__agent={agent}__model={model}__refno={refno}.json
-            for traj_file in trajectory_dir.glob("trajectory__*.json"):
-                match = re.match(
-                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
-                    traj_file.name,
-                )
-                if match:
-                    agent, model, refno = match.groups()
-                    model = model.replace("--", "/")
-                    try:
-                        with open(traj_file) as f:
-                            trajectory = json.load(f)
-                        inf_gen_config = trajectory.get("inf_gen_config", {})
-                        reasoning_effort = inf_gen_config.get("reasoning_effort", "")
-                        if reasoning_effort is None:
-                            reasoning_effort = ""
-                        if reasoning_effort:
-                            has_reasoning_effort = True
-                        reasoning_effort_lookup[(agent, model, refno)] = (
-                            reasoning_effort
-                        )
-                    except Exception:
-                        reasoning_effort_lookup[(agent, model, refno)] = ""
+        if False:
+            trajectory_dir = args.output_dir / "trajectories"
+            trials_lookup: dict[tuple, int] = {}
+            if trajectory_dir.exists():
+                # First pass: check if any trajectory has reasoning_effort and extract values
+                # Pattern: trajectory__agent={agent}__model={model}__refno={refno}.json
+                for traj_file in trajectory_dir.glob("trajectory__*.json"):
+                    match = re.match(
+                        r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
+                        traj_file.name,
+                    )
+                    if match:
+                        agent, model, refno = match.groups()
+                        model = model.replace("--", "/")
+                        try:
+                            with open(traj_file) as f:
+                                trajectory = json.load(f)
+                            inf_gen_config = trajectory.get("inf_gen_config", {})
+                            reasoning_effort = inf_gen_config.get(
+                                "reasoning_effort", ""
+                            )
+                            if reasoning_effort is None:
+                                reasoning_effort = ""
+                            if reasoning_effort:
+                                has_reasoning_effort = True
+                            reasoning_effort_lookup[(agent, model, refno)] = (
+                                reasoning_effort
+                            )
+                        except Exception:
+                            reasoning_effort_lookup[(agent, model, refno)] = ""
 
-            # Count trials per group
-            trajectory_counts: dict[tuple, int] = {}
-            for traj_file in trajectory_dir.glob("trajectory__*.json"):
-                match = re.match(
-                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
-                    traj_file.name,
+                # Count trials per group
+                trajectory_counts: dict[tuple, int] = {}
+                for traj_file in trajectory_dir.glob("trajectory__*.json"):
+                    match = re.match(
+                        r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
+                        traj_file.name,
+                    )
+                    if match:
+                        agent, model, refno = match.groups()
+                        model = model.replace("--", "/")
+                        if has_reasoning_effort:
+                            reasoning_effort = reasoning_effort_lookup.get(
+                                (agent, model, refno), ""
+                            )
+                            key = (agent, model, reasoning_effort)
+                        else:
+                            key = (agent, model)
+                        trajectory_counts[key] = trajectory_counts.get(key, 0) + 1
+                trials_lookup = trajectory_counts
+                logger.info(f"Counted trials from {trajectory_dir}: {trials_lookup}")
+            else:
+                # Fallback to counting unique refnos from data
+                logger.warning(
+                    f"Trajectories directory not found: {trajectory_dir}. "
+                    "Falling back to counting unique refnos from data."
                 )
-                if match:
-                    agent, model, refno = match.groups()
-                    model = model.replace("--", "/")
-                    if has_reasoning_effort:
-                        reasoning_effort = reasoning_effort_lookup.get(
-                            (agent, model, refno), ""
-                        )
-                        key = (agent, model, reasoning_effort)
-                    else:
-                        key = (agent, model)
-                    trajectory_counts[key] = trajectory_counts.get(key, 0) + 1
-            trials_lookup = trajectory_counts
-            logger.info(f"Counted trials from {trajectory_dir}: {trials_lookup}")
+                group_cols_fallback = ["agent", "model"]
+                trials_lookup = {
+                    k: v
+                    for k, v in df_matches.groupby(group_cols_fallback)["refno"]
+                    .nunique()
+                    .to_dict()
+                    .items()
+                }
         else:
-            # Fallback to counting unique refnos from data
-            logger.warning(
-                f"Trajectories directory not found: {trajectory_dir}. "
-                "Falling back to counting unique refnos from data."
+            trials_lookup = count_zeroshot_trials_per_group(
+                args.output_dir.resolve(),
+                include_reasoning_effort=True,
             )
-            group_cols_fallback = ["agent", "model"]
-            trials_lookup = {
-                k: v
-                for k, v in df_matches.groupby(group_cols_fallback)["refno"]
-                .nunique()
-                .to_dict()
-                .items()
-            }
+            has_reasoning_effort = True
     else:
         # Count number of trials (refnos) per agent/model
-        trials_lookup: dict[tuple, int] = {}
-        trials_df = count_trials_per_agent_model(args.jobs_dir)
-        trials_lookup = {
-            (row["agent"], row["model"]): row["num_trials"]
-            for _, row in trials_df.iterrows()
-        }
+        if False:
+            trials_lookup: dict[tuple, int] = {}
+            trials_df = count_trials_per_agent_model(args.jobs_dir)
+            trials_lookup = {
+                (row["agent"], row["model"]): row["num_trials"]
+                for _, row in trials_df.iterrows()
+            }
+        else:
+            trials_lookup = count_trials_per_group(args.jobs_dir)
 
     # Determine grouping columns based on whether reasoning_effort exists
     if has_reasoning_effort:
