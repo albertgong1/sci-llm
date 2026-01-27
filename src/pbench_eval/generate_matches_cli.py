@@ -79,9 +79,17 @@ async def process_single_group(
             df_pred["context"] = ""
 
         # Prepare ground truth data for this refno
-        df_gt_refno = df_gt[df_gt["refno"].str.lower() == refno.lower()].drop(
-            columns=["refno"]
-        )
+        if False:
+            df_gt_refno = df_gt[df_gt["refno"].str.lower() == refno.lower()].drop(
+                columns=["refno"]
+            )
+        else:
+            # NOTE: For Harbor evaluation, the refno for predictions is inferred from the trial dirname,
+            # which is slugified. The refno in the GT is not slugified, so we need to slugify it for matching.
+            df_gt_refno = df_gt[
+                df_gt["refno"].str.lower().apply(lambda x: slugify(x))
+                == slugify(refno.lower())
+            ].drop(columns=["refno"])
 
         # Define paths
         pred_matches_path = (
@@ -406,6 +414,8 @@ def cli_main() -> None:
 
     # Setup logging
     pbench.setup_logging(args.log_level)
+    # Suppress verbose google_genai logs
+    logging.getLogger("google_genai.models").setLevel(logging.WARNING)
     # Load env variables
     load_dotenv()
     # Check env
