@@ -23,6 +23,8 @@ uv run pbench-score-recall \
 ```
 """
 
+import json
+import re
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
@@ -127,7 +129,7 @@ def cli_main() -> None:
     dfs = []
     for csv_file in csv_files:
         logger.debug(f"Loading {csv_file.name}")
-        df = pd.read_csv(csv_file, dtype=str)
+        df = pd.read_csv(csv_file, dtype={"refno": str})
         dfs.append(df)
 
     df_matches = pd.concat(dfs, ignore_index=True)
@@ -140,26 +142,57 @@ def cli_main() -> None:
     )
 
     # If jobs_dir was not provided, count trajectory JSONs in trajectories directory
+    # and extract reasoning_effort if available
+    reasoning_effort_lookup: dict[
+        tuple[str, str, str], str
+    ] = {}  # (agent, model, refno) -> reasoning_effort
+    has_reasoning_effort = False
     if args.jobs_dir is None:
         trajectory_dir = args.output_dir / "trajectories"
-        trials_lookup: dict[tuple[str, str], int] = {}
+        trials_lookup: dict[tuple, int] = {}
         if trajectory_dir.exists():
-            # Count trajectory files per agent/model
+            # First pass: check if any trajectory has reasoning_effort and extract values
             # Pattern: trajectory__agent={agent}__model={model}__refno={refno}.json
-            import re
-
-            trajectory_counts: dict[tuple[str, str], int] = {}
             for traj_file in trajectory_dir.glob("trajectory__*.json"):
-                # Parse agent and model from filename
                 match = re.match(
-                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=.+\.json",
+                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
                     traj_file.name,
                 )
                 if match:
-                    agent, model = match.groups()
-                    # Convert model name back (-- to /)
+                    agent, model, refno = match.groups()
                     model = model.replace("--", "/")
-                    key = (agent, model)
+                    try:
+                        with open(traj_file) as f:
+                            trajectory = json.load(f)
+                        inf_gen_config = trajectory.get("inf_gen_config", {})
+                        reasoning_effort = inf_gen_config.get("reasoning_effort", "")
+                        if reasoning_effort is None:
+                            reasoning_effort = ""
+                        if reasoning_effort:
+                            has_reasoning_effort = True
+                        reasoning_effort_lookup[(agent, model, refno)] = (
+                            reasoning_effort
+                        )
+                    except Exception:
+                        reasoning_effort_lookup[(agent, model, refno)] = ""
+
+            # Count trials per group
+            trajectory_counts: dict[tuple, int] = {}
+            for traj_file in trajectory_dir.glob("trajectory__*.json"):
+                match = re.match(
+                    r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
+                    traj_file.name,
+                )
+                if match:
+                    agent, model, refno = match.groups()
+                    model = model.replace("--", "/")
+                    if has_reasoning_effort:
+                        reasoning_effort = reasoning_effort_lookup.get(
+                            (agent, model, refno), ""
+                        )
+                        key = (agent, model, reasoning_effort)
+                    else:
+                        key = (agent, model)
                     trajectory_counts[key] = trajectory_counts.get(key, 0) + 1
             trials_lookup = trajectory_counts
             logger.info(f"Counted trials from {trajectory_dir}: {trials_lookup}")
@@ -169,21 +202,28 @@ def cli_main() -> None:
                 f"Trajectories directory not found: {trajectory_dir}. "
                 "Falling back to counting unique refnos from data."
             )
+            group_cols_fallback = ["agent", "model"]
             trials_lookup = {
                 k: v
-                for k, v in df_matches.groupby(["agent", "model"])["refno"]
+                for k, v in df_matches.groupby(group_cols_fallback)["refno"]
                 .nunique()
                 .to_dict()
                 .items()
             }
     else:
         # Count number of trials (refnos) per agent/model
-        trials_lookup: dict[tuple[str, str], int] = {}
+        trials_lookup: dict[tuple, int] = {}
         trials_df = count_trials_per_agent_model(args.jobs_dir)
         trials_lookup = {
             (row["agent"], row["model"]): row["num_trials"]
             for _, row in trials_df.iterrows()
         }
+
+    # Determine grouping columns based on whether reasoning_effort exists
+    if has_reasoning_effort:
+        group_cols = ["agent", "model", "reasoning_effort"]
+    else:
+        group_cols = ["agent", "model"]
 
     # Load rubric
     logger.info(f"Loading rubric from {args.rubric_path}")
@@ -221,6 +261,15 @@ def cli_main() -> None:
         rubric_df=df_rubric if args.matching_mode == "conditions" else None,
     )
 
+    # Add reasoning_effort column if available
+    if has_reasoning_effort:
+        df_results["reasoning_effort"] = df_results.apply(
+            lambda row: reasoning_effort_lookup.get(
+                (row["agent"], row["model"], row["refno"]), ""
+            ),
+            axis=1,
+        )
+
     # Save results per group
     for (agent, model, refno), group in df_results.groupby(
         ["agent", "model", "refno"], dropna=False
@@ -238,8 +287,9 @@ def cli_main() -> None:
 
     # Aggregate results
     counta = lambda x: (x > 0).sum()  # noqa: E731
+    refno_group_cols = group_cols + ["refno"]
     acc_by_refno = (
-        df_results.groupby(["agent", "model", "refno"], dropna=False)
+        df_results.groupby(refno_group_cols, dropna=False)
         .agg(
             recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"),
             property_matches=pd.NamedAgg(
@@ -252,13 +302,19 @@ def cli_main() -> None:
         )
         .reset_index()
     )
+
     # Merge trial counts into acc_by_refno for per-group normalization
-    acc_by_refno["num_trials"] = acc_by_refno.apply(
-        lambda row: trials_lookup.get((row["agent"], row["model"]), 1), axis=1
-    )
+    def get_trials_count(row: pd.Series) -> int:
+        if has_reasoning_effort:
+            key = (row["agent"], row["model"], row["reasoning_effort"])
+        else:
+            key = (row["agent"], row["model"])
+        return trials_lookup.get(key, 1)
+
+    acc_by_refno["num_trials"] = acc_by_refno.apply(get_trials_count, axis=1)
 
     acc = (
-        acc_by_refno.groupby(["agent", "model"])
+        acc_by_refno.groupby(group_cols)
         .apply(
             lambda g: pd.Series(
                 {
@@ -284,6 +340,56 @@ def cli_main() -> None:
     )
     # Print results as table
     print(tabulate(acc, headers="keys", tablefmt="github", showindex=False))
+
+    # Compute average recall per property_name
+    # Rows: agent, model, reasoning_effort (if applicable)
+    # Columns: property names
+    property_group_cols = group_cols + ["refno", "property_name_gt"]
+    recall_by_property = (
+        df_results.groupby(property_group_cols, dropna=False)
+        .agg(recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"))
+        .reset_index()
+    )
+
+    # Add trial counts
+    recall_by_property["num_trials"] = recall_by_property.apply(
+        get_trials_count, axis=1
+    )
+
+    # Aggregate across refnos for each group and property
+    property_agg_cols = group_cols + ["property_name_gt"]
+    recall_by_property_agg = (
+        recall_by_property.groupby(property_agg_cols, dropna=False)
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "avg_recall": mean_sem_with_n(
+                        g["recall_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                }
+            ),
+            include_groups=False,
+        )
+        .reset_index()
+    )
+
+    # Pivot to get property names as columns
+    recall_pivot = recall_by_property_agg.pivot(
+        index=group_cols, columns="property_name_gt", values="avg_recall"
+    ).reset_index()
+
+    # Sort property columns by descending occurrence count
+    property_counts = df_results["property_name_gt"].value_counts()
+    property_cols = [c for c in recall_pivot.columns if c not in group_cols]
+    sorted_property_cols = sorted(
+        property_cols, key=lambda x: property_counts.get(x, 0), reverse=True
+    )
+    recall_pivot = recall_pivot[group_cols + sorted_property_cols]
+
+    # Save recall per property to CSV
+    recall_per_property_path = args.output_dir / "recall_per_property.csv"
+    recall_pivot.to_csv(recall_per_property_path, index=False)
+    print(f"Saved recall per property to {recall_per_property_path}")
 
 
 if __name__ == "__main__":

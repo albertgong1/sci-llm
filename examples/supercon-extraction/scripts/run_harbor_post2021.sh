@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run harbor extraction for multiple agent/model combinations
-# Run from examples/biosurfactants-extraction/, not from scripts/
-# Usage (local): ./scripts/run_harbor.sh JOBS_DIR [extra args...]
-# Usage (Modal): ./scripts/run_harbor.sh JOBS_DIR --modal [extra args...]
+# Run harbor extraction for multiple agent/model combinations (SuperCon Post-2021)
+# Run from examples/supercon-extraction/, not from scripts/
+# Usage (local): ./scripts/run_harbor_post2021.sh JOBS_DIR [extra args...]
+# Usage (Modal): ./scripts/run_harbor_post2021.sh JOBS_DIR --modal [extra args...]
 
 # Exit entire script on Ctrl+C
 trap "echo ' Interrupted, exiting...'; exit 130" INT
@@ -19,16 +19,16 @@ cmd_args=$@
 
 # Agent/model combinations
 # Format: "agent:model" or "agent:model:kwarg1=value1,kwarg2=value2"
-# TODO: add qwen-code with qwen3-max via OpenRouter
 combinations=(
   # "gemini-cli:gemini/gemini-3-pro-preview"
-  # "codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
+  "codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
   # "gemini-cli:gemini/gemini-3-flash-preview"
-  "terminus-2:gemini/gemini-3-pro-preview"
+  # "codex:openai/gpt-5-mini-2025-08-07:reasoning_effort=medium"
+  # "terminus-2:gemini/gemini-3-pro-preview"
   # "terminus-2:openai/gpt-5.2-2025-12-11:reasoning_effort=medium"
 )
-BATCH_SIZE=10
-NUM_BATCHES=3
+BATCH_SIZE=50
+NUM_BATCHES=1
 
 for combo in "${combinations[@]}"; do
   # Parse agent:model:kwargs format
@@ -50,7 +50,7 @@ for combo in "${combinations[@]}"; do
   for batch in $(seq 1 $NUM_BATCHES); do
     echo "Running batch ${batch}/${NUM_BATCHES}..."
     CMD="uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
-      --hf-tasks-repo kilian-group/biosurfactants-extraction-harbor-tasks --hf-tasks-version head \
+      --hf-tasks-repo kilian-group/supercon-post-2021-extraction-harbor-tasks --hf-tasks-version head \
       -a ${agent} -m ${model} ${ak_args} \
       --workspace . --jobs-dir ${jobs_dir} --seed 1 --batch-size ${BATCH_SIZE} --batch-number ${batch} $cmd_args"
     echo "Executing: $CMD"

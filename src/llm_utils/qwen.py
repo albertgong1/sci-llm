@@ -10,8 +10,8 @@ from typing import Any
 import requests
 
 try:
-    import httpx 
-except Exception: 
+    import httpx
+except Exception:
     httpx = None
 
 from llm_utils.common import (
@@ -25,8 +25,7 @@ from llm_utils.common import (
 
 
 class QwenClient:
-    """
-    Minimal OpenRouter client for OpenAI-compatible Chat Completions.
+    """Minimal OpenRouter client for OpenAI-compatible Chat Completions.
 
     Env vars supported:
       - OPENROUTER_API_KEY (preferred)
@@ -39,7 +38,9 @@ class QwenClient:
 
     def __init__(self, model_name: str) -> None:
         self.model_name = model_name
-        self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+        self.base_url = os.getenv(
+            "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+        ).rstrip("/")
         self.api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise RuntimeError(
@@ -62,14 +63,36 @@ class QwenClient:
         return headers
 
     def chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Synchronous Chat Completions call.
+
+        Args:
+            payload: The request payload.
+
+        Returns:
+            The response JSON.
+
+        """
         url = f"{self.base_url}/chat/completions"
-        resp = requests.post(url, headers=self._headers(), json=payload, timeout=self.timeout_s)
+        resp = requests.post(
+            url, headers=self._headers(), json=payload, timeout=self.timeout_s
+        )
         resp.raise_for_status()
         return resp.json()
 
     async def chat_completions_async(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Asynchronous Chat Completions call.
+
+        Args:
+            payload: The request payload.
+
+        Returns:
+            The response JSON.
+
+        """
         if httpx is None:
-            raise RuntimeError("httpx is required for async calls. Please `pip install httpx`.")
+            raise RuntimeError(
+                "httpx is required for async calls. Please `pip install httpx`."
+            )
         url = f"{self.base_url}/chat/completions"
         async with httpx.AsyncClient(timeout=self.timeout_s) as client:
             resp = await client.post(url, headers=self._headers(), json=payload)
@@ -88,8 +111,7 @@ class QwenChat(LLMChat):
         self._file_cache: dict[str, dict[str, Any]] = {}
 
     def _convert_conv_to_api_format(self, conv: Conversation) -> list[dict[str, Any]]:
-        """
-        Convert llm_utils.common.Conversation into OpenRouter/OpenAI-style messages.
+        """Convert llm_utils.common.Conversation into OpenRouter/OpenAI-style messages.
 
         Input (common.py):
           Conversation(messages=[Message(role=..., content=[str|File, ...]), ...])
@@ -111,7 +133,9 @@ class QwenChat(LLMChat):
                     text_accum.append(c)
                 elif isinstance(c, File):
                     if text_accum:
-                        parts.append({"type": "text", "text": "\n".join(text_accum).strip()})
+                        parts.append(
+                            {"type": "text", "text": "\n".join(text_accum).strip()}
+                        )
                         text_accum = []
 
                     key = self._file_cache_key(c)
@@ -121,7 +145,9 @@ class QwenChat(LLMChat):
                         cached = self._file_cache.get(key)
 
                     if cached is None:
-                        raise RuntimeError("Failed to cache file for OpenRouter message formatting.")
+                        raise RuntimeError(
+                            "Failed to cache file for OpenRouter message formatting."
+                        )
 
                     parts.append({"type": "file", "file": cached})
                 else:
@@ -140,8 +166,7 @@ class QwenChat(LLMChat):
         inf_gen_config: InferenceGenerationConfig,
         use_async: bool = False,
     ) -> Any:
-        """
-        Call OpenRouter Chat Completions endpoint.
+        """Call OpenRouter Chat Completions endpoint.
 
         Uses common.InferenceGenerationConfig field names.
         """
@@ -162,6 +187,11 @@ class QwenChat(LLMChat):
         if inf_gen_config.stop_sequences is not None:
             payload["stop"] = inf_gen_config.stop_sequences
 
+        # -----------------------------
+        # Output format (JSON mode)
+        # -----------------------------
+        if inf_gen_config.output_format == "json":
+            payload["response_format"] = {"type": "json_object"}
 
         # -----------------------------
         # Plugins: PDF parsing
@@ -186,15 +216,18 @@ class QwenChat(LLMChat):
             return self.client.chat_completions_async(payload)
         return self.client.chat_completions(payload)
 
-    def _parse_api_output(self, response: Any, inf_gen_config: InferenceGenerationConfig) -> LLMChatResponse:
-        """
-        Parse OpenRouter ChatCompletion response into llm_utils.common.LLMChatResponse.
+    def _parse_api_output(
+        self, response: Any, inf_gen_config: InferenceGenerationConfig
+    ) -> LLMChatResponse:
+        """Parse OpenRouter ChatCompletion response into llm_utils.common.LLMChatResponse.
 
         - pred: text or parsed json
         - web_search_metadata: WebSearchMetadata | None
         """
         if inspect.iscoroutine(response):
-            raise RuntimeError("Async response not awaited; did you call generate_response_async correctly?")
+            raise RuntimeError(
+                "Async response not awaited; did you call generate_response_async correctly?"
+            )
 
         text = ""
         usage: dict[str, Any] = {}
@@ -243,7 +276,9 @@ class QwenChat(LLMChat):
             elif inf_gen_config.output_format == "text":
                 pred = text
             else:
-                raise ValueError(f"Invalid output format: {inf_gen_config.output_format}")
+                raise ValueError(
+                    f"Invalid output format: {inf_gen_config.output_format}"
+                )
 
             return LLMChatResponse(
                 pred=pred,
@@ -262,8 +297,7 @@ class QwenChat(LLMChat):
             )
 
     def upload_file(self, file: File) -> None:
-        """
-        common.File only has .path; OpenRouter accepts inline data URLs for PDFs.
+        """common.File only has .path; OpenRouter accepts inline data URLs for PDFs.
 
         We cache base64 encoding and set file.uploaded_handle so File.is_uploaded() works.
         """
@@ -287,9 +321,7 @@ class QwenChat(LLMChat):
         file.uploaded_handle = key
 
     def delete_file(self, file: File) -> None:
-        """
-        OpenRouter inline files: no server deletion. Clear local cache and uploaded_handle.
-        """
+        """OpenRouter inline files: no server deletion. Clear local cache and uploaded_handle."""
         key = self._file_cache_key(file)
         self._file_cache.pop(key, None)
         file.uploaded_handle = None

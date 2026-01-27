@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Run pbench-eval for multiple model combinations
-# Run from examples/biosurfactants-extraction/, not from scripts/
+# Run pbench-eval for multiple model combinations (SuperCon)
+# Run from examples/supercon-extraction/, not from scripts/
 # Usage: ./scripts/run_simple.sh DATA_DIR OUTPUT_DIR [extra args...]
+#
+# Note: This script uses registry_data.json to define the ordering.
+# Ask ag2435@cornell.edu on Slack for a copy of this file.
 
 # Exit entire script on Ctrl+C
 trap "echo ' Interrupted, exiting...'; exit 130" INT
@@ -19,14 +22,16 @@ cmd_args=$@
 # Server/model combinations
 # Format: "server:model" or "server:model:kwarg1=value1,kwarg2=value2"
 combinations=(
-  # "gemini:gemini-3-pro-preview"
-  # "gemini:gemini-3-flash-preview"
-  # "openai:gpt-5.2-2025-12-11:openai_reasoning_effort=medium"
+  "gemini:gemini-3-pro-preview"
+  "gemini:gemini-3-flash-preview"
   # "openai:gpt-5.2-2025-12-11:openai_reasoning_effort=high"
-  # "openai:gpt-5-mini-2025-08-07:openai_reasoning_effort=medium"
+  "openai:gpt-5.2-2025-12-11:openai_reasoning_effort=medium"
   # "openai:gpt-5-mini-2025-08-07:openai_reasoning_effort=high"
-  "qwen:qwen/qwen3-max"
+  "openai:gpt-5-mini-2025-08-07:openai_reasoning_effort=medium"
 )
+
+# NOTE: this registry contains a shuffle of the tasks with Chao and Fatmagul validated ones at the front
+REGISTRY_PATH=out-0126-harbor/targeted-stoichiometric-template/registry.json
 
 for combo in "${combinations[@]}"; do
   # Parse server:model:kwargs format
@@ -48,8 +53,8 @@ for combo in "${combinations[@]}"; do
   echo "========================================"
 
   CMD="uv run pbench-eval -dd ${data_dir} --server ${server} -m ${model} \
-    -pp prompts/benchmark_soft_prompt_01.md -od ${output_dir} \
-    --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0 --log_level INFO ${extra_args} $cmd_args"
+    -pp prompts/targeted_extraction_prompt_03.md -od ${output_dir} \
+    --harbor_task_ordering_registry_path ${REGISTRY_PATH} --max_num_papers 50 --log_level INFO ${extra_args} $cmd_args"
   echo "Executing: $CMD"
   eval $CMD
 

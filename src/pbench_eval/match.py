@@ -199,7 +199,7 @@ async def generate_property_name_matches(
     else:
         BATCH_SIZE = len(tasks)  # run all at once
     results_data = []
-    for i in range(0, len(tasks), BATCH_SIZE):
+    for i in tqdm(range(0, len(tasks), BATCH_SIZE), desc="Calling LLM API in batches"):
         batch_tasks = {k: tasks[k] for k in list(tasks.keys())[i : i + BATCH_SIZE]}
         batch_results = await asyncio.gather(*batch_tasks.values())
         results_data.extend(batch_results)
