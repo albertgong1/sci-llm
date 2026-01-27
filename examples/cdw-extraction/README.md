@@ -24,6 +24,8 @@
 
 ## Reproducing Experiments
 
+### Using Harbor
+
 > \[!IMPORTANT\]
 > To obtain results incrementally, batching functionality is available. Simply specificy the `--batch-size` in the commands below. To obtain an unbiased estimate of the average accuracy across all tasks, please shuffle the tasks using the `--seed 1` flag.
 
@@ -51,10 +53,95 @@ uv run python ../../src/harbor-task-gen/run_batch_harbor.py jobs start \
 
 </details>
 
-2. Compute accuracy across tasks:
+2. Compute average precision and recall across tasks:
+
+> \[!TIP\]
+> If your Gemini account is on Tier 3, you can set `--max_concurrent 20`.
 
 ```bash
-uv run python format_accuracy.py -jd JOBS_DIR
+# Generate property name embeddings
+uv run pbench-pred-embeddings -jd JOBS_DIR -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/cdw-extraction --hf_split full --hf_revision v0.0.0 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (material-based matching for supercon)
+uv run pbench-score-precision -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR
+
+# Compute recall (condition-based matching for supercon)
+uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR
+```
+
+3. Aggregate accuracy and tokens across tasks:
+
+```bash
+# Use cost
+uv run pbench-aggregate -jd jobs-cdw -od out-cdw -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR --x-axis cost
+
+# Use tokens
+uv run pbench-aggregate -jd jobs-cdw -od out-cdw -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR --x-axis tokens
+```
+
+### Using the LLM API (no Harbor)
+
+> \[!WARNING\]
+> These instructions are Claude generated. I have not tested each one yet. -  Albert
+
+1. Please run the following command to generate the predictions:
+
+> \[!IMPORTANT\]
+> Registry and max num papers flags define an ordering to process the big list of papers and a limit. This script assumes that `registry_data.json` exists in this examples subdirectory. Ask ag2435@cornell.edu on Slack for a copy of this file.
+> Remove these flags to process the full dataset in DATA_DIR=data.
+
+```bash
+uv run pbench-eval -dd DATA_DIR --server gemini -m gemini-3-pro-preview -pp prompts/targeted_extraction_prompt_03.md \
+    --harbor_task_ordering_registry_path out-0126-harbor/targeted-stoichiometric-template/registry.json --max_num_papers 50 -od OUTPUT_DIR
+```
+
+2. Compute task-average precision and recall by model:
+
+```bash
+# Generate embeddings for predicted property names
+uv run pbench-pred-embeddings -od OUTPUT_DIR
+
+# Query LLM to determine best match between generated and ground-truth property name:
+uv run pbench-generate-matches -od OUTPUT_DIR -m gemini-2.5-flash \
+    --hf_repo kilian-group/cdw-extraction --hf_split full --hf_revision v0.0.0 \
+    --prompt_path prompts/property_matching_prompt.md
+
+# Compute precision (material-based matching for cdw)
+uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material
+
+# Compute recall (material-based matching for cdw)
+uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material
+```
+
+3. Aggregate accuracy and tokens across tasks:
+
+```bash
+# Use cost
+uv run pbench-aggregate -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR --x-axis cost
+
+# Use tokens
+uv run pbench-aggregate -od OUTPUT_DIR -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode material --log_level ERROR --x-axis tokens
 ```
 
 ## Constructing the CDW Dataset
@@ -127,7 +214,7 @@ uv run pbench-gt-embeddings --hf_repo kilian-group/cdw-extraction --hf_revision 
 ```bash
 uv run python ../../src/harbor-task-gen/prepare_harbor_tasks.py \
     --pdf-dir data/Paper_DB --output-dir OUTPUT_DIR --workspace . --template targeted-stoichiometric-template \
-    --gt-hf-repo kilian-group/cdw-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.1 \
+    --gt-hf-repo kilian-group/cdw-extraction --gt-hf-split SPLIT --gt-hf-revision v0.0.0 \
     --force --upload-hf --hf-repo-id kilian-group/cdw-extraction-harbor-tasks
 ```
 
