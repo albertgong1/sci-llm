@@ -78,12 +78,12 @@ uv run pbench-generate-matches -od OUTPUT_DIR -m gemini-2.5-flash \
 # Compute precision (condition-based matching for biosurfactants)
 uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric.csv \
-    --matching_mode conditions
+    --matching_mode conditions --log_level ERROR
 
 # Compute recall (condition-based matching for biosurfactants)
 uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric.csv \
-    --matching_mode conditions
+    --matching_mode conditions --log_level ERROR
 ```
 
 6. Compute task-average token usage, steps, and cost:
