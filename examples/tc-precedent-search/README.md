@@ -15,6 +15,7 @@ If you just want to run the full pipeline, skip to [Running Example](#running-ex
 Download [SuperCon_Tc_Tcn - no NA.csv](https://drive.google.com/file/d/11mqYhvSbl_cCNIDiQOgnS5N1P-26BREC/view?usp=sharing) and save to `examples/tc-precedent-search/`.
 
 > [!NOTE]
+>
 > - Total SuperCon rows: 21,153
 > - Rows where `file` column is #N/A: 4,534
 > - Rows where `file` column is blank: 14,226
@@ -27,9 +28,11 @@ python create_dev_set.py
 ```
 
 **Inputs:**
+
 - `assets/SuperCon_Tc_Tcn - no NA.csv`: Source SuperCon dataset
 
 **Outputs:**
+
 - `examples/tc-precedent-search/SuperCon_Tc_Tcn_dev-set.csv`: The generated development set
 
 Verify against the reference dev set [here](https://drive.google.com/file/d/13nb4HTU2p28b8oiEbQ87Y1CF4Jrcwlsa/view?usp=sharing).
@@ -44,6 +47,7 @@ uv run python prepare_precedent_tasks.py --force --write-job-config
 ```
 
 **Options:**
+
 | Flag | Description |
 |------|-------------|
 | `--csv` | Path to input CSV (default: `SuperCon_Tc_Tcn_dev-set.csv`) |
@@ -52,10 +56,12 @@ uv run python prepare_precedent_tasks.py --force --write-job-config
 | `--write-job-config` | Write `job.yaml` for Harbor |
 
 **Inputs:**
+
 - `SuperCon_Tc_Tcn_dev-set.csv`: The dev set
 - `search-template/`: Template files for the tasks
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`: Directory containing one task folder per material
 - `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/job.yaml`: Job configuration file
 
@@ -101,6 +107,7 @@ uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-work
 ```
 
 **Run all tasks as a job:**
+
 ```bash
 uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-workspace jobs start \
   -c out/harbor/precedent-search/tc-precedent-search/job.yaml \
@@ -109,13 +116,16 @@ uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-work
 ```
 
 **Inputs:**
+
 - Task directories in `examples/harbor-workspace/out/harbor/precedent-search/tc-precedent-search/tasks/`
 - `job.yaml` (for batch execution)
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/trials/`: Directory containing execution logs and `predictions.json` for each run
 
 **Check for failed tasks:**
+
 ```bash
 find examples/harbor-workspace/jobs/<TIMESTAMP_DIR> -name "exception.txt"
 ```
@@ -128,6 +138,7 @@ find examples/harbor-workspace/jobs/<TIMESTAMP_DIR> -name "exception.txt"
 Consolidate trial results into JSON files for analysis.
 
 **For Gemini CLI / Terminus agents:**
+
 ```bash
 uv run python examples/harbor-workspace/collect_harbor_results.py \
   --trials-dir examples/harbor-workspace/jobs/<JOB_ID> \
@@ -136,6 +147,7 @@ uv run python examples/harbor-workspace/collect_harbor_results.py \
 
 > [!IMPORTANT]
 > **For Codex results, you MUST use `recover_codex_results.py` instead:**
+>
 > ```bash
 > uv run python examples/harbor-workspace/recover_codex_results.py \
 >   --trials-dir examples/harbor-workspace/jobs/<JOB_TIMESTAMP_DIR> \
@@ -143,6 +155,7 @@ uv run python examples/harbor-workspace/collect_harbor_results.py \
 > ```
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: Consolidated prediction files
   - Naming convention: `<task_name>__<trial_id>__<agent>__<model>.json` (e.g., `mo3p1__abc123__codex__gpt-5.1-2025-11-13.json`)
 
@@ -158,11 +171,13 @@ uv run python src/pbench_eval/score_task.py \
 ```
 
 **Inputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: The collected JSON results
 - `assets/hard/rubric.csv`: The scoring rubric
 - `src/pbench_eval/utils.py`: The scoring logic
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/scores/scored_results_<OUTPUT_TAG>.csv`: CSV containing exact scores for every prediction
 
 ### 6. Enrich with Token Counts
@@ -174,6 +189,7 @@ uv run python examples/tc-precedent-search/add_token_counts.py \
 ```
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/scores/scored_results_<OUTPUT_TAG>_enriched.csv`
 
 ### 7. Rescore (0-1-2 Logic)
@@ -185,6 +201,7 @@ uv run python examples/tc-precedent-search/rescore_results.py \
 ```
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/scores/scored_results_<OUTPUT_TAG>_final.csv`
 
 ### 8. Generate Plots
@@ -194,6 +211,7 @@ uv run python examples/tc-precedent-search/generate_plots.py --tag <OUTPUT_TAG>_
 ```
 
 **Outputs:**
+
 - `examples/harbor-workspace/out/harbor/precedent-search/analysis/*.csv`: CSVs with aggregate statistics (Mean/Error by property)
 - `examples/harbor-workspace/out/harbor/precedent-search/figures/*.pdf`: PDF plots of the analysis
 
@@ -222,14 +240,17 @@ uv run python src/harbor-task-gen/run_harbor.py --workspace examples/harbor-work
 
 > [!TIP]
 > **When the Job Hangs:**
+>
 > 1. Delete all the task folders you want to rerun
 > 2. Resume with:
+>
 >    ```bash
 >    uv run python src/harbor-task-gen/run_harbor.py \
 >        --workspace examples/harbor-workspace \
 >        jobs resume \
 >        -p /Users/jjk297/repos/sci-llm/examples/harbor-workspace/jobs/<JOB_TIMESTAMP_DIR>
 >    ```
+>
 > 3. Note the job timestamp directory (e.g., `jobs/2026-01-13__14-30-00`)
 
 #### Step 2: Collect Results
@@ -244,6 +265,7 @@ uv run python examples/harbor-workspace/collect_harbor_results.py \
 
 > [!IMPORTANT]
 > **For Codex results, use `recover_codex_results.py` instead:**
+>
 > ```bash
 > uv run python examples/harbor-workspace/recover_codex_results.py \
 >   --trials-dir examples/harbor-workspace/jobs/2026-01-17__21-54-27 \
@@ -315,6 +337,7 @@ uv run python examples/tc-precedent-search/analyze_citation_quality.py
 ```
 
 *Creates:*
+
 - `<base>/detailed_matches.csv`
 - `<base>/title_or_doi_matches.csv`
 - `<base>/high_score_no_citation_match.csv`
@@ -324,9 +347,31 @@ uv run python examples/tc-precedent-search/analyze_citation_quality.py
 We can prompt LLMs with web search grounding to perform Tc precedent search as well. After creating the Tc dev set in step 1:
 
 ```bash
-uv run python run_precedent_search_with_llms.py --server gemini -m gemini-3-pro-preview -od out --use_web_search
+uv run python run_precedent_search_with_llms.py --server gemini -m gemini-3-pro-preview -od out --use_web_search --max_concurrent 50 --run run1
 ```
 
 This creates a CSV at `out/precedent_search__model=gemini-3-pro-preview__web_search.csv` with LLM predictions and DOI citations for material Tc values. This CSV already contains ground-truth Tc values from SuperCon merged.
 
-TODO: instructions to evaluate CSV output.
+```bash
+uv run python run_precedent_search_with_llms.py --server openai -m gpt-5.1-2025-11-13 -od out --use_web_search --max_concurrent 50 --reasoning_effort high --max_output_tokens 65536 --run run1
+```
+
+This creates a CSV at `out/precedent_search__model=gpt-5.1-2025-11-13__web_search.csv` with LLM predictions and DOI citations for material Tc values. This CSV already contains ground-truth Tc values from SuperCon merged.
+
+### 2. Scoring and Evaluation
+
+Use the scoring script to compare predictions against ground truth and extract structured citation data.
+
+#### Run Scoring (Batch Mode)
+
+The script will scan the `out/` directory and save results to `out/scores/`.
+
+```bash
+python score_web_search_csv_format.py --input out/
+```
+
+#### Run Scoring (Single File)
+
+```bash
+python score_web_search_csv_format.py --input out/your_results.csv --output out/your_results_scored.csv
+```
