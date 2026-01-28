@@ -21,14 +21,14 @@ def add_base_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--output_dir",
         "-od",
         type=Path,
-        default=Path("out"),
+        default=None,  # Path("out"),
         help="Output directory (default: out)",
     )
     parser.add_argument(
         "--jobs_dir",
         "-jd",
         type=Path,
-        default=Path("jobs"),
+        default=None,  # Path("jobs"),
         help="Jobs directory for Harbor runs (default: jobs)",
     )
     parser.add_argument(
