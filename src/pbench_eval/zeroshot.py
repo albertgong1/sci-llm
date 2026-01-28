@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from slugify import slugify
 from datasets import load_dataset
 from dotenv import load_dotenv
 
@@ -371,9 +372,15 @@ async def extract_properties(args: argparse.Namespace) -> None:
             harbor_task_ordering = json.load(f)
 
         # Load the refnos from harbor_task_ordering[0]["tasks"][:]["name"]
-        refnos_ordering = [
-            task["name"].strip().upper() for task in harbor_task_ordering[0]["tasks"]
-        ]
+        if False:
+            refnos_ordering = [
+                task["name"].strip().upper()
+                for task in harbor_task_ordering[0]["tasks"]
+            ]
+        else:
+            refnos_ordering = [
+                task["name"] for task in harbor_task_ordering[0]["tasks"]
+            ]
 
     if args.max_num_papers is not None:
         refnos_ordering = refnos_ordering[: args.max_num_papers]
@@ -382,7 +389,9 @@ async def extract_properties(args: argparse.Namespace) -> None:
     reordered_pdf_files = []
     for refno in refnos_ordering:
         for pdf in pdf_files:
-            if pdf.stem == refno:
+            # NOTE: refno from Harbor registry has been sluggified, so we need to slugify
+            # both sides during matching
+            if slugify(pdf.stem) == slugify(refno):
                 reordered_pdf_files.append(pdf)
                 break
 

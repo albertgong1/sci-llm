@@ -269,17 +269,21 @@ class GeminiChat(LLMChat):
                     if hasattr(chunk, "web") and chunk.web:
                         uris.append(chunk.web.uri)
                         titles.append(chunk.web.title)
-                
+
                 # Convert GroundingSupport objects to dicts
                 grounding_supports = []
                 for support in grounding_metadata.grounding_supports or []:
                     support_dict = {
-                        "grounding_chunk_indices": list(support.grounding_chunk_indices),
+                        "grounding_chunk_indices": list(
+                            support.grounding_chunk_indices
+                        ),
                         "segment": {
                             "text": support.segment.text,
                             "start_index": support.segment.start_index,
                             "end_index": support.segment.end_index,
-                        } if support.segment else None,
+                        }
+                        if support.segment
+                        else None,
                     }
                     grounding_supports.append(support_dict)
 
@@ -299,12 +303,12 @@ class GeminiChat(LLMChat):
                 finish_reason = str(response.candidates[0].finish_reason)
 
             return LLMChatResponse(
-                pred=pred, 
-                usage=usage, 
-                error=None, 
-                thought=thought, 
+                pred=pred,
+                usage=usage,
+                error=None,
+                thought=thought,
                 web_search_metadata=web_search_metadata,
-                finish_reason=finish_reason
+                finish_reason=finish_reason,
             )
         except Exception as e:
             # Handle cases where Gemini refuses to generate

@@ -1,6 +1,5 @@
 """OpenAI chat implementation."""
 
-import json
 import os
 from typing import Any
 
@@ -122,14 +121,14 @@ class OpenAIChat(LLMChat):
             gen_kwargs["temperature"] = inf_gen_config.temperature
         if inf_gen_config.top_p:
             gen_kwargs["top_p"] = inf_gen_config.top_p
-        
+
         if inf_gen_config.use_web_search:
             gen_kwargs["tools"] = [{"type": "web_search"}]
             if inf_gen_config.tool_choice:
                 gen_kwargs["tool_choice"] = inf_gen_config.tool_choice
         elif inf_gen_config.tool_choice:
-             gen_kwargs["tool_choice"] = inf_gen_config.tool_choice
-            
+            gen_kwargs["tool_choice"] = inf_gen_config.tool_choice
+
         if inf_gen_config.reasoning_effort:
             gen_kwargs["reasoning"] = {"effort": inf_gen_config.reasoning_effort}
 
@@ -248,10 +247,20 @@ class OpenAIChat(LLMChat):
 
             # Extract cached tokens if available
             # Note: The field name might vary slightly in SDK versions, checking both common patterns
-            if hasattr(response.usage, "input_token_details") and response.usage.input_token_details:
-                usage["cached_tokens"] = getattr(response.usage.input_token_details, "cached_tokens", 0)
-            elif hasattr(response.usage, "input_tokens_details") and response.usage.input_tokens_details:
-                 usage["cached_tokens"] = getattr(response.usage.input_tokens_details, "cached_tokens", 0)
+            if (
+                hasattr(response.usage, "input_token_details")
+                and response.usage.input_token_details
+            ):
+                usage["cached_tokens"] = getattr(
+                    response.usage.input_token_details, "cached_tokens", 0
+                )
+            elif (
+                hasattr(response.usage, "input_tokens_details")
+                and response.usage.input_tokens_details
+            ):
+                usage["cached_tokens"] = getattr(
+                    response.usage.input_tokens_details, "cached_tokens", 0
+                )
 
             # Extract reasoning tokens if available (for o1/o3 reasoning models)
             # Both Chat Completion and Responses API usually have this in output_tokens_details
@@ -259,21 +268,24 @@ class OpenAIChat(LLMChat):
                 hasattr(response.usage, "output_token_details")
                 and response.usage.output_token_details
             ):
-                usage["thinking_tokens"] = response.usage.output_token_details.reasoning_tokens
+                usage["thinking_tokens"] = (
+                    response.usage.output_token_details.reasoning_tokens
+                )
 
             if not response.output_text and usage.get("completion_tokens", 0) > 0:
                 # This could happen if all tokens were spent on reasoning
                 return LLMChatResponse(
-                    pred="", 
-                    usage=usage, 
-                    error="LLM generated reasoning tokens but no output text. Try increasing max_output_tokens.", 
-                    web_search_metadata=None
+                    pred="",
+                    usage=usage,
+                    error="LLM generated reasoning tokens but no output text. Try increasing max_output_tokens.",
+                    web_search_metadata=None,
                 )
 
             if inf_gen_config.output_format == "json":
-                # Note: parse_json_response will be called in the script, 
+                # Note: parse_json_response will be called in the script,
                 # but we handle direct JSON parsing here if requested in config.
                 import json as json_mod
+
                 pred = json_mod.loads(response.output_text)
             elif inf_gen_config.output_format == "text":
                 pred = response.output_text
@@ -288,11 +300,11 @@ class OpenAIChat(LLMChat):
             web_search_metadata = None
             queries = []
             uris = []
-            
+
             # Extract web search metadata if available
             # Helper to safely get the list of output items
             output_items = []
-            
+
             # Pydantic serialization might warn/fail for Beta features like web_search tools
             # We try flexible access
             try:
@@ -300,23 +312,25 @@ class OpenAIChat(LLMChat):
                     response_dict = response.model_dump()
                     output_items = response_dict.get("output", [])
                 elif hasattr(response, "dict"):
-                     response_dict = response.dict()
-                     output_items = response_dict.get("output", [])
+                    response_dict = response.dict()
+                    output_items = response_dict.get("output", [])
                 else:
                     output_items = getattr(response, "output", [])
             except Exception as e:
-                logger.debug(f"Pydantic serialization failed: {e}. Falling back to getattr.")
+                logger.debug(
+                    f"Pydantic serialization failed: {e}. Falling back to getattr."
+                )
                 # Try accessing internal __dict__ or raw attributes if possible
-                try: 
+                try:
                     response_dict = response.__dict__
                     output_items = response_dict.get("output", [])
-                except:
+                except Exception:
                     output_items = getattr(response, "output", [])
 
             # If response is a list itself
             if isinstance(response, list):
                 output_items = response
-            
+
             # Ensure output_items is iterable
             if not isinstance(output_items, list):
                 output_items = []
@@ -324,9 +338,13 @@ class OpenAIChat(LLMChat):
             # Debug: Log output items count and types
             logger.debug(f"Found {len(output_items)} output items")
             for i, item in enumerate(output_items):
-                it = item.get("type", "unknown") if isinstance(item, dict) else getattr(item, "type", "unknown")
+                it = (
+                    item.get("type", "unknown")
+                    if isinstance(item, dict)
+                    else getattr(item, "type", "unknown")
+                )
                 logger.debug(f"Item {i}: {it}")
-                
+
             web_search_metadata = None
             queries = []
             uris = []
@@ -335,96 +353,127 @@ class OpenAIChat(LLMChat):
             for item in output_items:
                 # Check for web_search_call items
                 if isinstance(item, dict):
-                     item_type = item.get("type")
+                    item_type = item.get("type")
                 else:
-                     item_type = getattr(item, "type", None)
+                    item_type = getattr(item, "type", None)
 
                 if item_type == "web_search_call":
-                   num_tool_calls += 1
-                   try:
-                       logger.debug(f"Full WebSearchCall Item: {item}")
-                       
-                       # Extract action
-                       # Extract action
-                       if isinstance(item, dict):
-                           # Check for flattened 'action'
-                           if "action" in item:
-                               action = item["action"]
-                           else:
-                               # Check for nested 'web_search_call'
-                               ws_call = item.get("web_search_call", {})
-                               action = ws_call.get("action", {}) if isinstance(ws_call, dict) else getattr(ws_call, "action", {})
-                       else:
-                           # Object access
-                           if hasattr(item, "action"):
-                               action = item.action
-                           else:
-                               ws_call = getattr(item, "web_search_call", None)
-                               if ws_call:
-                                   action = getattr(ws_call, "action", None)
-                               else:
-                                   action = None
+                    num_tool_calls += 1
+                    try:
+                        logger.debug(f"Full WebSearchCall Item: {item}")
 
-                       if action:
-                           logger.debug(f"Action: {action}")
-                           # Try to extract queries from action object or dict
-                           if isinstance(action, dict):
-                               q = action.get("query")
-                               if q: queries.append(q)
-                               qs = action.get("queries")
-                               if qs: queries.extend(qs)
-                           else:
-                               # Try attribute access first
-                               q = getattr(action, "query", None)
-                               if q: queries.append(q)
-                               qs = getattr(action, "queries", None)
-                               if qs: queries.extend(qs)
-                               
-                               # If attributes failed, try __dict__ if available
-                               if not q and not qs and hasattr(action, "__dict__"):
-                                   ad = action.__dict__
-                                   q = ad.get("query")
-                                   if q: queries.append(q)
-                                   qs = ad.get("queries")
-                                   if qs: queries.extend(qs)
-                   except Exception as e:
-                       logger.debug(f"Failed to extract info from web_search_call: {e}")
+                        # Extract action
+                        # Extract action
+                        if isinstance(item, dict):
+                            # Check for flattened 'action'
+                            if "action" in item:
+                                action = item["action"]
+                            else:
+                                # Check for nested 'web_search_call'
+                                ws_call = item.get("web_search_call", {})
+                                action = (
+                                    ws_call.get("action", {})
+                                    if isinstance(ws_call, dict)
+                                    else getattr(ws_call, "action", {})
+                                )
+                        else:
+                            # Object access
+                            if hasattr(item, "action"):
+                                action = item.action
+                            else:
+                                ws_call = getattr(item, "web_search_call", None)
+                                if ws_call:
+                                    action = getattr(ws_call, "action", None)
+                                else:
+                                    action = None
+
+                        if action:
+                            logger.debug(f"Action: {action}")
+                            # Try to extract queries from action object or dict
+                            if isinstance(action, dict):
+                                q = action.get("query")
+                                if q:
+                                    queries.append(q)
+                                qs = action.get("queries")
+                                if qs:
+                                    queries.extend(qs)
+                            else:
+                                # Try attribute access first
+                                q = getattr(action, "query", None)
+                                if q:
+                                    queries.append(q)
+                                qs = getattr(action, "queries", None)
+                                if qs:
+                                    queries.extend(qs)
+
+                                # If attributes failed, try __dict__ if available
+                                if not q and not qs and hasattr(action, "__dict__"):
+                                    ad = action.__dict__
+                                    q = ad.get("query")
+                                    if q:
+                                        queries.append(q)
+                                    qs = ad.get("queries")
+                                    if qs:
+                                        queries.extend(qs)
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to extract info from web_search_call: {e}"
+                        )
 
                 # Also check for message annotations for citations
                 if item_type == "message":
                     try:
-                        content = item.get("content", []) if isinstance(item, dict) else getattr(item, "content", [])
+                        content = (
+                            item.get("content", [])
+                            if isinstance(item, dict)
+                            else getattr(item, "content", [])
+                        )
                         for part in content:
-                            annotations = part.get("annotations", []) if isinstance(part, dict) else getattr(part, "annotations", [])
+                            annotations = (
+                                part.get("annotations", [])
+                                if isinstance(part, dict)
+                                else getattr(part, "annotations", [])
+                            )
                             for ano in annotations:
-                                ano_type = ano.get("type") if isinstance(ano, dict) else getattr(ano, "type", None)
+                                ano_type = (
+                                    ano.get("type")
+                                    if isinstance(ano, dict)
+                                    else getattr(ano, "type", None)
+                                )
                                 if ano_type == "url_citation":
-                                    url = ano.get("url") if isinstance(ano, dict) else getattr(ano, "url", None)
+                                    url = (
+                                        ano.get("url")
+                                        if isinstance(ano, dict)
+                                        else getattr(ano, "url", None)
+                                    )
                                     if url:
                                         uris.append(url)
                     except Exception as e:
-                         logger.debug(f"Failed to extract citation: {e}")
+                        logger.debug(f"Failed to extract citation: {e}")
 
             if queries or uris:
                 from llm_utils.common import WebSearchMetadata
-                web_search_metadata = WebSearchMetadata(queries=queries, uris=uris, num_tool_calls=num_tool_calls)
+
+                web_search_metadata = WebSearchMetadata(
+                    queries=queries, uris=uris, num_tool_calls=num_tool_calls
+                )
 
             finish_reason = getattr(response, "finish_reason", None)
-            
+
             return LLMChatResponse(
-                pred=pred, 
-                usage=usage, 
-                error=None, 
+                pred=pred,
+                usage=usage,
+                error=None,
                 web_search_metadata=web_search_metadata,
-                finish_reason=finish_reason
+                finish_reason=finish_reason,
             )
         except Exception as e:
             return LLMChatResponse(
-                pred="", 
-                usage={}, 
-                error=str(e), 
+                pred="",
+                usage={},
+                error=str(e),
                 web_search_metadata=None,
-                finish_reason=None
+                finish_reason=None,
             )
 
     def upload_file(self, file: File) -> None:
