@@ -8,7 +8,7 @@ from llm_utils import get_llm, InferenceGenerationConfig
 import json
 
 from pbench_eval.match import generate_embeddings, generate_property_name_matches
-from pbench_eval.utils import scorer_pymatgen, score_value
+from pbench_eval.utils import scorer_pymatgen, score_value, score_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -184,12 +184,21 @@ def compute_recall_per_material_property(
         if num_matches == 0:
             # No matches, score is 0
             recall_score = 0.0
+            evidence_score_val = 0.0
         else:
             # At least one match, calculate scores and take max
             scores = []
+            evidence_scores = []
 
             for row in matching_rows:
-                # Skip if values are missing
+                # Calculate evidence score for all matching rows
+                ev_score = score_evidence(
+                    evidence_pred=row.get("location.evidence_pred", ""),
+                    evidence_gt=row.get("location.evidence_gt", ""),
+                )
+                evidence_scores.append(ev_score)
+
+                # Skip value scoring if values are missing
                 if (
                     pd.isna(row["value_string_pred"])
                     or pd.isna(row["value_string_gt"])
@@ -208,6 +217,7 @@ def compute_recall_per_material_property(
 
             # Take maximum score
             recall_score = max(scores) if scores else 0.0
+            evidence_score_val = max(evidence_scores) if evidence_scores else 0.0
 
         result = {
             "refno": refno,
@@ -221,6 +231,7 @@ def compute_recall_per_material_property(
             "num_property_matches": len(group),
             "num_property_material_matches": num_matches,
             "recall_score": recall_score,
+            "evidence_score": evidence_score_val,
             "matches": ", ".join(
                 [
                     f"{row['property_name_pred']}: {row['value_string_pred']}"
@@ -328,12 +339,21 @@ def compute_precision_per_material_property(
         if num_matches == 0:
             # No matches, score is 0
             precision_score = 0.0
+            evidence_score_val = 0.0
         else:
             # At least one match, calculate scores and take max
             scores = []
+            evidence_scores = []
 
             for row in matching_rows:
-                # Skip if values are missing
+                # Calculate evidence score for all matching rows
+                ev_score = score_evidence(
+                    evidence_pred=row.get("location.evidence_pred", ""),
+                    evidence_gt=row.get("location.evidence_gt", ""),
+                )
+                evidence_scores.append(ev_score)
+
+                # Skip value scoring if values are missing
                 if (
                     pd.isna(row["value_string_pred"])
                     or pd.isna(row["value_string_gt"])
@@ -352,6 +372,7 @@ def compute_precision_per_material_property(
 
             # Take maximum score
             precision_score = max(scores) if scores else 0.0
+            evidence_score_val = max(evidence_scores) if evidence_scores else 0.0
 
         result = {
             "refno": refno,
@@ -367,6 +388,7 @@ def compute_precision_per_material_property(
             "num_property_matches": len(group),
             "num_property_material_matches": num_matches,
             "precision_score": precision_score,
+            "evidence_score": evidence_score_val,
             "matches": ", ".join(
                 [
                     f"{row['property_name_gt']}: {row['value_string_gt']}"

@@ -50,6 +50,16 @@ DOMAIN_ALIASES: dict[str, str] = {
     "cdw": "CDW",
 }
 
+# Agent color_key -> legend display name mapping
+DISPLAY_NAMES: dict[str, str] = {
+    "zeroshot-gpt": "GPT",
+    "zeroshot-gemini": "Gemini",
+    "codex": "codex",
+    "gemini-cli": "gemini-cli",
+    "terminus-2-gpt": "terminus-2 (GPT)",
+    "terminus-2-gemini": "terminus-2 (Gemini)",
+}
+
 # Model -> alpha mapping (large models = high alpha, small models = low alpha)
 MODEL_ALPHAS: dict[str, float] = {
     "gpt-5-mini-2025-08-07": 0.4,  # small
@@ -87,7 +97,7 @@ output_dirs = [
         Path("examples/biosurfactants-extraction/out-biosurfactants"),
     ),  # harbor
     ("biosurfactants", Path("examples/biosurfactants-extraction/out-no-agent")),
-    ("cdw", Path("examples/cdw-extraction/out-cdw")),  # harbor
+    # ("cdw", Path("examples/cdw-extraction/out-cdw")),  # harbor
 ]
 
 # Set x-axis label based on metric
@@ -96,8 +106,8 @@ x_metric_label = "avg_x_metric"
 
 # Plot with error bars and labels
 legend_handles = []
-domains = ["supercon", "biosurfactants", "cdw"]
-fig, axs = plt.subplots(1, len(domains), figsize=(6.75, 2.25), sharey=True)
+domains = ["supercon", "biosurfactants"]
+fig, axs = plt.subplots(1, len(domains), figsize=(3.375, 2.25), sharey=True)
 for domain, output_dir in output_dirs:
     ax = axs[domains.index(domain)]
     # Read F1 scores
@@ -126,11 +136,7 @@ for domain, output_dir in output_dirs:
             alpha=alpha,
             capsize=0,
         )
-        # Use model family as label for zeroshot, otherwise use color_key
-        if agent_name == "zeroshot":
-            legend_label = "Gemini" if "gemini" in model_name else "GPT"
-        else:
-            legend_label = color_key
+        legend_label = DISPLAY_NAMES.get(color_key, color_key)
         if legend_label not in [h.get_label() for h in legend_handles]:
             legend_handles.append(
                 plt.Line2D(
@@ -153,10 +159,19 @@ for domain, output_dir in output_dirs:
     ax.spines["right"].set_visible(False)
 
 # Add legend for agents at the bottom (only include agents with results)
+# Sort handles: GPT/codex variants first (top row), Gemini variants second (bottom row)
+gpt_labels = ["GPT", "codex", "terminus-2 (GPT)"]
+sorted_handles = sorted(
+    legend_handles,
+    key=lambda h: (
+        0 if h.get_label() in gpt_labels else 1,
+        gpt_labels.index(h.get_label()) if h.get_label() in gpt_labels else 0,
+    ),
+)
 fig.legend(
-    handles=legend_handles,
+    handles=sorted_handles,
     loc="lower center",
-    ncol=len(legend_handles),
+    ncol=3,
     fontsize=LEGEND_FONT_SIZE,
     frameon=False,
     bbox_to_anchor=(0.5, -0.15),

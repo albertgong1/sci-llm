@@ -62,6 +62,12 @@ def compute_f1_by_refno(args: Namespace) -> pd.DataFrame:
         (f1_by_refno["precision_score"] * f1_by_refno["recall_score"])
         / (f1_by_refno["precision_score"] + f1_by_refno["recall_score"] + 1e-8)
     )
+    # compute evidence F1 score
+    # evidence_score_x is from precision, evidence_score_y is from recall
+    f1_by_refno["evidence_f1_score"] = 2 * (
+        (f1_by_refno["evidence_score_x"] * f1_by_refno["evidence_score_y"])
+        / (f1_by_refno["evidence_score_x"] + f1_by_refno["evidence_score_y"] + 1e-8)
+    )
     return f1_by_refno
 
 
@@ -82,21 +88,7 @@ def cli_main() -> None:
     else:
         trials_lookup = count_trials_per_group(args.jobs_dir)
 
-    if False:
-        precision_by_refno = compute_precision_by_refno(args)
-        recall_by_refno = compute_recall_by_refno(args)
-        # Merge precision and recall results
-        f1_by_refno = precision_by_refno.merge(
-            recall_by_refno,
-            on=["agent", "model", "refno"],
-        )
-        # compute F1 score
-        f1_by_refno["f1_score"] = 2 * (
-            (f1_by_refno["precision_score"] * f1_by_refno["recall_score"])
-            / (f1_by_refno["precision_score"] + f1_by_refno["recall_score"] + 1e-8)
-        )
-    else:
-        f1_by_refno = compute_f1_by_refno(args)
+    f1_by_refno = compute_f1_by_refno(args)
 
     f1_by_refno["num_trials"] = f1_by_refno.apply(
         lambda row: trials_lookup.get((row["agent"], row["model"])), axis=1
@@ -109,6 +101,9 @@ def cli_main() -> None:
                 {
                     "avg_f1_score": mean_sem_with_n(
                         g["f1_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                    "avg_evidence_f1": mean_sem_with_n(
+                        g["evidence_f1_score"].tolist(), g["num_trials"].iloc[0]
                     ),
                     "successful_count": len(g),
                     "num_trials": g["num_trials"].iloc[0],

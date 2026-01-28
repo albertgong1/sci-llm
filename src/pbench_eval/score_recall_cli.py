@@ -144,6 +144,7 @@ def compute_recall_by_refno(args: Namespace) -> pd.DataFrame:
         df_results.groupby(refno_group_cols, dropna=False)
         .agg(
             recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"),
+            evidence_score=pd.NamedAgg(column="evidence_score", aggfunc="mean"),
             property_matches=pd.NamedAgg(
                 column="num_property_matches", aggfunc="count"
             ),
@@ -381,6 +382,7 @@ def cli_main() -> None:
         df_results.groupby(refno_group_cols, dropna=False)
         .agg(
             recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"),
+            evidence_score=pd.NamedAgg(column="evidence_score", aggfunc="mean"),
             property_matches=pd.NamedAgg(
                 column="num_property_matches", aggfunc="count"
             ),
@@ -409,6 +411,9 @@ def cli_main() -> None:
                 {
                     "avg_recall": mean_sem_with_n(
                         g["recall_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                    "avg_evidence": mean_sem_with_n(
+                        g["evidence_score"].tolist(), g["num_trials"].iloc[0]
                     ),
                     "avg_property_matches": mean_sem_with_n(
                         g["property_matches"].tolist(), g["num_trials"].iloc[0]

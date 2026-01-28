@@ -51,7 +51,6 @@ def aggregate_accuracy_tokens(args: Namespace) -> pd.DataFrame:
         trials_lookup = count_zeroshot_trials_per_group(
             args.output_dir.resolve(),
         )
-
     # Get F1 scores by refno
     f1_by_refno = compute_f1_by_refno(args)
     f1_by_refno["num_trials"] = f1_by_refno.apply(
@@ -65,6 +64,9 @@ def aggregate_accuracy_tokens(args: Namespace) -> pd.DataFrame:
                 {
                     "avg_f1_score": padded_mean(
                         g["f1_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                    "avg_evidence_f1": padded_mean(
+                        g["evidence_f1_score"].tolist(), g["num_trials"].iloc[0]
                     ),
                     "successful_count": len(g),
                     "num_trials": g["num_trials"].iloc[0],
@@ -81,6 +83,9 @@ def aggregate_accuracy_tokens(args: Namespace) -> pd.DataFrame:
                 {
                     "avg_f1_score": padded_sem(
                         g["f1_score"].tolist(), g["num_trials"].iloc[0]
+                    ),
+                    "avg_evidence_f1": padded_sem(
+                        g["evidence_f1_score"].tolist(), g["num_trials"].iloc[0]
                     ),
                     "successful_count": len(g),
                     "num_trials": g["num_trials"].iloc[0],
@@ -138,7 +143,7 @@ def aggregate_accuracy_tokens(args: Namespace) -> pd.DataFrame:
         x_metric_mean, left_on=["agent", "model"], right_on=["agent", "model_name"]
     )
     merged = merged.merge(
-        f1_sem[["agent", "model", "avg_f1_score"]],
+        f1_sem[["agent", "model", "avg_f1_score", "avg_evidence_f1"]],
         on=["agent", "model"],
         suffixes=("", "_sem"),
     )

@@ -1,6 +1,9 @@
 """Helper functions"""
 
+import difflib
 import re
+from typing import Literal
+
 from pymatgen.core import Composition
 import logging
 import pandas as pd
@@ -445,3 +448,35 @@ def score_value(
         case _:
             # Default to exact match
             return 1.0 if scorer_exact_match(pred_value, answer_value) else 0.0
+
+
+def score_evidence(
+    evidence_pred: str,
+    evidence_gt: str,
+    method: Literal["sequence_matcher"] = "sequence_matcher",
+) -> float:
+    """Score evidence similarity between predicted and ground truth evidence.
+
+    Args:
+        evidence_pred: The predicted evidence string.
+        evidence_gt: The ground truth evidence string.
+        method: Similarity method to use. Currently supports "sequence_matcher".
+
+    Returns:
+        float: Similarity score from 0.0 to 1.0.
+
+    """
+    if pd.isna(evidence_pred) or pd.isna(evidence_gt):
+        return 0.0
+
+    evidence_pred = str(evidence_pred).strip()
+    evidence_gt = str(evidence_gt).strip()
+
+    if not evidence_pred or not evidence_gt:
+        return 0.0
+
+    match method:
+        case "sequence_matcher":
+            return difflib.SequenceMatcher(None, evidence_pred, evidence_gt).ratio()
+        case _:
+            return difflib.SequenceMatcher(None, evidence_pred, evidence_gt).ratio()
