@@ -38,6 +38,10 @@ For bash files:
 - Use a usage header if the bash script takes 1+ CLI arguments
 - When 1+ CLI arguments, `shift` by the number of arguments, assign `cmd_args=$@` and pass `$cmd_args` to the script that bash files calls (if any)
 
+## Matplotlib best practices
+- For single-column figures, use figsize=(3.25, 2.5) as per the ICML guidelines
+- For two-column figures, use figsize=(6.75, 2.5) as per the ICML guidelines
+
 ## Common Commands
 
 ### Environment Setup
