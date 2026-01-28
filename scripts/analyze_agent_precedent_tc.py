@@ -15,12 +15,42 @@ Usage:
 import argparse
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tldextract
 from tabulate import tabulate
+
+
+# URL extraction regex pattern
+URL_PATTERN = re.compile(r'https?://[^\s\'"<>\\]+')
+
+
+def extract_domains_from_text(text: str) -> list[str]:
+    """Extract registered domains from URLs found in text.
+
+    Uses tldextract to normalize domains (e.g., api.crossref.org -> crossref.org).
+
+    Args:
+        text: String that may contain URLs
+
+    Returns:
+        List of registered domains (e.g., ["crossref.org", "duckduckgo.com"])
+    """
+    urls = URL_PATTERN.findall(text)
+    domains: list[str] = []
+    for url in urls:
+        try:
+            extracted = tldextract.extract(url)
+            if extracted.domain and extracted.suffix:
+                registered_domain = f"{extracted.domain}.{extracted.suffix}"
+                domains.append(registered_domain)
+        except Exception:
+            continue
+    return domains
 
 # Category labels for correctness breakdown
 CATEGORY_INCORRECT_CLASS = "Incorrect Classification"
@@ -76,6 +106,95 @@ def load_tool_use_counts_from_trajectory(trajectory_path: Path) -> int | None:
 
     except (json.JSONDecodeError, KeyError):
         return None
+
+
+def _extract_items_codex(tool_call: dict) -> list[str]:
+    """Extract domains or function name from a codex tool call.
+
+    For exec_command, extracts URL domains from the cmd argument.
+    If not exec_command, returns empty list.
+    """
+    fn_name = tool_call.get("function_name", "")
+    if fn_name != "exec_command":
+        return []
+        # return [fn_name] if fn_name else []
+
+    args = tool_call.get("arguments", {})
+    cmd = args.get("cmd", "")
+    if isinstance(cmd, str):
+        domains = extract_domains_from_text(cmd)
+        if domains:
+            return domains
+    return []
+    # return ["exec_command (local)"]
+
+
+def _extract_items_terminus(tool_call: dict) -> list[str]:
+    """Extract domains or function name from a terminus tool call.
+
+    For bash_command, extracts URL domains from the keystrokes argument.
+    If not bash_command, returns empty list.
+    """
+    fn_name = tool_call.get("function_name", "")
+    if fn_name != "bash_command":
+        return []
+        # return [fn_name] if fn_name else []
+
+    args = tool_call.get("arguments", {})
+    keystrokes = args.get("keystrokes", "")
+    if isinstance(keystrokes, str):
+        domains = extract_domains_from_text(keystrokes)
+        if domains:
+            return domains
+    return []
+    # return ["bash_command (local)"]
+
+
+def _extract_items_default(tool_call: dict) -> list[str]:
+    """Extract function name from a tool call (default behavior)."""
+    fn_name = tool_call.get("function_name", "")
+    return [fn_name] if fn_name else []
+
+
+def load_tool_call_names_from_trajectory(
+    trajectory_path: Path, agent: str | None = None
+) -> Counter[str]:
+    """Load tool call items from trajectory.json.
+
+    For codex and terminus agents, extracts URL domains from command arguments.
+    For other agents, extracts function names.
+
+    Args:
+        trajectory_path: Path to trajectory.json file
+        agent: Agent name (used to determine extraction strategy)
+
+    Returns:
+        Counter of function_name or domain occurrences.
+    """
+    if not trajectory_path.exists():
+        return Counter()
+
+    # Select extraction function based on agent
+    if agent == "codex":
+        extract_fn = _extract_items_codex
+    elif agent and agent.startswith("terminus-"):
+        extract_fn = _extract_items_terminus
+    else:
+        extract_fn = _extract_items_default
+
+    try:
+        with open(trajectory_path) as f:
+            data = json.load(f)
+
+        items: list[str] = []
+        for step in data["steps"]:
+            for tool_call in step.get("tool_calls", []):
+                items.extend(extract_fn(tool_call))
+
+        return Counter(items)
+
+    except (json.JSONDecodeError, KeyError):
+        return Counter()
 
 
 def load_json_agent_completed_run(
@@ -482,6 +601,58 @@ def format_mean_stderr(mean: float | None, stderr: float | None) -> str:
     return f"{mean:.1f} ± {stderr:.1f}"
 
 
+def compute_tool_call_distribution(
+    dfs: list[pd.DataFrame], agents: list[str]
+) -> dict[str, dict[str, float]]:
+    """Compute normalized distribution of tool call function names per agent.
+
+    Args:
+        dfs: List of DataFrames (one per CSV file)
+        agents: List of agent names corresponding to each DataFrame
+
+    Returns:
+        Dict mapping agent -> {function_name: normalized_fraction}
+    """
+    # Group DataFrames by agent
+    agent_dfs: dict[str, list[pd.DataFrame]] = {}
+    for df, agent in zip(dfs, agents):
+        if agent not in agent_dfs:
+            agent_dfs[agent] = []
+        agent_dfs[agent].append(df)
+
+    results: dict[str, dict[str, float]] = {}
+
+    for agent, agent_df_list in agent_dfs.items():
+        # Aggregate tool call counts across all trajectories for this agent
+        total_counter: Counter[str] = Counter()
+
+        for df in agent_df_list:
+            # Get unique (job_id, metadata_trial_id) combinations
+            unique_trials = df[["job_id", "metadata_trial_id"]].drop_duplicates()
+
+            for _, row in unique_trials.iterrows():
+                job_id = row["job_id"]
+                trial_id = row["metadata_trial_id"]
+
+                task_run_dir = get_task_run_dir(agent, job_id, trial_id)
+                trajectory_path = task_run_dir / "agent" / "trajectory.json"
+
+                counter = load_tool_call_names_from_trajectory(trajectory_path, agent)
+                total_counter.update(counter)
+
+        # Normalize by total count
+        total_calls = sum(total_counter.values())
+        if total_calls > 0:
+            results[agent] = {
+                fn_name: count / total_calls
+                for fn_name, count in total_counter.most_common()
+            }
+        else:
+            results[agent] = {}
+
+    return results
+
+
 def main() -> None:
     """Main entry point for the script."""
     # Argument parsing
@@ -607,6 +778,21 @@ def main() -> None:
 
     print("\n## Tool Calls: Correct Yes vs Correct No (Correct Classification)\n")
     print(tabulate(yes_no_display_df, headers="keys", tablefmt="github", showindex=False))
+
+    ### 4. Tool call function name distribution (top 10 per agent)
+    tool_dist = compute_tool_call_distribution(all_dfs, all_agents)
+
+    print("\n## Tool Call Distribution (Top 10 per Agent)\n")
+    for agent in tool_dist:
+        print(f"\n### {agent}\n")
+        # Sort by fraction descending and take top 10
+        sorted_items = sorted(tool_dist[agent].items(), key=lambda x: x[1], reverse=True)[:10]
+        if not sorted_items:
+            print("No tool calls found.\n")
+            continue
+
+        top_rows = [{"Tool/Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
+        print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
 
 
 if __name__ == "__main__":
