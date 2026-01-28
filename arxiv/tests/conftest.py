@@ -13,18 +13,13 @@ def example_doi_url() -> str:
 
 
 @pytest.fixture
-def example_doi() -> str:
-    return "10.1103/PhysRevB.102.165125"
+def example_doi_dx_url() -> str:
+    return "https://dx.doi.org/10.1021/ma702733f"
 
 
 @pytest.fixture
-def example_doi_response_html() -> str:
-    return dedent(
-        """
-        <html><head><title>Handle Redirect</title></head>
-        <body><a href="https://link.aps.org/doi/10.1103/PhysRevB.102.165125">https://link.aps.org/doi/10.1103/PhysRevB.102.165125</a></body></html>
-        """
-    ).strip()
+def example_doi() -> str:
+    return "10.1103/PhysRevB.102.165125"
 
 
 @pytest.fixture
