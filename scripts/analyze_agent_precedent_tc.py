@@ -17,9 +17,15 @@ import json
 import re
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tabulate import tabulate
+
+# Category labels for correctness breakdown
+CATEGORY_INCORRECT_CLASS = "Incorrect Classification"
+CATEGORY_CORRECT_WRONG_VAL = "Correct Class + Wrong Value"
+CATEGORY_FULLY_CORRECT = "Fully Correct"
 
 
 # Agent log file mapping for log mining recovery methods
@@ -154,6 +160,200 @@ def add_tool_counts_to_df(df: pd.DataFrame, agent: str) -> pd.DataFrame:
     return df
 
 
+def categorize_material(material_df: pd.DataFrame) -> str:
+    """Categorize a material based on classification and value extraction correctness.
+
+    Args:
+        material_df: DataFrame containing the 3 rows for a single material
+                    (is_superconducting, tc, tcn)
+
+    Returns:
+        One of: CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT
+    """
+    # Get the is_superconducting row
+    is_sc_row = material_df[material_df["property_name"] == "is_superconducting"]
+    if is_sc_row.empty:
+        return CATEGORY_INCORRECT_CLASS
+
+    is_sc_score = is_sc_row["score"].iloc[0]
+    is_sc_value = is_sc_row["property_value"].iloc[0]
+
+    # Check classification correctness
+    if is_sc_score == 0:
+        return CATEGORY_INCORRECT_CLASS
+
+    # Classification is correct, now check value extraction
+    if is_sc_value == "Yes":
+        # Look at tc row
+        tc_row = material_df[material_df["property_name"] == "tc"]
+        if tc_row.empty:
+            return CATEGORY_CORRECT_WRONG_VAL
+        value_score = tc_row["score"].iloc[0]
+    elif is_sc_value == "No":
+        # Look at tcn row
+        tcn_row = material_df[material_df["property_name"] == "tcn"]
+        if tcn_row.empty:
+            return CATEGORY_CORRECT_WRONG_VAL
+        value_score = tcn_row["score"].iloc[0]
+    else:
+        # Unknown or other value - treat as wrong value
+        return CATEGORY_CORRECT_WRONG_VAL
+
+    if value_score == 1:
+        return CATEGORY_FULLY_CORRECT
+    else:
+        return CATEGORY_CORRECT_WRONG_VAL
+
+
+def add_category_to_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Add correctness_category column to dataframe.
+
+    Args:
+        df: DataFrame with material, property_name, property_value, score columns
+
+    Returns:
+        DataFrame with correctness_category column added
+    """
+    # Build mapping from material -> category
+    category_map: dict[str, str] = {}
+
+    for material in df["material"].unique():
+        material_df = df[df["material"] == material]
+        category_map[material] = categorize_material(material_df)
+
+    df["correctness_category"] = df["material"].map(category_map)
+    return df
+
+
+def compute_breakdown_summary(
+    dfs: list[pd.DataFrame], agents: list[str]
+) -> pd.DataFrame:
+    """Compute mean ± stderr of tool calls by correctness category for each agent.
+
+    Args:
+        dfs: List of DataFrames (one per CSV file)
+        agents: List of agent names corresponding to each DataFrame
+
+    Returns:
+        DataFrame with columns: agent, category, mean_tool_calls, stderr_tool_calls, n_materials
+    """
+    results: list[dict] = []
+
+    # Group DataFrames by agent
+    agent_dfs: dict[str, list[pd.DataFrame]] = {}
+    for df, agent in zip(dfs, agents):
+        if agent not in agent_dfs:
+            agent_dfs[agent] = []
+        agent_dfs[agent].append(df)
+
+    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+
+    for agent, agent_df_list in agent_dfs.items():
+        for category in categories:
+            # Collect tool counts for this category across all jobs
+            all_tool_counts: list[float] = []
+
+            for df in agent_df_list:
+                # Get unique materials in this category
+                cat_df = df[df["correctness_category"] == category]
+                material_counts = cat_df.groupby("material")["n_tool_use_counts"].first()
+                valid_counts = material_counts.dropna()
+                all_tool_counts.extend(valid_counts.tolist())
+
+            if len(all_tool_counts) == 0:
+                results.append({
+                    "agent": agent,
+                    "category": category,
+                    "mean_tool_calls": None,
+                    "stderr_tool_calls": None,
+                    "n_materials": 0,
+                })
+            else:
+                mean_val = np.mean(all_tool_counts)
+                stderr_val = (
+                    np.std(all_tool_counts, ddof=1) / np.sqrt(len(all_tool_counts))
+                    if len(all_tool_counts) > 1
+                    else 0
+                )
+                results.append({
+                    "agent": agent,
+                    "category": category,
+                    "mean_tool_calls": mean_val,
+                    "stderr_tool_calls": stderr_val,
+                    "n_materials": len(all_tool_counts),
+                })
+
+    return pd.DataFrame(results)
+
+
+def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> None:
+    """Generate grouped bar chart of tool calls by correctness category.
+
+    Args:
+        breakdown_df: DataFrame from compute_breakdown_summary
+        output_path: Path to save the chart
+    """
+    agents = list(breakdown_df["agent"].unique())
+    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+
+    # Colors for each category
+    category_colors = {
+        CATEGORY_INCORRECT_CLASS: "red",
+        CATEGORY_CORRECT_WRONG_VAL: "gold",
+        CATEGORY_FULLY_CORRECT: "blue",
+    }
+
+    # Short labels for legend
+    category_short = {
+        CATEGORY_INCORRECT_CLASS: "Incorrect Class",
+        CATEGORY_CORRECT_WRONG_VAL: "Correct Class + Wrong Value",
+        CATEGORY_FULLY_CORRECT: "Fully Correct",
+    }
+
+    x = np.arange(len(agents))
+    width = 0.25
+    n_categories = len(categories)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for i, cat in enumerate(categories):
+        means = []
+        stderrs = []
+        for agent in agents:
+            row = breakdown_df[(breakdown_df["agent"] == agent) & (breakdown_df["category"] == cat)]
+            if row.empty or pd.isna(row["mean_tool_calls"].iloc[0]):
+                means.append(0)
+                stderrs.append(0)
+            else:
+                means.append(row["mean_tool_calls"].iloc[0])
+                stderrs.append(row["stderr_tool_calls"].iloc[0])
+
+        offset = (i - n_categories / 2 + 0.5) * width
+        ax.bar(
+            x + offset,
+            means,
+            width,
+            label=category_short[cat],
+            color=category_colors[cat],
+            yerr=stderrs,
+            capsize=3,
+        )
+
+    ax.set_xlabel("Agent")
+    ax.set_ylabel("Tool Calls (mean ± stderr)")
+    ax.set_title("Tool Calls by Correctness Category per Agent")
+    ax.set_xticks(x)
+    ax.set_xticklabels(agents)
+    ax.legend(title="Category", loc="upper right")
+    ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.savefig(output_path.with_suffix(".png"), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved breakdown chart to {output_path}")
+
+
 def compute_tool_use_counts_summary(dfs: list[pd.DataFrame], agents: list[str]) -> pd.DataFrame:
     """Compute mean ± stderr of tool use counts across job_ids for each agent.
 
@@ -246,6 +446,7 @@ def main() -> None:
 
         df = pd.read_csv(csv_path)
         df = add_tool_counts_to_df(df, agent)
+        df = add_category_to_df(df)
 
         all_dfs.append(df)
         all_agents.append(agent)
@@ -255,7 +456,7 @@ def main() -> None:
         df.to_csv(output_path, index=False)
         print(f"  Saved augmented CSV to {output_path}")
 
-    # Compute and display summary statistics
+    ### 1. Compute and display summary statistics
     summary_df = compute_tool_use_counts_summary(all_dfs, all_agents)
 
     # Format for display
@@ -269,6 +470,38 @@ def main() -> None:
 
     print("\n## Tool Calls Summary\n")
     print(tabulate(display_df, headers="keys", tablefmt="github", showindex=False))
+
+    ### 2. Compute and display breakdown by correctness category
+    breakdown_df = compute_breakdown_summary(all_dfs, all_agents)
+
+    # Pivot for display: agents as rows, categories as columns
+    pivot_df = breakdown_df.pivot(index="agent", columns="category", values=["mean_tool_calls", "stderr_tool_calls", "n_materials"])
+
+    # Format breakdown table
+    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+    breakdown_display_rows: list[dict] = []
+
+    for agent in breakdown_df["agent"].unique():
+        row_data = {"Agent": agent}
+        for cat in categories:
+            cat_row = breakdown_df[(breakdown_df["agent"] == agent) & (breakdown_df["category"] == cat)]
+            if cat_row.empty:
+                row_data[cat] = "N/A"
+            else:
+                mean_val = cat_row["mean_tool_calls"].iloc[0]
+                stderr_val = cat_row["stderr_tool_calls"].iloc[0]
+                n_mat = cat_row["n_materials"].iloc[0]
+                row_data[cat] = f"{format_mean_stderr(mean_val, stderr_val)} (n={n_mat})"
+        breakdown_display_rows.append(row_data)
+
+    breakdown_display_df = pd.DataFrame(breakdown_display_rows)
+
+    print("\n## Tool Calls by Correctness Category\n")
+    print(tabulate(breakdown_display_df, headers="keys", tablefmt="github", showindex=False))
+
+    # Generate grouped bar chart
+    chart_path = args.output_dir / "tool_calls_breakdown_by_correctness_category.png"
+    plot_breakdown_bar_chart(breakdown_df, chart_path)
 
 
 if __name__ == "__main__":
