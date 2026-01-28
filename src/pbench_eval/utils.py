@@ -480,3 +480,26 @@ def score_evidence(
             return difflib.SequenceMatcher(None, evidence_pred, evidence_gt).ratio()
         case _:
             return difflib.SequenceMatcher(None, evidence_pred, evidence_gt).ratio()
+
+
+def compute_pairwise_evidence_scores(
+    evidence_list_a: list[str],
+    evidence_list_b: list[str],
+) -> list[list[float]]:
+    """Compute pairwise evidence scores between two lists.
+
+    Args:
+        evidence_list_a: First list of evidence strings
+        evidence_list_b: Second list of evidence strings
+
+    Returns:
+        2D list of shape (len(a), len(b)) with score_evidence values
+
+    """
+    scores = []
+    for ev_a in evidence_list_a:
+        row_scores = []
+        for ev_b in evidence_list_b:
+            row_scores.append(score_evidence(ev_a, ev_b))
+        scores.append(row_scores)
+    return scores

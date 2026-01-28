@@ -58,6 +58,7 @@ pbench-generate-matches = "pbench_eval.generate_matches_cli:cli_main"
 pbench-score-precision = "pbench_eval.score_precision_cli:cli_main"
 pbench-score-recall = "pbench_eval.score_recall_cli:cli_main"
 pbench-score-f1 = "pbench_eval.score_f1_cli:cli_main"
+pbench-score-evidence = "pbench_eval.score_evidence_cli:cli_main"
 pbench-aggregate = "pbench_eval.aggregate_accuracy_tokens:cli_main"
 
 [tool.setuptools]
