@@ -92,6 +92,138 @@ def compute_evidence_f1_for_refno(
     }
 
 
+def compute_evidence_recall_for_refno_by_page(
+    df_pred_refno: pd.DataFrame,
+    df_gt_refno: pd.DataFrame,
+    evidence_column: str = "location.evidence",
+    page_column: str = "location.page",
+) -> dict[int, float]:
+    """Compute evidence recall by page for a single refno.
+
+    For each page in the GT, computes recall as:
+    - For each GT evidence on that page, find max similarity to any prediction
+    - Average these max scores to get page-level recall
+
+    Args:
+        df_pred_refno: Predictions for this refno
+        df_gt_refno: Ground truth for this refno
+        evidence_column: Column name containing evidence strings
+        page_column: Column name containing page numbers
+
+    Returns:
+        Dict mapping page number -> evidence recall for that page
+
+    """
+    # Extract all prediction evidence (not filtered by page)
+    evidence_pred = df_pred_refno[evidence_column].fillna("").astype(str).tolist()
+
+    # Handle empty predictions
+    if not evidence_pred:
+        return {}
+
+    # Get unique pages from GT (drop NaN and convert to int)
+    gt_pages = df_gt_refno[page_column].dropna()
+    if gt_pages.empty:
+        return {}
+
+    unique_pages = sorted(gt_pages.astype(int).unique())
+
+    page_recalls: dict[int, float] = {}
+    for page in unique_pages:
+        # Filter GT to this page
+        df_gt_page = df_gt_refno[df_gt_refno[page_column].astype(float) == float(page)]
+        evidence_gt_page = df_gt_page[evidence_column].fillna("").astype(str).tolist()
+
+        if not evidence_gt_page:
+            continue
+
+        # Compute pairwise scores: shape (n_pred, n_gt_page)
+        scores_matrix = compute_pairwise_evidence_scores(
+            evidence_pred, evidence_gt_page
+        )
+
+        # Recall: for each GT evidence on this page, max over all predictions
+        n_pred = len(scores_matrix)
+        n_gt_page = len(scores_matrix[0]) if scores_matrix else 0
+
+        if n_gt_page == 0:
+            continue
+
+        recall_scores = []
+        for j in range(n_gt_page):
+            max_score = max(scores_matrix[i][j] for i in range(n_pred))
+            recall_scores.append(max_score)
+
+        page_recalls[page] = sum(recall_scores) / len(recall_scores)
+
+    return page_recalls
+
+
+def compute_evidence_recall_by_page(
+    df_pred: pd.DataFrame,
+    df_gt: pd.DataFrame,
+    evidence_column: str = "location.evidence",
+    page_column: str = "location.page",
+) -> pd.DataFrame:
+    """Compute evidence recall by page for all (agent, model) groups.
+
+    Args:
+        df_pred: All predictions with columns [agent, model, refno, location.evidence]
+        df_gt: Ground truth with columns [refno, location.evidence, location.page]
+        evidence_column: Column name containing evidence strings
+        page_column: Column name containing page numbers
+
+    Returns:
+        DataFrame with columns: agent, model, page, avg_evidence_recall,
+        avg_evidence_recall_sem, count
+
+    """
+    from collections import defaultdict
+
+    from pbench_eval.stats import padded_mean, padded_sem
+
+    # Collect recall values: {(agent, model, page): [recall values across refnos]}
+    recall_by_page: dict[tuple[str, str, int], list[float]] = defaultdict(list)
+
+    for (agent, model, refno), group in df_pred.groupby(
+        ["agent", "model", "refno"], dropna=False
+    ):
+        # Filter ground truth for this refno (same matching logic as compute_evidence_f1_by_refno)
+        df_gt_refno = df_gt[
+            df_gt["refno"].str.lower().apply(lambda x: slugify(x))
+            == slugify(refno.lower())
+        ]
+
+        if df_gt_refno.empty:
+            continue
+
+        # Compute per-page recall for this refno
+        page_recalls = compute_evidence_recall_for_refno_by_page(
+            group, df_gt_refno, evidence_column=evidence_column, page_column=page_column
+        )
+
+        for page, recall in page_recalls.items():
+            recall_by_page[(agent, model, page)].append(recall)
+
+    # Aggregate across refnos
+    results = []
+    for (agent, model, page), recall_values in recall_by_page.items():
+        results.append(
+            {
+                "agent": agent,
+                "model": model,
+                "page": page,
+                "avg_evidence_recall": padded_mean(recall_values, len(recall_values)),
+                "avg_evidence_recall_sem": padded_sem(
+                    recall_values, len(recall_values)
+                ),
+                "count": len(recall_values),
+            }
+        )
+
+    return pd.DataFrame(results)
+
+
 def compute_evidence_f1_by_refno(
     df_pred: pd.DataFrame,
     df_gt: pd.DataFrame,
@@ -280,6 +412,87 @@ def cli_main() -> None:
     output_path = args.output_dir / "evidence_f1_by_refno.csv"
     evidence_by_refno.to_csv(output_path, index=False)
     logger.info(f"Saved detailed results to {output_path}")
+
+    # Save summary table to tables/ directory for plotting
+    # Create separate columns for mean and SEM (required by plotting scripts)
+    from pbench_eval.stats import padded_mean, padded_sem
+
+    summary_rows = []
+    for _, row in aggregated.iterrows():
+        group_data = evidence_by_refno[
+            (evidence_by_refno["agent"] == row["agent"])
+            & (evidence_by_refno["model"] == row["model"])
+        ]
+        n_trials = int(row["num_trials"])
+        summary_rows.append(
+            {
+                "agent": row["agent"],
+                "model": row["model"],
+                "avg_evidence_precision": padded_mean(
+                    group_data["evidence_precision"].tolist(), n_trials
+                ),
+                "avg_evidence_precision_sem": padded_sem(
+                    group_data["evidence_precision"].tolist(), n_trials
+                ),
+                "avg_evidence_recall": padded_mean(
+                    group_data["evidence_recall"].tolist(), n_trials
+                ),
+                "avg_evidence_recall_sem": padded_sem(
+                    group_data["evidence_recall"].tolist(), n_trials
+                ),
+                "avg_evidence_f1": padded_mean(
+                    group_data["evidence_f1"].tolist(), n_trials
+                ),
+                "avg_evidence_f1_sem": padded_sem(
+                    group_data["evidence_f1"].tolist(), n_trials
+                ),
+                "successful_count": int(row["successful_count"]),
+                "num_trials": n_trials,
+            }
+        )
+
+    summary_df = pd.DataFrame(summary_rows)
+    tables_dir = args.output_dir / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = tables_dir / "evidence_summary.csv"
+    summary_df.to_csv(summary_path, index=False)
+    logger.info(f"Saved summary table to {summary_path}")
+
+    # Save location.page distribution for GT dataset
+    page_column = "location.page"
+    if page_column in df_gt.columns:
+        page_values = df_gt[page_column].dropna()
+        page_distribution = page_values.value_counts().sort_index().reset_index()
+        page_distribution.columns = ["page", "count"]
+        page_dist_path = tables_dir / "gt_page_distribution.csv"
+        page_distribution.to_csv(page_dist_path, index=False)
+        logger.info(f"Saved GT page distribution to {page_dist_path}")
+
+        # Compute and save evidence recall by page
+        if page_column in df_pred.columns:
+            recall_by_page = compute_evidence_recall_by_page(
+                df_pred,
+                df_gt,
+                evidence_column=evidence_column,
+                page_column=page_column,
+            )
+            if not recall_by_page.empty:
+                # Sort by agent, model, page for readability
+                recall_by_page = recall_by_page.sort_values(
+                    ["agent", "model", "page"]
+                ).reset_index(drop=True)
+                recall_by_page_path = tables_dir / "evidence_recall_by_page.csv"
+                recall_by_page.to_csv(recall_by_page_path, index=False)
+                logger.info(f"Saved evidence recall by page to {recall_by_page_path}")
+            else:
+                logger.warning("No evidence recall by page computed")
+        else:
+            logger.warning(
+                f"'{page_column}' column not found in predictions, "
+                "skipping evidence recall by page"
+            )
+    else:
+        logger.warning(f"'{page_column}' column not found in ground truth data")
 
 
 if __name__ == "__main__":
