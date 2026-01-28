@@ -54,6 +54,26 @@ uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
     --matching_mode conditions
 ```
 
+4. Aggregate accuracy and token cost:
+
+```bash
+# Total cost
+uv run pbench-aggregate -jd jobs-biosurfactants -od out-biosurfactants -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions --log_level ERROR --x-axis cost
+
+# Total tokens
+uv run pbench-aggregate -jd jobs-biosurfactants -od out-biosurfactants -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions --log_level ERROR --x-axis tokens
+```
+
+5. Compute evidence metrics:
+
+```bash
+uv run pbench-score-evidence -jd jobs-biosurfactants -od out-biosurfactants --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0
+```
+
 ### Using the LLM API (no Harbor)
 
 1. Please run the following command to generate the predictions:
@@ -92,6 +112,25 @@ uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
 uv run python format_tokens.py -od OUTPUT_DIR
 ```
 
+7. Aggregate accuracy and token cost:
+
+```bash
+# Total cost
+uv run pbench-aggregate -od out-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions --log_level ERROR --x-axis cost
+
+# Total tokens
+uv run pbench-aggregate -od out-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric.csv \
+    --matching_mode conditions --log_level ERROR --x-axis tokens
+```
+
+8. Compute evidence metrics:
+
+```bash
+uv run pbench-score-evidence  -od out-no-agent --hf_repo kilian-group/biosurfactants-extraction --hf_split full --hf_revision v0.0.0
+```
 
 ## Reproducing the Dataset Construction
 

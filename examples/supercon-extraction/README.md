@@ -117,6 +117,17 @@ uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
 uv run python format_tokens.py -jd JOBS_DIR
 ```
 
+4. Compute evidence metrics:
+
+<details>
+    <summary>Instructions for SuperCon Post-2021</summary>
+
+```bash
+uv run pbench-score-evidence -od out-post-2021-no-agent --hf_repo kilian-group/supercon-post-2021-extraction --hf_split full --hf_revision v0.0.1
+```
+
+</details>
+
 ### Using the LLM API (no Harbor)
 
 1. Please run the following command to generate the predictions:
@@ -205,11 +216,25 @@ uv run python format_tokens.py -od OUTPUT_DIR
 TODO:
 - [ ] Allow user to specify precision, recall, or F1. Currently, it will compute F1 scores.
 
-```bash
+<!-- ```bash
 uv run python format_accuracy_tokens.py -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric_4.csv \
     --conversion_factors_path scoring/si_conversion_factors.csv \
     --matching_mode material --log_level ERROR --x-axis cost
+``` -->
+
+```bash
+# Total cost
+uv run pbench-aggregate -od out-post-2021-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_5.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR --x-axis cost
+
+# Total tokens
+uv run pbench-aggregate -od out-post-2021-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_5.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR --x-axis tokens
 ```
 
 ## Constructing the Dataset from SuperCon original
