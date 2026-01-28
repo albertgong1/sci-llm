@@ -228,9 +228,10 @@ def main() -> None:
         help="Paths to scored results CSV files (e.g., scored_results_tc-gemini-cli-run-1_detailed.csv)",
     )
     parser.add_argument(
-        "--output-csv",
+        "--output-dir",
+        "-od",
         type=Path,
-        default=None,
+        default=Path("out"),
         help="Optional path to save augmented CSV with n_tool_use_counts column",
     )
     args = parser.parse_args()
@@ -249,11 +250,10 @@ def main() -> None:
         all_dfs.append(df)
         all_agents.append(agent)
 
-        # Optionally save augmented CSV
-        if args.output_csv:
-            output_path = args.output_csv.parent / f"{csv_path.stem}_with_steps.csv"
-            df.to_csv(output_path, index=False)
-            print(f"  Saved augmented CSV to {output_path}")
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = args.output_dir / f"{csv_path.stem}_with_steps.csv"
+        df.to_csv(output_path, index=False)
+        print(f"  Saved augmented CSV to {output_path}")
 
     # Compute and display summary statistics
     summary_df = compute_tool_use_counts_summary(all_dfs, all_agents)
