@@ -354,6 +354,73 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
     print(f"Saved breakdown chart to {output_path}")
 
 
+def compute_yes_no_comparison(
+    dfs: list[pd.DataFrame], agents: list[str]
+) -> pd.DataFrame:
+    """Compare tool calls for correctly classified Yes vs No materials.
+
+    Includes both FULLY_CORRECT and CORRECT_WRONG_VAL categories
+    (i.e., all materials where is_superconducting classification was correct).
+
+    Args:
+        dfs: List of DataFrames (one per CSV file)
+        agents: List of agent names corresponding to each DataFrame
+
+    Returns:
+        DataFrame with columns: agent, ground_truth, mean_tool_calls, stderr_tool_calls, n_materials
+    """
+    results: list[dict] = []
+
+    # Group DataFrames by agent
+    agent_dfs: dict[str, list[pd.DataFrame]] = {}
+    for df, agent in zip(dfs, agents):
+        if agent not in agent_dfs:
+            agent_dfs[agent] = []
+        agent_dfs[agent].append(df)
+
+    correct_categories = [CATEGORY_FULLY_CORRECT, CATEGORY_CORRECT_WRONG_VAL]
+
+    for agent, agent_df_list in agent_dfs.items():
+        for ground_truth in ["Yes", "No"]:
+            all_tool_counts: list[float] = []
+
+            for df in agent_df_list:
+                # Filter to correct classification + is_superconducting rows with matching ground truth
+                mask = (
+                    (df["correctness_category"].isin(correct_categories))
+                    & (df["property_name"] == "is_superconducting")
+                    & (df["property_value"] == ground_truth)
+                )
+                filtered = df[mask]
+                valid_counts = filtered["n_tool_use_counts"].dropna()
+                all_tool_counts.extend(valid_counts.tolist())
+
+            if len(all_tool_counts) == 0:
+                results.append({
+                    "agent": agent,
+                    "ground_truth": ground_truth,
+                    "mean_tool_calls": None,
+                    "stderr_tool_calls": None,
+                    "n_materials": 0,
+                })
+            else:
+                mean_val = np.mean(all_tool_counts)
+                stderr_val = (
+                    np.std(all_tool_counts, ddof=1) / np.sqrt(len(all_tool_counts))
+                    if len(all_tool_counts) > 1
+                    else 0
+                )
+                results.append({
+                    "agent": agent,
+                    "ground_truth": ground_truth,
+                    "mean_tool_calls": mean_val,
+                    "stderr_tool_calls": stderr_val,
+                    "n_materials": len(all_tool_counts),
+                })
+
+    return pd.DataFrame(results)
+
+
 def compute_tool_use_counts_summary(dfs: list[pd.DataFrame], agents: list[str]) -> pd.DataFrame:
     """Compute mean ± stderr of tool use counts across job_ids for each agent.
 
@@ -502,6 +569,44 @@ def main() -> None:
     # Generate grouped bar chart
     chart_path = args.output_dir / "tool_calls_breakdown_by_correctness_category.png"
     plot_breakdown_bar_chart(breakdown_df, chart_path)
+
+    ### 3. Yes vs No comparison for fully correct materials
+    yes_no_df = compute_yes_no_comparison(all_dfs, all_agents)
+
+    # Format table: Agent | Correct Yes | Correct No | Δ (No - Yes)
+    yes_no_display_rows: list[dict] = []
+
+    for agent in yes_no_df["agent"].unique():
+        agent_data = yes_no_df[yes_no_df["agent"] == agent]
+        yes_row = agent_data[agent_data["ground_truth"] == "Yes"]
+        no_row = agent_data[agent_data["ground_truth"] == "No"]
+
+        yes_mean = yes_row["mean_tool_calls"].iloc[0] if not yes_row.empty else None
+        yes_stderr = yes_row["stderr_tool_calls"].iloc[0] if not yes_row.empty else None
+        yes_n = yes_row["n_materials"].iloc[0] if not yes_row.empty else 0
+
+        no_mean = no_row["mean_tool_calls"].iloc[0] if not no_row.empty else None
+        no_stderr = no_row["stderr_tool_calls"].iloc[0] if not no_row.empty else None
+        no_n = no_row["n_materials"].iloc[0] if not no_row.empty else 0
+
+        # Compute delta
+        if yes_mean is not None and no_mean is not None:
+            delta = no_mean - yes_mean
+            delta_str = f"{delta:+.1f}"
+        else:
+            delta_str = "N/A"
+
+        yes_no_display_rows.append({
+            "Agent": agent,
+            "Correct Yes (TP)": f"{format_mean_stderr(yes_mean, yes_stderr)} (n={yes_n})",
+            "Correct No (TN)": f"{format_mean_stderr(no_mean, no_stderr)} (n={no_n})",
+            "Δ (No - Yes)": delta_str,
+        })
+
+    yes_no_display_df = pd.DataFrame(yes_no_display_rows)
+
+    print("\n## Tool Calls: Correct Yes vs Correct No (Correct Classification)\n")
+    print(tabulate(yes_no_display_df, headers="keys", tablefmt="github", showindex=False))
 
 
 if __name__ == "__main__":
