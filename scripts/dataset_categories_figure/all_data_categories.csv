@@ -1,0 +1,199 @@
+property_name,count,category,dataset
+common formula of materials,31879.0,Material,SuperCon
+Tc (of this sample) recommended,26321.0,Superconductivity,SuperCon
+common name of structure,24685.0,Structural,SuperCon
+transition temperature (mid point),17115.0,Superconductivity,SuperCon
+shape,15923.0,Material,SuperCon
+lattice constant a,13102.0,Structural,SuperCon
+lattice constant c,11745.0,Structural,SuperCon
+raw materials,7910.0,Preparation,SuperCon
+*preparation method,7437.0,Preparation,SuperCon
+"*crystal structure, symmetry",6781.0,Structural,SuperCon
+Tc from susceptibility measurement,5608.0,Superconductivity,SuperCon
+lowest temperature for measurement (not superconducting),4637.0,Superconductivity,SuperCon
+transition temperature (R = 100%),4606.0,Superconductivity,SuperCon
+transition temperature (R = 0),4051.0,Superconductivity,SuperCon
+space group,3667.0,Structural,SuperCon
+lattice constant b,3512.0,Structural,SuperCon
+coefficient of electronic specific heat,2492.0,Thermal,SuperCon
+Debye temperature,1843.0,Thermal,SuperCon
+Hc2 at 0 K for poly crystal,1756.0,Superconductivity,SuperCon
+resistivity at RT for poly crystal,1651.0,Normal State,SuperCon
+Neel temperature,1490.0,Magnetic,SuperCon
+transition width for resistive transition,1352.0,Superconductivity,SuperCon
+Curie temperature,1199.0,Magnetic,SuperCon
+-slope in Hc2 vs T at Tc for poly crystal,1164.0,Superconductivity,SuperCon
+thermopower at 300 K,1120.0,Thermal,SuperCon
+slope at P = 0 in Tc vs P plot,1038.0,Superconductivity,SuperCon
+volume fraction of Meissner effect(%),1038.0,Superconductivity,SuperCon
+resistivity at normal-T for poly crystal,1026.0,Normal State,SuperCon
+"normarized energy gap at 0 K , 2delta(0)/kTc",996.0,Superconductivity,SuperCon
+coherence length at 0 K for poly crystal,837.0,Superconductivity,SuperCon
+magnetic moment per formula,798.0,Magnetic,SuperCon
+penetration depth at 0 K for poly crystal,767.0,Superconductivity,SuperCon
+international table number,543.0,Structural,SuperCon
+Hall coefficient at 300 K,533.0,Normal State,SuperCon
+"energy gap at 0 K , delta(0)",488.0,Superconductivity,SuperCon
+Hc2 at 0 K for single crystal for H //c-axis,460.0,Superconductivity,SuperCon
+Hc1 at 0 K for poly crystal,442.0,Superconductivity,SuperCon
+coherence length at 0 K for single crystal for H //ab-plane,435.0,Superconductivity,SuperCon
+penetration depth at 0 K for single crystal for H //ab-plane,401.0,Superconductivity,SuperCon
+"alpha in Tc = A * M^(-alpha), isotope effect",387.0,Superconductivity,SuperCon
+Hc2 at 0 K for single crystal for H //ab-plane,377.0,Superconductivity,SuperCon
+density (gcm-3),360.0,Mechanical,SuperCon
+isotope element,349.0,Superconductivity,SuperCon
+temperature independent term in susceptibility,346.0,Magnetic,SuperCon
+resistivity at RT for single crystal for J//ab-plane,334.0,Normal State,SuperCon
+carrier density at 300 K,326.0,Normal State,SuperCon
+-slope in Hc2 vs T at Tc for single crystal for H //c-axis,326.0,Superconductivity,SuperCon
+-slope in Hc2 vs T at Tc for single crystal for H //ab-plane,312.0,Superconductivity,SuperCon
+coherence length at 0 K for single crystal for H ⊥ab-plane,283.0,Superconductivity,SuperCon
+resistivity at 77 K for poly crystal,283.0,Normal State,SuperCon
+resistivity at normal-T for single crystal for J//ab-plane,225.0,Normal State,SuperCon
+exchange ratio of isotope(%),219.0,Superconductivity,SuperCon
+Curie constant,214.0,Magnetic,SuperCon
+DTC = Tc - Tc0 for isotope element,189.0,Superconductivity,SuperCon
+resistivity at 4.2 K for poly crystal,169.0,Normal State,SuperCon
+resistivity at 77 K for single crystal for J//ab-plane,157.0,Normal State,SuperCon
+"Hall coefficient for single, H//c-axis",145.0,Normal State,SuperCon
+penetration depth at 0 K for single crystal for H⊥ab-plane,134.0,Superconductivity,SuperCon
+specific heat jump at Tc (delta-C),129.0,Thermal,SuperCon
+Hc2 at given temperature for poly crystal,126.0,Superconductivity,SuperCon
+resistivity at RT for single crystal for J//c-axis,117.0,Normal State,SuperCon
+Hc1 at given temperature for poly crystal,116.0,Superconductivity,SuperCon
+Hc1 at 0 K for single crystal for H //c-axis,94.0,Superconductivity,SuperCon
+thermal conductivity at 300 K,88.0,Thermal,SuperCon
+Hc1 at 0 K for single crystal for H //ab-plane,77.0,Superconductivity,SuperCon
+resistivity at normal-T for single crystal for J//c-axis,64.0,Normal State,SuperCon
+Young's modulus at 300 K ,55.0,Mechanical,SuperCon
+"Jc at T = 77 K, H = 0 T",54.0,Superconductivity,SuperCon
+shear modulus at 300 K ,54.0,Mechanical,SuperCon
+Hc2 at given temperature for single crystal H//ab-plane,47.0,Superconductivity,SuperCon
+"Jc at 4.2 K, H = 0 T",47.0,Superconductivity,SuperCon
+resistivity at 4.2 K for single crystal for J//ab-plane,45.0,Normal State,SuperCon
+Hc2 at given temperature for single crystal H//c-axis,42.0,Superconductivity,SuperCon
+Poisson ratio at 300 K ,42.0,Mechanical,SuperCon
+resistivity at 77 K for single crystal for J//c-axis,42.0,Normal State,SuperCon
+sound velocity at 300 K ,26.0,Mechanical,SuperCon
+target material,25.0,Preparation,SuperCon
+"Hall coefficient at 300 K for single, H//c-axis",25.0,Normal State,SuperCon
+pressure dependence of LATA,23.0,Structural,SuperCon
+pressure dependence of LATC,22.0,Structural,SuperCon
+hardness at 300 K ,20.0,Mechanical,SuperCon
+Hc1 at given temperature for single crystal H//c-axis,20.0,Superconductivity,SuperCon
+Hc1 at given temperature for single crystal H//ab-plane,16.0,Superconductivity,SuperCon
+substrate,13.0,Preparation,SuperCon
+thermopower at 300 K for parallel to ab-plane,13.0,Thermal,SuperCon
+temperature dependence of LATA,12.0,Structural,SuperCon
+temperature dependence of LATC,11.0,Structural,SuperCon
+resistivity at 4.2 K for single crystal for J//c-axis,10.0,Normal State,SuperCon
+pressure dependence of LATB,8.0,Structural,SuperCon
+thermal conductivity at 300 K for heat flow//ab-plane,8.0,Thermal,SuperCon
+"Hall coefficient at 300 K for single, H//ab-plane",8.0,Normal State,SuperCon
+shear modulus at 4.2 K ,7.0,Mechanical,SuperCon
+thermal conductivity at 300 K for heat flow//c-axis,7.0,Thermal,SuperCon
+Young's modulus at 4.2 K ,6.0,Mechanical,SuperCon
+Poisson ratio at 4.2 K ,6.0,Mechanical,SuperCon
+temperature dependence of LATB,5.0,Structural,SuperCon
+sound velocity at 4.2 K ,2.0,Mechanical,SuperCon
+q-vector,30.0,Structural,CDW
+lattice constant a,21.0,Structural,CDW
+lattice constant c,20.0,Structural,CDW
+atomic fractional coordinates,18.0,Structural,CDW
+modulation period,15.0,Structural,CDW
+lattice constant b,15.0,Structural,CDW
+CDW transition temperature (T_CDW),10.0,Environmental,CDW
+unit-cell volume,9.0,Structural,CDW
+q-vector components,8.0,Structural,CDW
+Wyckoff position,6.0,Structural,CDW
+effective mass,6.0,Electronic,CDW
+symmetry change at CDW transition,4.0,Structural,CDW
+electronic band gap,4.0,Electronic,CDW
+modulation phase shift,3.0,Structural,CDW
+point group,3.0,Structural,CDW
+superlattice periodicity length,2.0,Structural,CDW
+lock-in transition temperature,2.0,Environmental,CDW
+temperature range of incommensurate phase,2.0,Environmental,CDW
+carrier concentration,2.0,Electronic,CDW
+phonon linewidth,2.0,Electronic,CDW
+conductivity,2.0,Electronic,CDW
+resistivity anisotropy,2.0,Electronic,CDW
+modulation vector direction,1.0,Structural,CDW
+modulation amplitude,1.0,Structural,CDW
+harmonic content,1.0,Structural,CDW
+primary modulation,1.0,Structural,CDW
+secondary modulation,1.0,Structural,CDW
+CDW displacement pattern,1.0,Structural,CDW
+superlattice peak intensity,1.0,Structural,CDW
+atomic sites that modulate,1.0,Structural,CDW
+multiple CDW transitions,1.0,Environmental,CDW
+order of CDW transition,1.0,Structural,CDW
+hysteresis width,1.0,Environmental,CDW
+commensurate CDW,1.0,Structural,CDW
+incommensurate CDW,1.0,Structural,CDW
+nearly commensurate CDW,1.0,Structural,CDW
+unidirectional CDW,1.0,Structural,CDW
+bidirectional CDW,1.0,Structural,CDW
+triple-q CDW,1.0,Structural,CDW
+multi-q CDW,1.0,Structural,CDW
+stripe-like CDW,1.0,Structural,CDW
+checkerboard CDW,1.0,Structural,CDW
+spin density wave,1.0,Electronic,CDW
+high-T space group,1.0,Structural,CDW
+low-T space group,1.0,Structural,CDW
+crystallographic class,1.0,Structural,CDW
+magnetic space group,1.0,Structural,CDW
+propagation vector symmetry direction,1.0,Structural,CDW
+crystal structure type / prototype,1.0,Structural,CDW
+"lattice angles (alpha, beta, gamma)",1.0,Structural,CDW
+interlayer spacing,1.0,Structural,CDW
+bond lengths,1.0,Chemical,CDW
+bond angles,1.0,Chemical,CDW
+atomic site label,1.0,Structural,CDW
+displacement amplitude per atom,1.0,Structural,CDW
+coordination number changes,1.0,Chemical,CDW
+structural distortion vectors,1.0,Structural,CDW
+partial gap size,1.0,Electronic,CDW
+pseudogap,1.0,Electronic,CDW
+Fermi surface reconstruction features,1.0,Electronic,CDW
+band folding vector,1.0,Electronic,CDW
+spectral weight suppression,1.0,Electronic,CDW
+density of states at Fermi level,1.0,Electronic,CDW
+mobility change,1.0,Electronic,CDW
+ARPES peak intensity,1.0,Methods,CDW
+phonon soft mode frequency,1.0,Electronic,CDW
+phonon softening amplitude,1.0,Electronic,CDW
+temperature dependence of phonon frequency,1.0,Electronic,CDW
+Raman mode frequency,1.0,Methods,CDW
+Raman intensity anomaly,1.0,Methods,CDW
+IR absorption frequency,1.0,Methods,CDW
+IR mode intensity,1.0,Methods,CDW
+phonon gap opening,1.0,Electronic,CDW
+resistivity,1.0,Electronic,CDW
+dœÅ/dT slope,1.0,Electronic,CDW
+Hall coefficient,1.0,Electronic,CDW
+magnetoresistance,1.0,Electronic,CDW
+Seebeck coefficient,1.0,Electronic,CDW
+thermal conductivity,1.0,Electronic,CDW
+activation energy,1.0,Electronic,CDW
+magnetic susceptibility,1.0,Electronic,CDW
+magnetization,1.0,Electronic,CDW
+field-induced CDW changes,1.0,Electronic,CDW
+magnetic field for CDW melting,1.0,Environmental,CDW
+spin-related anomalies,1.0,Electronic,CDW
+Adsorption Kinetics,22.0,"Interfacial, Surface",Biosurfactants
+Biodegradability Rate,19.0,"Biological, Kinetic",Biosurfactants
+Catalytic Activity (k_cat),27.0,"Biological, Kinetic",Biosurfactants
+Chelation Constant (pK / Kf),25.0,"Soil Handling, Electrostatic",Biosurfactants
+Cloud Point,14.0,"Physiochemical, Phase",Biosurfactants
+Critical Micelle Concentration (CMC),31.0,"Interfacial, Surface",Biosurfactants
+Dissolution Time,5.0,"Rheological, Physical",Biosurfactants
+Dynamic Viscosity (η),30.0,"Rheological, Physical",Biosurfactants
+Emulsification Index (E24),8.0,"Soil Handling, Electrostatic",Biosurfactants
+Foam Height,4.0,"Rheological, Physical",Biosurfactants
+HLB (Hydrophilic-Lipophilic Balance),1.0,"Physiochemical, Phase",Biosurfactants
+Interfacial Tension (IFT),35.0,"Interfacial, Surface",Biosurfactants
+Particulate Dispersion,34.0,"Soil Handling, Electrostatic",Biosurfactants
+Pour Point,2.0,"Rheological, Physical",Biosurfactants
+Surface Tension (γ),9.0,"Interfacial, Surface",Biosurfactants
+Zeta Potential (ζ),20.0,"Soil Handling, Electrostatic",Biosurfactants
