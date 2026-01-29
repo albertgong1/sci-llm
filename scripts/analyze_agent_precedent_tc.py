@@ -24,8 +24,6 @@ import pandas as pd
 import tldextract
 from tabulate import tabulate
 
-from llm_utils.common import parse_json_response
-
 # URL extraction regex pattern
 URL_PATTERN = re.compile(r'https?://[^\s\'"<>\\]+')
 
@@ -60,6 +58,7 @@ CATEGORY_INCORRECT_CLASS = "Incorrect Classification"
 CATEGORY_CORRECT_WRONG_VAL = "Correct Class + Wrong Value"
 CATEGORY_FULLY_CORRECT = "Fully Correct"
 
+CATEGORIES = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
 
 # Agent log file mapping for log mining recovery methods
 AGENT_LOG_FILES: dict[str, str] = {
@@ -322,10 +321,8 @@ def compute_breakdown_summary(
             agent_dfs[agent] = []
         agent_dfs[agent].append(df)
 
-    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
-
     for agent, agent_df_list in agent_dfs.items():
-        for category in categories:
+        for category in CATEGORIES:
             # Collect tool counts for this category across all jobs
             all_tool_counts: list[float] = []
 
@@ -370,7 +367,6 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
         output_path: Path to save the chart
     """
     agents = list(breakdown_df["agent"].unique())
-    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
 
     # Colors for each category
     category_colors = {
@@ -379,20 +375,13 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
         CATEGORY_FULLY_CORRECT: "blue",
     }
 
-    # Short labels for legend
-    category_short = {
-        CATEGORY_INCORRECT_CLASS: "Incorrect Class",
-        CATEGORY_CORRECT_WRONG_VAL: "Correct Class + Wrong Value",
-        CATEGORY_FULLY_CORRECT: "Fully Correct",
-    }
-
     x = np.arange(len(agents))
     width = 0.25
-    n_categories = len(categories)
+    n_categories = len(CATEGORIES)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    for i, cat in enumerate(categories):
+    for i, cat in enumerate(CATEGORIES):
         means = []
         stderrs = []
         for agent in agents:
@@ -409,7 +398,7 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
             x + offset,
             means,
             width,
-            label=category_short[cat],
+            label=cat,
             color=category_colors[cat],
             yerr=stderrs,
             capsize=3,
@@ -424,77 +413,10 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.savefig(output_path.with_suffix(".png"), dpi=150, bbox_inches="tight")
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
     plt.close()
     print(f"Saved breakdown chart to {output_path}")
-
-
-def compute_yes_no_comparison(
-    dfs: list[pd.DataFrame], agents: list[str]
-) -> pd.DataFrame:
-    """Compare tool calls for correctly classified Yes vs No materials.
-
-    Includes both FULLY_CORRECT and CORRECT_WRONG_VAL categories
-    (i.e., all materials where is_superconducting classification was correct).
-
-    Args:
-        dfs: List of DataFrames (one per CSV file)
-        agents: List of agent names corresponding to each DataFrame
-
-    Returns:
-        DataFrame with columns: agent, ground_truth, mean_tool_calls, stderr_tool_calls, n_materials
-    """
-    results: list[dict] = []
-
-    # Group DataFrames by agent
-    agent_dfs: dict[str, list[pd.DataFrame]] = {}
-    for df, agent in zip(dfs, agents):
-        if agent not in agent_dfs:
-            agent_dfs[agent] = []
-        agent_dfs[agent].append(df)
-
-    correct_categories = [CATEGORY_FULLY_CORRECT, CATEGORY_CORRECT_WRONG_VAL]
-
-    for agent, agent_df_list in agent_dfs.items():
-        for ground_truth in ["Yes", "No"]:
-            all_tool_counts: list[float] = []
-
-            for df in agent_df_list:
-                # Filter to correct classification + is_superconducting rows with matching ground truth
-                mask = (
-                    (df["correctness_category"].isin(correct_categories))
-                    & (df["property_name"] == "is_superconducting")
-                    & (df["property_value"] == ground_truth)
-                )
-                filtered = df[mask]
-                valid_counts = filtered["n_tool_use_counts"].dropna()
-                all_tool_counts.extend(valid_counts.tolist())
-
-            if len(all_tool_counts) == 0:
-                results.append({
-                    "agent": agent,
-                    "ground_truth": ground_truth,
-                    "mean_tool_calls": None,
-                    "stderr_tool_calls": None,
-                    "n_materials": 0,
-                })
-            else:
-                mean_val = np.mean(all_tool_counts)
-                stderr_val = (
-                    np.std(all_tool_counts, ddof=1) / np.sqrt(len(all_tool_counts))
-                    if len(all_tool_counts) > 1
-                    else 0
-                )
-                results.append({
-                    "agent": agent,
-                    "ground_truth": ground_truth,
-                    "mean_tool_calls": mean_val,
-                    "stderr_tool_calls": stderr_val,
-                    "n_materials": len(all_tool_counts),
-                })
-
-    return pd.DataFrame(results)
 
 
 def compute_tool_use_counts_summary(dfs: list[pd.DataFrame], agents: list[str]) -> pd.DataFrame:
@@ -629,13 +551,12 @@ def compute_tool_call_distribution_by_category(
             agent_dfs[agent] = []
         agent_dfs[agent].append(df)
 
-    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
     results: dict[str, dict[str, dict[str, float]]] = {}
 
     for agent, agent_df_list in agent_dfs.items():
         results[agent] = {}
 
-        for category in categories:
+        for category in CATEGORIES:
             # Aggregate tool calls for materials in this category
             total_counter: Counter[str] = Counter()
 
@@ -666,6 +587,120 @@ def compute_tool_call_distribution_by_category(
                 results[agent][category] = {}
 
     return results
+
+
+def plot_url_distribution_stacked_horizontal(
+    dist_by_cat: dict[str, dict[str, dict[str, float]]],
+    output_dir: Path,
+    top_n: int = 8,
+) -> None:
+    """Plot stacked horizontal bar chart of URL distribution by correctness category.
+
+    Creates one plot per agent. Each bar represents a category, with stacked segments
+    showing domain proportions within that category.
+
+    Args:
+        dist_by_cat: Dict from compute_tool_call_distribution_by_category
+        output_dir: Directory to save the charts
+        top_n: Number of top domains to show (others grouped as "Other")
+    """
+    agents = list(dist_by_cat.keys())
+    category_short = {
+        CATEGORY_INCORRECT_CLASS: "Incorrect Class",
+        CATEGORY_CORRECT_WRONG_VAL: "Correct + Wrong Val",
+        CATEGORY_FULLY_CORRECT: "Fully Correct",
+    }
+
+    for agent in agents:
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        # Build color palette for domains for this agent
+        all_domains: set[str] = set()
+        for cat in CATEGORIES:
+            cat_dist = dist_by_cat[agent].get(cat, {})
+            top_items = sorted(cat_dist.items(), key=lambda x: x[1], reverse=True)[:top_n]
+            all_domains.update(d for d, _ in top_items)
+
+        if not all_domains:
+            plt.close()
+            print(f"No data for agent {agent}, skipping stacked horizontal chart")
+            continue
+
+        domain_list = sorted(all_domains)
+        cmap = plt.cm.get_cmap("tab20", len(domain_list) + 1)
+        domain_colors = {d: cmap(i) for i, d in enumerate(domain_list)}
+        domain_colors["Other"] = cmap(len(domain_list))
+
+        y_positions = np.arange(len(CATEGORIES))
+        bar_height = 0.6
+
+        for y_idx, cat in enumerate(CATEGORIES):
+            cat_dist = dist_by_cat[agent].get(cat, {})
+            if not cat_dist:
+                continue
+
+            # Get top N domains + "Other"
+            sorted_items = sorted(cat_dist.items(), key=lambda x: x[1], reverse=True)
+            top_items = sorted_items[:top_n]
+            other_frac = sum(frac for _, frac in sorted_items[top_n:])
+
+            # Draw stacked bars
+            left = 0
+            for domain, frac in top_items:
+                ax.barh(
+                    y_idx,
+                    frac,
+                    height=bar_height,
+                    left=left,
+                    color=domain_colors.get(domain, "gray"),
+                    edgecolor="white",
+                    linewidth=0.5,
+                )
+                left += frac
+
+            if other_frac > 0:
+                ax.barh(
+                    y_idx,
+                    other_frac,
+                    height=bar_height,
+                    left=left,
+                    color=domain_colors["Other"],
+                    edgecolor="white",
+                    linewidth=0.5,
+                )
+
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels([c for c in CATEGORIES])
+        ax.set_xlabel("Fraction")
+        ax.set_title(f"{agent} - URL Distribution by Correctness Category")
+        ax.set_xlim(0, 1)
+        ax.grid(axis="x", alpha=0.3)
+
+        # Create legend with all domains
+        legend_handles = [
+            plt.Rectangle((0, 0), 1, 1, facecolor=domain_colors[d], edgecolor="white")
+            for d in domain_list
+        ]
+        legend_handles.append(
+            plt.Rectangle((0, 0), 1, 1, facecolor=domain_colors["Other"], edgecolor="white")
+        )
+        legend_labels = domain_list + ["Other"]
+
+        ax.legend(
+            legend_handles,
+            legend_labels,
+            loc="center left",
+            bbox_to_anchor=(1.0, 0.5),
+            fontsize=9,
+            title="Domain",
+        )
+
+        plt.tight_layout()
+        output_path = output_dir / f"url_distribution_stacked_horizontal_{agent}.pdf"
+        plt.savefig(output_path, dpi=300, bbox_inches="tight")
+        plt.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
+        plt.close()
+        print(f"Saved stacked horizontal chart to {output_path}")
 
 
 def main() -> None:
@@ -731,12 +766,11 @@ def main() -> None:
     pivot_df = breakdown_df.pivot(index="agent", columns="category", values=["mean_tool_calls", "stderr_tool_calls", "n_materials"])
 
     # Format breakdown table
-    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
     breakdown_display_rows: list[dict] = []
 
     for agent in breakdown_df["agent"].unique():
         row_data = {"Agent": agent}
-        for cat in categories:
+        for cat in CATEGORIES:
             cat_row = breakdown_df[(breakdown_df["agent"] == agent) & (breakdown_df["category"] == cat)]
             if cat_row.empty:
                 row_data[cat] = "N/A"
@@ -756,46 +790,7 @@ def main() -> None:
     chart_path = args.output_dir / "tool_calls_breakdown_by_correctness_category.png"
     plot_breakdown_bar_chart(breakdown_df, chart_path)
 
-    ### 3. Yes vs No comparison for fully correct materials
-    # NOT DOING THIS FOR NOW
-    # yes_no_df = compute_yes_no_comparison(all_dfs, all_agents)
-
-    # # Format table: Agent | Correct Yes | Correct No | Δ (No - Yes)
-    # yes_no_display_rows: list[dict] = []
-
-    # for agent in yes_no_df["agent"].unique():
-    #     agent_data = yes_no_df[yes_no_df["agent"] == agent]
-    #     yes_row = agent_data[agent_data["ground_truth"] == "Yes"]
-    #     no_row = agent_data[agent_data["ground_truth"] == "No"]
-
-    #     yes_mean = yes_row["mean_tool_calls"].iloc[0] if not yes_row.empty else None
-    #     yes_stderr = yes_row["stderr_tool_calls"].iloc[0] if not yes_row.empty else None
-    #     yes_n = yes_row["n_materials"].iloc[0] if not yes_row.empty else 0
-
-    #     no_mean = no_row["mean_tool_calls"].iloc[0] if not no_row.empty else None
-    #     no_stderr = no_row["stderr_tool_calls"].iloc[0] if not no_row.empty else None
-    #     no_n = no_row["n_materials"].iloc[0] if not no_row.empty else 0
-
-    #     # Compute delta
-    #     if yes_mean is not None and no_mean is not None:
-    #         delta = no_mean - yes_mean
-    #         delta_str = f"{delta:+.1f}"
-    #     else:
-    #         delta_str = "N/A"
-
-    #     yes_no_display_rows.append({
-    #         "Agent": agent,
-    #         "Correct Yes (TP)": f"{format_mean_stderr(yes_mean, yes_stderr)} (n={yes_n})",
-    #         "Correct No (TN)": f"{format_mean_stderr(no_mean, no_stderr)} (n={no_n})",
-    #         "Δ (No - Yes)": delta_str,
-    #     })
-
-    # yes_no_display_df = pd.DataFrame(yes_no_display_rows)
-
-    # print("\n## Tool Calls: Correct Yes vs Correct No (Correct Classification)\n")
-    # print(tabulate(yes_no_display_df, headers="keys", tablefmt="github", showindex=False))
-
-    ### 4. Tool call function name distribution (top 10 per agent)
+    ### 3. Tool call function name distribution (top 10 per agent)
     tool_dist = compute_tool_call_distribution(all_dfs, all_agents)
 
     print("\n## Tool Call Distribution (Top 10 per Agent)\n")
@@ -810,25 +805,26 @@ def main() -> None:
         top_rows = [{"Tool/Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
         print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
 
-    ### 5. URL distribution by correctness category (top 5 per agent per category)
+    ### 4. URL distribution by correctness category (top 5 per agent per category)
     tool_dist_by_cat = compute_tool_call_distribution_by_category(all_dfs, all_agents)
 
-    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+    # print("\n## URL Distribution by Correctness Category (Top 10 per Agent)\n")
+    # for agent in tool_dist_by_cat:
+    #     print(f"\n### {agent}\n")
+    #     for category in CATEGORIES:
+    #         cat_dist = tool_dist_by_cat[agent].get(category, {})
+    #         sorted_items = sorted(cat_dist.items(), key=lambda x: x[1], reverse=True)[:10]
 
-    print("\n## URL Distribution by Correctness Category (Top 10 per Agent)\n")
-    for agent in tool_dist_by_cat:
-        print(f"\n### {agent}\n")
-        for category in categories:
-            cat_dist = tool_dist_by_cat[agent].get(category, {})
-            sorted_items = sorted(cat_dist.items(), key=lambda x: x[1], reverse=True)[:10]
+    #         print(f"\n**{category}**\n")
+    #         if not sorted_items:
+    #             print("No URLs found.\n")
+    #             continue
 
-            print(f"\n**{category}**\n")
-            if not sorted_items:
-                print("No URLs found.\n")
-                continue
+    #         top_rows = [{"Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
+    #         print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
 
-            top_rows = [{"Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
-            print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
+    # Generate URL distribution visualizations (one plot per agent)
+    plot_url_distribution_stacked_horizontal(tool_dist_by_cat, args.output_dir)
 
 
 if __name__ == "__main__":
