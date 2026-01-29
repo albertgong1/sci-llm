@@ -24,10 +24,12 @@ import pandas as pd
 import tldextract
 from tabulate import tabulate
 
+from llm_utils.common import parse_json_response
 
 # URL extraction regex pattern
 URL_PATTERN = re.compile(r'https?://[^\s\'"<>\\]+')
 
+SKIP_DOMAINS: list[str] = ["w3.org"]
 
 def extract_domains_from_text(text: str) -> list[str]:
     """Extract registered domains from URLs found in text.
@@ -47,7 +49,8 @@ def extract_domains_from_text(text: str) -> list[str]:
             extracted = tldextract.extract(url)
             if extracted.domain and extracted.suffix:
                 registered_domain = f"{extracted.domain}.{extracted.suffix}"
-                domains.append(registered_domain)
+                if registered_domain not in SKIP_DOMAINS:
+                    domains.append(registered_domain)
         except Exception:
             continue
     return domains
@@ -195,52 +198,6 @@ def load_tool_call_names_from_trajectory(
 
     except (json.JSONDecodeError, KeyError):
         return Counter()
-
-
-def load_json_agent_completed_run(
-    task_run_dir: Path, recovery_method: str, agent: str
-) -> dict | None:
-    """Load the agent's output for a completed run.
-
-    Args:
-        task_run_dir: Path to the task run directory
-        recovery_method: How to find the agent's output (predictions_json, gemini_log_mining, etc.)
-        agent: Agent name
-
-    Returns:
-        Parsed JSON output or None if not found
-    """
-    if recovery_method == "predictions_json":
-        predictions_path = task_run_dir / "verifier" / "app_output" / "predictions.json"
-        if predictions_path.exists():
-            with open(predictions_path) as f:
-                return json.load(f)
-
-    elif recovery_method == "gemini_log_mining":
-        log_path = task_run_dir / "agent" / "gemini-cli.txt"
-        if log_path.exists():
-            return {"log_path": str(log_path)}
-
-    elif recovery_method == "codex_log_mining":
-        log_path = task_run_dir / "agent" / "codex.txt"
-        if log_path.exists():
-            return {"log_path": str(log_path)}
-
-    elif recovery_method == "terminus_log_mining":
-        # Look at episode-*/response.txt starting from latest episode
-        agent_dir = task_run_dir / "agent"
-        if agent_dir.exists():
-            episode_dirs = sorted(
-                [d for d in agent_dir.iterdir() if d.is_dir() and d.name.startswith("episode-")],
-                key=lambda x: int(x.name.split("-")[1]),
-                reverse=True,
-            )
-            for episode_dir in episode_dirs:
-                response_path = episode_dir / "response.txt"
-                if response_path.exists():
-                    return {"log_path": str(response_path)}
-
-    return None
 
 
 def add_tool_counts_to_df(df: pd.DataFrame, agent: str) -> pd.DataFrame:
@@ -653,6 +610,64 @@ def compute_tool_call_distribution(
     return results
 
 
+def compute_tool_call_distribution_by_category(
+    dfs: list[pd.DataFrame], agents: list[str]
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Compute normalized URL distribution per agent per correctness category.
+
+    Args:
+        dfs: List of DataFrames (one per CSV file)
+        agents: List of agent names corresponding to each DataFrame
+
+    Returns:
+        Dict mapping agent -> category -> {domain: normalized_fraction}
+    """
+    # Group DataFrames by agent
+    agent_dfs: dict[str, list[pd.DataFrame]] = {}
+    for df, agent in zip(dfs, agents):
+        if agent not in agent_dfs:
+            agent_dfs[agent] = []
+        agent_dfs[agent].append(df)
+
+    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+    results: dict[str, dict[str, dict[str, float]]] = {}
+
+    for agent, agent_df_list in agent_dfs.items():
+        results[agent] = {}
+
+        for category in categories:
+            # Aggregate tool calls for materials in this category
+            total_counter: Counter[str] = Counter()
+
+            for df in agent_df_list:
+                # Get unique materials in this category
+                cat_materials = df[df["correctness_category"] == category]["material"].unique()
+
+                for material in cat_materials:
+                    # Get the trial info for this material
+                    material_row = df[df["material"] == material].iloc[0]
+                    job_id = material_row["job_id"]
+                    trial_id = material_row["metadata_trial_id"]
+
+                    task_run_dir = get_task_run_dir(agent, job_id, trial_id)
+                    trajectory_path = task_run_dir / "agent" / "trajectory.json"
+
+                    counter = load_tool_call_names_from_trajectory(trajectory_path, agent)
+                    total_counter.update(counter)
+
+            # Normalize by total count
+            total_calls = sum(total_counter.values())
+            if total_calls > 0:
+                results[agent][category] = {
+                    name: count / total_calls
+                    for name, count in total_counter.most_common()
+                }
+            else:
+                results[agent][category] = {}
+
+    return results
+
+
 def main() -> None:
     """Main entry point for the script."""
     # Argument parsing
@@ -742,42 +757,43 @@ def main() -> None:
     plot_breakdown_bar_chart(breakdown_df, chart_path)
 
     ### 3. Yes vs No comparison for fully correct materials
-    yes_no_df = compute_yes_no_comparison(all_dfs, all_agents)
+    # NOT DOING THIS FOR NOW
+    # yes_no_df = compute_yes_no_comparison(all_dfs, all_agents)
 
-    # Format table: Agent | Correct Yes | Correct No | Δ (No - Yes)
-    yes_no_display_rows: list[dict] = []
+    # # Format table: Agent | Correct Yes | Correct No | Δ (No - Yes)
+    # yes_no_display_rows: list[dict] = []
 
-    for agent in yes_no_df["agent"].unique():
-        agent_data = yes_no_df[yes_no_df["agent"] == agent]
-        yes_row = agent_data[agent_data["ground_truth"] == "Yes"]
-        no_row = agent_data[agent_data["ground_truth"] == "No"]
+    # for agent in yes_no_df["agent"].unique():
+    #     agent_data = yes_no_df[yes_no_df["agent"] == agent]
+    #     yes_row = agent_data[agent_data["ground_truth"] == "Yes"]
+    #     no_row = agent_data[agent_data["ground_truth"] == "No"]
 
-        yes_mean = yes_row["mean_tool_calls"].iloc[0] if not yes_row.empty else None
-        yes_stderr = yes_row["stderr_tool_calls"].iloc[0] if not yes_row.empty else None
-        yes_n = yes_row["n_materials"].iloc[0] if not yes_row.empty else 0
+    #     yes_mean = yes_row["mean_tool_calls"].iloc[0] if not yes_row.empty else None
+    #     yes_stderr = yes_row["stderr_tool_calls"].iloc[0] if not yes_row.empty else None
+    #     yes_n = yes_row["n_materials"].iloc[0] if not yes_row.empty else 0
 
-        no_mean = no_row["mean_tool_calls"].iloc[0] if not no_row.empty else None
-        no_stderr = no_row["stderr_tool_calls"].iloc[0] if not no_row.empty else None
-        no_n = no_row["n_materials"].iloc[0] if not no_row.empty else 0
+    #     no_mean = no_row["mean_tool_calls"].iloc[0] if not no_row.empty else None
+    #     no_stderr = no_row["stderr_tool_calls"].iloc[0] if not no_row.empty else None
+    #     no_n = no_row["n_materials"].iloc[0] if not no_row.empty else 0
 
-        # Compute delta
-        if yes_mean is not None and no_mean is not None:
-            delta = no_mean - yes_mean
-            delta_str = f"{delta:+.1f}"
-        else:
-            delta_str = "N/A"
+    #     # Compute delta
+    #     if yes_mean is not None and no_mean is not None:
+    #         delta = no_mean - yes_mean
+    #         delta_str = f"{delta:+.1f}"
+    #     else:
+    #         delta_str = "N/A"
 
-        yes_no_display_rows.append({
-            "Agent": agent,
-            "Correct Yes (TP)": f"{format_mean_stderr(yes_mean, yes_stderr)} (n={yes_n})",
-            "Correct No (TN)": f"{format_mean_stderr(no_mean, no_stderr)} (n={no_n})",
-            "Δ (No - Yes)": delta_str,
-        })
+    #     yes_no_display_rows.append({
+    #         "Agent": agent,
+    #         "Correct Yes (TP)": f"{format_mean_stderr(yes_mean, yes_stderr)} (n={yes_n})",
+    #         "Correct No (TN)": f"{format_mean_stderr(no_mean, no_stderr)} (n={no_n})",
+    #         "Δ (No - Yes)": delta_str,
+    #     })
 
-    yes_no_display_df = pd.DataFrame(yes_no_display_rows)
+    # yes_no_display_df = pd.DataFrame(yes_no_display_rows)
 
-    print("\n## Tool Calls: Correct Yes vs Correct No (Correct Classification)\n")
-    print(tabulate(yes_no_display_df, headers="keys", tablefmt="github", showindex=False))
+    # print("\n## Tool Calls: Correct Yes vs Correct No (Correct Classification)\n")
+    # print(tabulate(yes_no_display_df, headers="keys", tablefmt="github", showindex=False))
 
     ### 4. Tool call function name distribution (top 10 per agent)
     tool_dist = compute_tool_call_distribution(all_dfs, all_agents)
@@ -793,6 +809,26 @@ def main() -> None:
 
         top_rows = [{"Tool/Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
         print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
+
+    ### 5. URL distribution by correctness category (top 5 per agent per category)
+    tool_dist_by_cat = compute_tool_call_distribution_by_category(all_dfs, all_agents)
+
+    categories = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+
+    print("\n## URL Distribution by Correctness Category (Top 10 per Agent)\n")
+    for agent in tool_dist_by_cat:
+        print(f"\n### {agent}\n")
+        for category in categories:
+            cat_dist = tool_dist_by_cat[agent].get(category, {})
+            sorted_items = sorted(cat_dist.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            print(f"\n**{category}**\n")
+            if not sorted_items:
+                print("No URLs found.\n")
+                continue
+
+            top_rows = [{"Domain": name, "Fraction": f"{frac:.1%}"} for name, frac in sorted_items]
+            print(tabulate(top_rows, headers="keys", tablefmt="github", showindex=False))
 
 
 if __name__ == "__main__":
