@@ -24,10 +24,60 @@ import pandas as pd
 import tldextract
 from tabulate import tabulate
 
+# Set font family to Times New Roman
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "DejaVu Serif"],
+    "axes.linewidth": 0.8,
+    "axes.edgecolor": "#333333",
+})
+
 # URL extraction regex pattern
 URL_PATTERN = re.compile(r'https?://[^\s\'"<>\\]+')
 
 SKIP_DOMAINS: list[str] = ["w3.org"]
+
+AGENT2LATEX_MACRO: dict[str, str] = {
+    "gemini-cli": "\\geminicli",
+    "codex": "\\codex",
+    "terminus-gemini": "\\terminusgemini",
+    "terminus-gpt": "\\terminusgpt",
+}
+
+AGENT2AGENT_NAME: dict[str, str] = {
+    "gemini-cli": "gemini-cli",
+    "codex": "codex",
+    "terminus-gemini": "T2-gemini",
+    "terminus-gpt": "T2-gpt",
+}
+
+# Agent log file mapping for log mining recovery methods
+AGENT_LOG_FILES: dict[str, str] = {
+    "gemini-cli": "gemini-cli.txt",
+    "codex": "codex.txt",
+    "terminus-gemini": None,  # uses episode-*/response.txt
+    "terminus-gpt": None,  # uses episode-*/response.txt
+}
+
+# Category labels for correctness breakdown
+CATEGORY_INCORRECT_CLASS = "Incorrect"
+CATEGORY_CORRECT_WRONG_VAL = "Partial"
+CATEGORY_FULLY_CORRECT = "Correct"
+
+CATEGORIES = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
+
+# Colors for each category
+CATEGORY2COLOR: dict[str, str] = {
+    CATEGORY_INCORRECT_CLASS: "#FFCC80",
+    CATEGORY_CORRECT_WRONG_VAL: "#C6F1D6",
+    CATEGORY_FULLY_CORRECT: "#88D8B0",
+}
+
+NOT_ATTEMPTED_COLOR = "#E0E0E0"
+
+# Base directory for agent metadata
+METADATA_BASE_DIR = Path("precedent-search-agent-metadata")
+
 
 def extract_domains_from_text(text: str) -> list[str]:
     """Extract registered domains from URLs found in text.
@@ -52,24 +102,6 @@ def extract_domains_from_text(text: str) -> list[str]:
         except Exception:
             continue
     return domains
-
-# Category labels for correctness breakdown
-CATEGORY_INCORRECT_CLASS = "Incorrect Classification"
-CATEGORY_CORRECT_WRONG_VAL = "Correct Class + Wrong Value"
-CATEGORY_FULLY_CORRECT = "Fully Correct"
-
-CATEGORIES = [CATEGORY_INCORRECT_CLASS, CATEGORY_CORRECT_WRONG_VAL, CATEGORY_FULLY_CORRECT]
-
-# Agent log file mapping for log mining recovery methods
-AGENT_LOG_FILES: dict[str, str] = {
-    "gemini-cli": "gemini-cli.txt",
-    "codex": "codex.txt",
-    "terminus-gemini": None,  # uses episode-*/response.txt
-    "terminus-gpt": None,  # uses episode-*/response.txt
-}
-
-# Base directory for agent metadata
-METADATA_BASE_DIR = Path("precedent-search-agent-metadata")
 
 
 def parse_agent_from_csv_path(csv_path: Path) -> str:
@@ -366,14 +398,8 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
         breakdown_df: DataFrame from compute_breakdown_summary
         output_path: Path to save the chart
     """
+    FONT_SIZE = 24
     agents = list(breakdown_df["agent"].unique())
-
-    # Colors for each category
-    category_colors = {
-        CATEGORY_INCORRECT_CLASS: "red",
-        CATEGORY_CORRECT_WRONG_VAL: "gold",
-        CATEGORY_FULLY_CORRECT: "blue",
-    }
 
     x = np.arange(len(agents))
     width = 0.25
@@ -399,17 +425,16 @@ def plot_breakdown_bar_chart(breakdown_df: pd.DataFrame, output_path: Path) -> N
             means,
             width,
             label=cat,
-            color=category_colors[cat],
+            color=CATEGORY2COLOR[cat],
             yerr=stderrs,
             capsize=3,
         )
 
-    ax.set_xlabel("Agent")
-    ax.set_ylabel("Tool Calls (mean ± stderr)")
-    ax.set_title("Tool Calls by Correctness Category per Agent")
+    ax.set_ylabel("# Tool Calls", fontsize=FONT_SIZE)
     ax.set_xticks(x)
-    ax.set_xticklabels(agents)
-    ax.legend(title="Category", loc="upper right")
+    ax.set_xticklabels([AGENT2AGENT_NAME[agent] for agent in agents])
+    ax.tick_params(axis="both", labelsize=FONT_SIZE)
+    ax.legend(loc="upper right", fontsize=FONT_SIZE)
     ax.grid(axis="y", alpha=0.3)
 
     plt.tight_layout()
@@ -744,50 +769,44 @@ def main() -> None:
         df.to_csv(output_path, index=False)
         print(f"  Saved augmented CSV to {output_path}")
 
-    ### 1. Compute and display summary statistics
+    ### 1. Compute summary statistics
     summary_df = compute_tool_use_counts_summary(all_dfs, all_agents)
 
-    # Format for display
-    display_df = pd.DataFrame({
-        "Agent": summary_df["agent"],
-        "Tool Calls (mean ± stderr)": summary_df.apply(
-            lambda row: format_mean_stderr(row["mean_tool_use_counts"], row["stderr_tool_use_counts"]),
-            axis=1,
-        ),
-    })
-
-    print("\n## Tool Calls Summary\n")
-    print(tabulate(display_df, headers="keys", tablefmt="github", showindex=False))
-
-    ### 2. Compute and display breakdown by correctness category
+    ### 2. Compute breakdown by correctness category
     breakdown_df = compute_breakdown_summary(all_dfs, all_agents)
 
-    # Pivot for display: agents as rows, categories as columns
-    pivot_df = breakdown_df.pivot(index="agent", columns="category", values=["mean_tool_calls", "stderr_tool_calls", "n_materials"])
+    # Build combined table: Agent | Total
+    combined_rows: list[dict] = []
 
-    # Format breakdown table
-    breakdown_display_rows: list[dict] = []
+    for agent in summary_df["agent"].unique():
+        # Get overall stats
+        agent_summary = summary_df[summary_df["agent"] == agent].iloc[0]
+        overall_mean = agent_summary["mean_tool_use_counts"]
+        overall_stderr = agent_summary["stderr_tool_use_counts"]
 
-    for agent in breakdown_df["agent"].unique():
-        row_data = {"Agent": agent}
-        for cat in CATEGORIES:
-            cat_row = breakdown_df[(breakdown_df["agent"] == agent) & (breakdown_df["category"] == cat)]
-            if cat_row.empty:
-                row_data[cat] = "N/A"
-            else:
-                mean_val = cat_row["mean_tool_calls"].iloc[0]
-                stderr_val = cat_row["stderr_tool_calls"].iloc[0]
-                n_mat = cat_row["n_materials"].iloc[0]
-                row_data[cat] = f"{format_mean_stderr(mean_val, stderr_val)} (n={n_mat})"
-        breakdown_display_rows.append(row_data)
+        row_data = {
+            "Agent": agent,
+            "Total": format_mean_stderr(overall_mean, overall_stderr),
+        }
 
-    breakdown_display_df = pd.DataFrame(breakdown_display_rows)
+        combined_rows.append(row_data)
 
-    print("\n## Tool Calls by Correctness Category\n")
-    print(tabulate(breakdown_display_df, headers="keys", tablefmt="github", showindex=False))
+    combined_df = pd.DataFrame(combined_rows)
+    # Reorder the columns to "Agent", "Total"
+    combined_df = combined_df[["Agent", "Total"]]
+
+    # Print markdown table
+    print("\n## Tool Calls Summary\n")
+    print(tabulate(combined_df, headers="keys", tablefmt="github", showindex=False))
+
+    # Print LaTeX table
+    print("\n## LaTeX Table (for Overleaf)\n")
+    combined_df_latex = combined_df.copy()
+    combined_df_latex["Agent"] = combined_df_latex["Agent"].map(AGENT2LATEX_MACRO)
+    print(combined_df_latex.to_latex(index=False, escape=False))
 
     # Generate grouped bar chart
-    chart_path = args.output_dir / "tool_calls_breakdown_by_correctness_category.png"
+    chart_path = args.output_dir / "tool_calls_breakdown_by_correctness_category.pdf"
     plot_breakdown_bar_chart(breakdown_df, chart_path)
 
     ### 3. Tool call function name distribution (top 10 per agent)
