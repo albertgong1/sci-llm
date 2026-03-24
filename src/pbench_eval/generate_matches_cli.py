@@ -38,6 +38,25 @@ logger = logging.getLogger(__name__)
 MAX_CONCURRENT_TASKS = 10
 
 
+def load_registry_refnos(registry_path: Path, limit: int) -> list[str]:
+    """Load the first `limit` refnos/task names from a Harbor registry JSON."""
+    payload = json.loads(registry_path.read_text())
+    tasks: list[dict] = []
+    if isinstance(payload, list):
+        for entry in payload:
+            if isinstance(entry, dict) and isinstance(entry.get("tasks"), list):
+                tasks.extend(task for task in entry["tasks"] if isinstance(task, dict))
+    elif isinstance(payload, dict) and isinstance(payload.get("tasks"), list):
+        tasks.extend(task for task in payload["tasks"] if isinstance(task, dict))
+
+    refnos: list[str] = []
+    for task in tasks[:limit]:
+        name = task.get("name")
+        if isinstance(name, str) and name:
+            refnos.append(name)
+    return refnos
+
+
 async def process_single_group(
     agent: str,
     model: str,
@@ -263,6 +282,26 @@ async def main(args: argparse.Namespace) -> None:
             dfs.append(df)
         df = pd.concat(dfs, ignore_index=True)
 
+    # Optionally restrict to refnos listed in a registry file
+    registry_path = Path(args.registry_path) if args.registry_path else output_dir / "registry_data.json"
+    registry_limit = args.registry_limit
+    if registry_limit > 0 and registry_path.exists():
+        allowed_refnos = load_registry_refnos(registry_path, registry_limit)
+        allowed_refnos_slugified = {slugify(refno.lower()) for refno in allowed_refnos}
+        original_rows = len(df)
+        df = df[
+            df["refno"].astype(str).str.lower().apply(lambda x: slugify(x)).isin(allowed_refnos_slugified)
+        ].copy()
+        logger.info(
+            "Filtered predictions using %s: kept %d rows across first %d registry tasks (from %d rows)",
+            registry_path,
+            len(df),
+            registry_limit,
+            original_rows,
+        )
+    elif registry_limit > 0 and args.registry_path:
+        logger.warning("Registry path does not exist: %s", registry_path)
+
     #
     # Load ground truth properties
     #
@@ -402,6 +441,18 @@ def cli_main() -> None:
         type=int,
         default=MAX_CONCURRENT_TASKS,
         help=f"Maximum number of concurrent tasks (default: {MAX_CONCURRENT_TASKS})",
+    )
+    parser.add_argument(
+        "--registry_path",
+        type=str,
+        default=None,
+        help="Optional path to a registry_data.json file; if omitted, OUTPUT_DIR/registry_data.json is used when present.",
+    )
+    parser.add_argument(
+        "--registry_limit",
+        type=int,
+        default=200,
+        help="If a registry file is present, only process the first N task names from it (default: 200). Set to 0 to disable.",
     )
 
     args = parser.parse_args()

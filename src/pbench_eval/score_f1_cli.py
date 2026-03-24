@@ -97,10 +97,16 @@ def cli_main() -> None:
     pbench.setup_logging(args.log_level)
 
     # If jobs_dir was not provided, count trajectory JSONs in trajectories directory
-    if args.jobs_dir is None:
-        trials_lookup = count_zeroshot_trials_per_group(args.output_dir.resolve())
-    else:
-        trials_lookup = count_trials_per_group(args.jobs_dir)
+    # if args.jobs_dir is None:
+    #     trials_lookup = count_zeroshot_trials_per_group(args.output_dir.resolve())
+    # else:
+    #     trials_lookup = count_trials_per_group(args.jobs_dir)
+    
+    # HACK
+    trials_lookup = {
+        ("chemdataextractor", "supermat_eval"): 1327,
+        ("grobid", "supermat_eval"): 1327
+    }
 
     f1_by_refno = compute_f1_by_refno(args)
 

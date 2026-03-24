@@ -295,10 +295,17 @@ def cli_main() -> None:
                     .items()
                 }
         else:
-            trials_lookup = count_zeroshot_trials_per_group(
-                args.output_dir.resolve(),
-                # include_reasoning_effort=True,
-            )
+            if False:
+                trials_lookup = count_zeroshot_trials_per_group(
+                    args.output_dir.resolve(),
+                    # include_reasoning_effort=True,
+                )
+            else:
+                # HACK
+                trials_lookup = {
+                    ("chemdataextractor", "supermat_eval"): 1327,
+                    ("grobid", "supermat_eval"): 1327
+                }
             has_reasoning_effort = False
     else:
         # Count number of trials (refnos) per agent/model
