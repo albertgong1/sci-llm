@@ -140,19 +140,19 @@ uv run pbench-generate-matches -od out-post-2021-no-agent -m gemini-2.5-flash \
 
 ```bash
 # Compute F1 using material-based matching
-uv run pbench-score-f1 -od out-supercon-no-agent -m gemini-2.5-flash \
+uv run pbench-score-f1 -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric_5.csv \
     --conversion_factors_path scoring/si_conversion_factors.csv \
     --matching_mode material --log_level ERROR
 
 # Compute precision using material-based matching
-uv run pbench-score-precision -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+uv run pbench-score-precision -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric_5.csv \
     --conversion_factors_path scoring/si_conversion_factors.csv \
     --matching_mode material --log_level ERROR
 
 # Compute recall using material-based matching
-uv run pbench-score-recall -jd JOBS_DIR -od OUTPUT_DIR -m gemini-2.5-flash \
+uv run pbench-score-recall -od OUTPUT_DIR -m gemini-2.5-flash \
     --rubric_path scoring/rubric_5.csv \
     --conversion_factors_path scoring/si_conversion_factors.csv \
     --matching_mode material --log_level ERROR
