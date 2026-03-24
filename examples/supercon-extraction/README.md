@@ -177,6 +177,18 @@ uv run pbench-aggregate -od OUTPUT_DIR -m gemini-2.5-flash \
     --matching_mode material --log_level ERROR --x-axis tokens
 ```
 
+5. Compute average recall by sub-category (e.g., `superconductor_class`, `num_elements`, `is_stoic`):
+
+> \[!NOTE\]
+> In the scores above, we aggregate by refno, then take average across all refno. Here we treat all GT properties equally regardless of paper origin.
+
+```bash
+uv run pbench-score-recall -od out-supercon-no-agent -m gemini-2.5-flash \
+    --rubric_path scoring/rubric_5.csv \
+    --conversion_factors_path scoring/si_conversion_factors.csv \
+    --matching_mode material --log_level ERROR --group_by superconductor_class --hf_repo kilian-group/supercon-extraction --hf_split full --hf_revision v0.2.1
+```
+
 ## Constructing the Dataset from SuperCon original
 
 1. Download the following from Google Drive (email ag2435@cornell.edu for access) and place in `DATA_DIR/Paper_DB`.

@@ -33,6 +33,11 @@ import pandas as pd
 import logging
 
 import pbench
+from pbench_eval.normalize_material import (
+    is_stoic,
+    classify_superconductor,
+    parse_elements,
+)
 from pbench_eval.metrics import compute_recall_per_material_property
 from pbench_eval.harbor_utils import count_trials_per_agent_model
 from pbench_eval.token_utils import (
@@ -43,6 +48,24 @@ from pbench_eval.stats import mean_sem_with_n
 from pbench_eval.cli_utils import load_rubric
 
 logger = logging.getLogger(__name__)
+
+
+def load_full_gt(
+    hf_repo: str, hf_split: str, hf_revision: str | None = None
+) -> pd.DataFrame:
+    """Load the full GT dataset from HuggingFace and explode properties.
+
+    Returns DataFrame with columns: refno, id, material_or_system, property_name.
+    """
+    from datasets import load_dataset
+
+    dataset = load_dataset(hf_repo, split=hf_split, revision=hf_revision)
+    df_gt: pd.DataFrame = dataset.to_pandas()
+    df_gt = df_gt.explode(column="properties").reset_index(drop=True)
+    df_gt = pd.concat(
+        [df_gt[["refno"]], pd.json_normalize(df_gt["properties"])], axis=1
+    )
+    return df_gt[["refno", "id", "material_or_system", "property_name"]]
 
 
 def compute_recall_by_refno(args: Namespace) -> pd.DataFrame:
@@ -201,6 +224,13 @@ def cli_main() -> None:
         type=str,
         default="material_or_system",
         help="Column name for material matching (default: material_or_system)",
+    )
+    parser.add_argument(
+        "--group_by",
+        type=str,
+        choices=["refno", "superconductor_class", "is_stoic", "num_elements"],
+        default="refno",
+        help="Column to group recall by (default: refno)",
     )
 
     args = parser.parse_args()
@@ -397,6 +427,91 @@ def cli_main() -> None:
 
     # Aggregate results
     counta = lambda x: (x > 0).sum()  # noqa: E731
+
+    if args.group_by != "refno":
+        # Load full GT to include materials with no matches (recall=0)
+        if not args.hf_repo or not args.hf_split:
+            logger.error(
+                "--hf_repo and --hf_split are required when --group_by is not 'refno'"
+            )
+            sys.exit(1)
+
+        df_full_gt = load_full_gt(args.hf_repo, args.hf_split, args.hf_revision)
+        logger.info(
+            f"Loaded {len(df_full_gt)} GT properties from {args.hf_repo}/{args.hf_split}"
+        )
+
+        # Assign classification column to full GT
+        if args.group_by == "superconductor_class":
+            df_full_gt[args.group_by] = df_full_gt["material_or_system"].apply(
+                classify_superconductor
+            )
+        elif args.group_by == "is_stoic":
+            df_full_gt[args.group_by] = df_full_gt["material_or_system"].apply(is_stoic)
+        elif args.group_by == "num_elements":
+            df_full_gt[args.group_by] = df_full_gt["material_or_system"].apply(
+                lambda x: len(parse_elements(x)) <= 3
+            )
+        df_full_gt = df_full_gt[df_full_gt["refno"].isin(df_results["refno"].unique())]
+        logger.info(
+            f"Filtered full GT to {len(df_full_gt)} properties with refnos in results"
+        )
+
+        # For each (agent, model), left-join full GT onto df_results
+        score_cols = [
+            "recall_score",
+            "evidence_score",
+            "num_property_matches",
+            "num_property_material_matches",
+            "has_property_material_match",
+        ]
+        all_results = []
+        for (agent, model), group in df_results.groupby(["agent", "model"]):
+            df_merged = df_full_gt.merge(
+                group[["refno", "id_gt"] + score_cols],
+                left_on=["refno", "id"],
+                right_on=["refno", "id_gt"],
+                how="left",
+            )
+            for col in score_cols:
+                df_merged[col] = df_merged[col].fillna(0.0)
+            df_merged["agent"] = agent
+            df_merged["model"] = model
+            all_results.append(df_merged)
+
+        df_full_results = pd.concat(all_results, ignore_index=True)
+
+        # Group by [agent, model, <group_by_col>]
+        class_group_cols = group_cols + [args.group_by]
+        acc_by_class = (
+            df_full_results.groupby(class_group_cols, dropna=False)
+            .agg(
+                recall_score=pd.NamedAgg(column="recall_score", aggfunc="mean"),
+                evidence_score=pd.NamedAgg(column="evidence_score", aggfunc="mean"),
+                property_matches=pd.NamedAgg(
+                    column="num_property_matches", aggfunc="count"
+                ),
+                property_material_matches=pd.NamedAgg(
+                    column="num_property_material_matches", aggfunc=counta
+                ),
+                has_property_material_match=pd.NamedAgg(
+                    column="has_property_material_match", aggfunc="mean"
+                ),
+                num_gt=pd.NamedAgg(column="id", aggfunc="size"),
+            )
+            .reset_index()
+        )
+
+        print(
+            tabulate(acc_by_class, headers="keys", tablefmt="github", showindex=False)
+        )
+
+        # Save to CSV
+        output_path = args.output_dir / f"recall_by_{args.group_by}.csv"
+        acc_by_class.to_csv(output_path, index=False)
+        print(f"Saved recall by {args.group_by} to {output_path}")
+        return
+
     refno_group_cols = group_cols + ["refno"]
     acc_by_refno = (
         df_results.groupby(refno_group_cols, dropna=False)

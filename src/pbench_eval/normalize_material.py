@@ -1,5 +1,38 @@
 import re
+
 from pymatgen.core import Composition
+
+
+def is_stoic(formula: str) -> bool:
+    """Check whether a formula is stoichiometric (all element amounts are integers).
+
+    Uses pymatgen to parse the formula. Returns True if every element's
+    stoichiometric coefficient is an integer (e.g. YBa2Cu3O7), False if any
+    coefficient is non-integral (e.g. Ba0.54K0.46BiO3).
+
+    Args:
+        formula: Chemical formula string parseable by pymatgen (e.g. "B2Os1",
+                 "Ba0.54K0.46Bi1O3").
+
+    Returns:
+        True if all concentrations are integral, False otherwise.
+
+    Examples:
+        >>> is_stoic("B2Os1")
+        True
+        >>> is_stoic("YBa2Cu3O7")
+        True
+        >>> is_stoic("Ba0.54K0.46Bi1O3")
+        False
+        >>> is_stoic("La1.85Sr0.15CuO4")
+        False
+
+    """
+    try:
+        comp = Composition(formula)
+    except Exception:
+        return 0  # Could not parse formula (e.g., generic formula with doping variables -> not stoichiometric)
+    return int(all(amount == int(amount) for amount in comp.values()))
 
 
 def strip_formula(text: str) -> tuple[str, dict[str, float]]:
@@ -410,3 +443,238 @@ def classify_and_normalize(
             notes.append("Normalization produced invalid formula")
 
     return normalized, formula_type, notes
+
+
+# Classify superconductor chemical formulas into broad families based on
+# composition heuristics. Covers the major families discussed in the
+# superconductivity literature; compounds that don't match any rule are
+# labelled "conventional" as the default bucket.
+
+
+def parse_elements(formula: str) -> dict[str, float]:
+    """Parse a chemical formula string into a dict of {element: total_amount}.
+
+    Handles formats like:
+        'Y1Ba2Cu3O7-z'  ->  {'Y': 1, 'Ba': 2, 'Cu': 3, 'O': 7}
+        'Fe1Se0.92'     ->  {'Fe': 1, 'Se': 0.92}
+        'Bi2Sr2Ca1Cu2O8+d' -> {'Bi': 2, 'Sr': 2, 'Ca': 1, 'Cu': 2, 'O': 8}
+
+    Variables like z, d, Z, x are ignored (treated as 0).
+    """
+    # Remove trailing variable expressions like O7-z, O8+d, O6+Z, O4-z, Oz
+    # First handle O{number}+/-{var} patterns
+    cleaned = re.sub(r"([+\-][a-zZ])$", "", formula.strip())
+    # Then handle bare variable suffixes like "Oz" or "OZ" (no number before var)
+    # Replace e.g. "Cu3Oz" with "Cu3O1" so O is still counted
+    cleaned = re.sub(
+        r"([A-Z][a-z]?)([a-z])$",
+        lambda m: m.group(1) + "1" if m.group(2) in "xyzδd" else m.group(0),
+        cleaned,
+    )
+    # Also handle uppercase Z used as variable
+    cleaned = re.sub(r"([A-Z][a-z]?)(Z)$", r"\g<1>1", cleaned)
+
+    pattern = r"([A-Z][a-z]?)(\d*\.?\d*)"
+    matches = re.findall(pattern, cleaned)
+
+    elements: dict[str, float] = {}
+    for elem, amount_str in matches:
+        if not elem[0].isupper():
+            continue
+        # Skip if it looks like a variable (single lowercase letter captured
+        # as an element, e.g. 'd', 'z' — but these won't match [A-Z][a-z]?)
+        amount = float(amount_str) if amount_str else 1.0
+        elements[elem] = elements.get(elem, 0.0) + amount
+
+    return elements
+
+
+def has_element(elements: dict[str, float], symbol: str) -> bool:
+    """Check if an element is present with a nonzero amount."""
+    return elements.get(symbol, 0) > 0
+
+
+def classify_superconductor(formula: str) -> str:
+    """Classify a superconductor formula into one of:
+        'cuprate', 'iron_based', 'nickelate', 'heavy_fermion',
+        'hydride', or 'conventional'.
+
+    The classification is based on compositional heuristics — it checks for
+    the presence of key elements and element combinations that characterise
+    each superconductor family.
+
+    Parameters
+    ----------
+    formula : str
+        Chemical formula, e.g. 'Y1Ba2Cu3O7-z', 'LaFeAsO', 'MgB2'.
+
+    Returns
+    -------
+    str
+        One of the six category labels.
+
+    Examples
+    --------
+    >>> classify_superconductor('Y1Ba2Cu3O7-z')
+    'cuprate'
+    >>> classify_superconductor('Ba1Fe2As2')
+    'iron_based'
+    >>> classify_superconductor('Nd0.8Sr0.2NiO2')
+    'nickelate'
+    >>> classify_superconductor('La1H10')
+    'hydride'
+    >>> classify_superconductor('CeCoIn5')
+    'heavy_fermion'
+    >>> classify_superconductor('MgB2')
+    'conventional'
+
+    """
+    elems = parse_elements(formula)
+
+    has_cu = has_element(elems, "Cu")
+    has_o = has_element(elems, "O")
+    has_fe = has_element(elems, "Fe")
+    has_ni = has_element(elems, "Ni")
+    has_h = has_element(elems, "H")
+    has_as = has_element(elems, "As")
+    has_se = has_element(elems, "Se")
+    has_te = has_element(elems, "Te")
+    has_p = has_element(elems, "P")
+    has_s = has_element(elems, "S")
+    has_ce = has_element(elems, "Ce")
+    has_u = has_element(elems, "U")
+
+    # Fraction of hydrogen by atom count (for hydride detection)
+    total_atoms = sum(elems.values()) if elems else 1
+    h_fraction = elems.get("H", 0) / total_atoms
+
+    # ----------------------------------------------------------------
+    # 1. CUPRATE: Cu + O, typically with alkaline-earth or rare-earth
+    #    cations (Ba, Sr, La, Y, Ca, Tl, Bi, Hg, etc.)
+    #    Exclude compounds where Cu is minor (e.g. CuxBi2Se3 topological SC)
+    #    or where Fe dominates (iron-based with trace Cu).
+    # ----------------------------------------------------------------
+    if has_cu and has_o:
+        cu_amount = elems.get("Cu", 0)
+        o_amount = elems.get("O", 0)
+
+        # Cuprate indicators: significant Cu and O content, plus typical
+        # cuprate cations
+        cuprate_cations = {
+            "Ba",
+            "Sr",
+            "La",
+            "Y",
+            "Ca",
+            "Tl",
+            "Bi",
+            "Hg",
+            "Nd",
+            "Pr",
+            "Eu",
+            "Gd",
+            "Er",
+            "Sm",
+            "Tb",
+            "Dy",
+            "Ho",
+            "Tm",
+            "Yb",
+            "Lu",
+        }
+        has_cuprate_cation = any(has_element(elems, c) for c in cuprate_cations)
+
+        # Exclude Fe-dominant compounds (iron-based SC with O)
+        fe_amount = elems.get("Fe", 0)
+
+        if (
+            has_cuprate_cation
+            and cu_amount >= 1.0
+            and not (has_fe and fe_amount > cu_amount)
+        ):
+            return "cuprate"
+
+    # ----------------------------------------------------------------
+    # 2. IRON-BASED: Fe + (As, Se, Te, P, or S)
+    #    Covers 1111 (LaFeAsO), 122 (BaFe2As2), 111 (LiFeAs),
+    #    11 (FeSe, FeTe), intercalated FeSe, etc.
+    #    Fe must be a major constituent (not trace doping on another site).
+    # ----------------------------------------------------------------
+    if has_fe:
+        fe_amount = elems.get("Fe", 0)
+        has_pnictogen_or_chalcogen = has_as or has_se or has_te or has_p or has_s
+
+        if has_pnictogen_or_chalcogen and fe_amount >= 0.5:
+            # Exclude filled skutterudites where Fe is in a cage (LaFe4P12)
+            # — these have very high P/As ratio relative to Fe
+            p_amount = elems.get("P", 0)
+            if p_amount > 0 and p_amount / fe_amount > 4:
+                pass  # likely a skutterudite, fall through
+            else:
+                return "iron_based"
+
+    # ----------------------------------------------------------------
+    # 3. NICKELATE: Ni + O, in layered/perovskite-like structures
+    #    (NdNiO2 infinite-layer, La3Ni2O7 bilayer, etc.)
+    #    Exclude Ni-based intermetallics without O (e.g. MgCNi3, KNi2Se2).
+    # ----------------------------------------------------------------
+    if has_ni and has_o:
+        ni_amount = elems.get("Ni", 0)
+        o_amount = elems.get("O", 0)
+
+        # Check for nickelate cations (rare-earth or alkaline-earth)
+        nickelate_cations = {
+            "La",
+            "Nd",
+            "Pr",
+            "Sr",
+            "Ca",
+            "Sm",
+            "Eu",
+            "Gd",
+            "Y",
+            "Ba",
+            "Lu",
+        }
+        has_nickelate_cation = any(has_element(elems, c) for c in nickelate_cations)
+
+        if has_nickelate_cation and ni_amount >= 1.0 and o_amount >= 1.0:
+            # Make sure Cu isn't dominant (that would be a cuprate)
+            cu_amount = elems.get("Cu", 0)
+            if cu_amount <= ni_amount:
+                return "nickelate"
+
+    # ----------------------------------------------------------------
+    # 4. HYDRIDE: Hydrogen-rich compounds (typically high-pressure)
+    #    H must be a dominant constituent (> 40% of atoms).
+    #    Excludes water-intercalated cobaltates, H-doped FeAs, etc.
+    # ----------------------------------------------------------------
+    if has_h and h_fraction > 0.4:
+        return "hydride"
+
+    # ----------------------------------------------------------------
+    # 5. HEAVY FERMION: Ce or U-based compounds with specific structure
+    #    markers (In, Si, Ge, Sn, Co, Ir, Rh, Pt, Pd).
+    #    Ce or U must be present as a major constituent carrying f-electrons.
+    # ----------------------------------------------------------------
+    if has_ce or has_u:
+        hf_ligands = {"In", "Si", "Ge", "Co", "Ir", "Rh", "Pt", "Pd", "Sn", "C"}
+        has_hf_ligand = any(has_element(elems, l) for l in hf_ligands)
+
+        ce_amount = elems.get("Ce", 0)
+        u_amount = elems.get("U", 0)
+        f_amount = ce_amount + u_amount
+
+        # Only classify as heavy fermion if f-electron element is a major
+        # constituent and typical ligands are present.
+        # Exclude Ce/U-doped iron pnictides (already caught above).
+        if has_hf_ligand and f_amount >= 0.5:
+            # Exclude if Fe + (As/Se) dominates (iron-based with Ce/U doping)
+            if not (has_fe and (has_as or has_se)):
+                return "heavy_fermion"
+
+    # ----------------------------------------------------------------
+    # 6. CONVENTIONAL: Everything else — elements, MgB2, intermetallics,
+    #    TMDCs, oxides (BaKBiO, pyrochlores), borides, GICs, etc.
+    # ----------------------------------------------------------------
+    return "conventional"
