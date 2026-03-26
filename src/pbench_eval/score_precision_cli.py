@@ -88,6 +88,28 @@ def compute_precision_by_refno(args: Namespace) -> pd.DataFrame:
         f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
     )
 
+    if args.non_llm_baseline:
+        here = Path(__file__)
+        repo_root = here.parent.parent.parent
+        eval_data_root = repo_root / "pbench_out"
+        registry_data_path = eval_data_root / "registry_data.json"
+        if not (registry_data_path.exists() and registry_data_path.is_file()):
+            raise RuntimeError(f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}")
+        registry_data = json.loads(Path(registry_data_path).read_text())
+        assert isinstance(registry_data, list)
+        eval_subset = registry_data[0]["tasks"]
+
+        # only take the first 200
+        first_n = 200
+        refnos = [x["name"] for x in eval_subset][:first_n]
+
+        num_rows_original = df_matches.shape[0]
+        df_matches["refno_normed"] = df_matches["refno"].str.lower()
+        df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
+        del df_matches["refno_normed"]
+        num_rows_after_filtering = df_matches.shape[0]
+        print(f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}")
+
     group_cols = ["agent", "model"]
 
     # Load rubric
@@ -184,6 +206,9 @@ def cli_main() -> None:
         type=str,
         default="material_or_system",
         help="Column name for material matching (default: material_or_system)",
+    )
+    parser.add_argument(
+        '--non_llm_baseline', action='store_true', help='Flag for special logic for non-agent and non-LLM eval.'
     )
 
     args = parser.parse_args()
@@ -294,18 +319,42 @@ def cli_main() -> None:
                     .to_dict()
                     .items()
                 }
+        elif args.non_llm_baseline:
+            here = Path(__file__)
+            repo_root = here.parent.parent.parent
+            eval_data_root = repo_root / "pbench_out"
+            registry_data_path = eval_data_root / "registry_data.json"
+            if not (registry_data_path.exists() and registry_data_path.is_file()):
+                raise RuntimeError(f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}")
+            registry_data = json.loads(Path(registry_data_path).read_text())
+            assert isinstance(registry_data, list)
+            eval_subset = registry_data[0]["tasks"]
+
+            # only take the first 200
+            first_n = 200
+            refnos = [x["name"] for x in eval_subset][:first_n]
+
+            num_rows_original = df_matches.shape[0]
+            df_matches["refno_normed"] = df_matches["refno"].str.lower()
+            df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
+            del df_matches["refno_normed"]
+            num_rows_after_filtering = df_matches.shape[0]
+            trials_lookup = {
+                ("chemdataextractor", "supermat_eval"): df_matches[
+                    (df_matches["agent"] == "chemdataextractor") & 
+                    (df_matches["model"] == "supermat_eval")
+                ]["refno"].nunique(),
+                ("grobid", "supermat_eval"): df_matches[
+                    (df_matches["agent"] == "grobid") & 
+                    (df_matches["model"] == "supermat_eval")
+                ]["refno"].nunique(),
+            }
+            print(f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}")
         else:
-            if False:
-                trials_lookup = count_zeroshot_trials_per_group(
-                    args.output_dir.resolve(),
-                    # include_reasoning_effort=True,
-                )
-            else:
-                # HACK
-                trials_lookup = {
-                    ("chemdataextractor", "supermat_eval"): 1327,
-                    ("grobid", "supermat_eval"): 1327
-                }
+            trials_lookup = count_zeroshot_trials_per_group(
+                args.output_dir.resolve(),
+                # include_reasoning_effort=True,
+            )
             has_reasoning_effort = False
     else:
         # Count number of trials (refnos) per agent/model
