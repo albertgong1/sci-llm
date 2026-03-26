@@ -106,6 +106,11 @@ def compute_precision_by_refno(args: Namespace) -> pd.DataFrame:
         num_rows_original = df_matches.shape[0]
         df_matches["refno_normed"] = df_matches["refno"].str.lower()
         df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
+        hits = set(df_matches["refno_normed"].tolist())
+        expected = set(refnos)
+        missing = expected - hits
+        if missing:
+            raise ValueError(f"You are missing {len(missing)} paper(s). Re-run extraction for: {missing}")
         del df_matches["refno_normed"]
         num_rows_after_filtering = df_matches.shape[0]
         print(f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}")

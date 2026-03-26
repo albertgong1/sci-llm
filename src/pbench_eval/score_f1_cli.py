@@ -157,6 +157,10 @@ def cli_main() -> None:
     )
     print(tabulate(f1, headers="keys", tablefmt="github", floatfmt=".4f"))
 
+    f1_path = args.output_dir / "f1_per_property.csv"
+    f1.to_csv(f1_path, index=False)
+    print(f"Saved F1 per property to {f1_path}")
+
 
 if __name__ == "__main__":
     cli_main()
