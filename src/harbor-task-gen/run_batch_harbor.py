@@ -26,11 +26,12 @@ Example:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import logging
 import os
 import random
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -119,6 +120,18 @@ def _replace_registry_path_in_argv(argv: list[str], new_path: str) -> list[str]:
             continue
         result.append(arg)
     return result
+
+
+def _registry_cache_prefix(registry_path: Path, workspace: Path) -> str:
+    """Return a collision-resistant cache prefix for a source registry."""
+    resolved = registry_path.resolve()
+    try:
+        relative = resolved.relative_to(workspace.resolve())
+    except ValueError:
+        relative = resolved
+    stem = resolved.stem.replace("__registry", "")
+    digest = hashlib.sha1(str(relative).encode("utf-8")).hexdigest()[:10]
+    return f"{stem}__{digest}"
 
 
 def _compute_total_batches(registry_data: list[dict[str, Any]], batch_size: int) -> int:
@@ -267,7 +280,7 @@ def _apply_batching_to_argv(
 
     # Generate batch registry filename (include seed in name if shuffled)
     cache_dir = workspace / "out" / "harbor" / "registry-cache"
-    base_name = registry_path.stem.replace("__registry", "")
+    base_name = _registry_cache_prefix(registry_path, workspace)
     seed_suffix = f"__seed{seed}" if seed is not None else ""
     batch_registry_path = (
         cache_dir / f"{base_name}{seed_suffix}__batch{batch_number}__registry.json"
@@ -352,6 +365,257 @@ def _patch_modal_download_logs(timeout_sec: int) -> None:
 
     patched._harbor_task_gen_patched = True  # type: ignore[attr-defined]
     Trial._maybe_download_logs = patched  # type: ignore[assignment]
+
+
+def _normalize_message_content(content: Any) -> str:
+    """Convert list/block message payloads into plain text for ATIF export."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+            else:
+                parts.append(json.dumps(item, ensure_ascii=False))
+        return "\n".join(part for part in parts if part)
+    try:
+        return json.dumps(content, ensure_ascii=False)
+    except TypeError:
+        return str(content)
+
+
+def _load_json_lossy(path: Path) -> dict[str, Any] | None:
+    """Best-effort JSON loader for partially written trajectory files."""
+    raw_bytes = path.read_bytes()
+    text = raw_bytes.decode("utf-8", errors="ignore").strip()
+    if not text:
+        return None
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict):
+        return payload
+
+    last_brace = text.rfind("}")
+    if last_brace == -1:
+        return None
+
+    try:
+        recovered = json.loads(text[: last_brace + 1])
+    except json.JSONDecodeError:
+        return None
+
+    return recovered if isinstance(recovered, dict) else None
+
+
+def _is_hard_codex_cli_error(message: str) -> bool:
+    """Return whether a Codex CLI error is a durable failure for the trial."""
+    lowered = message.lower()
+    hard_markers = (
+        "authentication",
+        "billing details",
+        "insufficient_quota",
+        "invalid api key",
+        "model not found",
+        "permission denied",
+        "quota exceeded",
+        "unsupported model",
+    )
+    return any(marker in lowered for marker in hard_markers)
+
+
+def _extract_codex_cli_error(log_path: Path) -> str | None:
+    """Return a hard Codex CLI error message when the JSONL log contains one."""
+    if not log_path.exists():
+        return None
+
+    for raw_line in log_path.read_text(errors="ignore").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if "Quota exceeded. Check your plan and billing details." in line:
+            return "Quota exceeded. Check your plan and billing details."
+
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        msg_type = payload.get("type")
+        if msg_type == "error":
+            message = payload.get("message")
+            if (
+                isinstance(message, str)
+                and message
+                and _is_hard_codex_cli_error(message)
+            ):
+                return message
+        if msg_type in {"turn.failed", "thread.failed"}:
+            error = payload.get("error")
+            if isinstance(error, dict):
+                message = error.get("message")
+                if (
+                    isinstance(message, str)
+                    and message
+                    and _is_hard_codex_cli_error(message)
+                ):
+                    return message
+            message = payload.get("message")
+            if (
+                isinstance(message, str)
+                and message
+                and _is_hard_codex_cli_error(message)
+            ):
+                return message
+
+    return None
+
+
+def _patch_gemini_post_run_loading() -> None:
+    """Make Gemini trajectory loading tolerant of truncated or lossy files."""
+    try:
+        from harbor.agents.installed.gemini_cli import GeminiCli
+    except Exception:
+        return
+
+    original = GeminiCli.populate_context_post_run
+    if getattr(original, "_harbor_task_gen_gemini_loader_patched", False):
+        return
+
+    def patched(self: Any, context: Any) -> None:
+        logger = getattr(self, "_logger", logging.getLogger(__name__))
+        gemini_path = self.logs_dir / "gemini-cli.trajectory.json"
+        if not gemini_path.exists():
+            return
+
+        gemini_trajectory = _load_json_lossy(gemini_path)
+        if gemini_trajectory is None:
+            logger.warning("Skipping malformed Gemini trajectory at %s.", gemini_path)
+            return
+
+        n_input_tokens = 0
+        n_output_tokens = 0
+        n_cache_tokens = 0
+        for message in gemini_trajectory.get("messages", []):
+            if not isinstance(message, dict) or message.get("type") != "gemini":
+                continue
+            tokens = message.get("tokens", {})
+            if not isinstance(tokens, dict):
+                continue
+            n_input_tokens += int(tokens.get("input", 0) or 0)
+            n_output_tokens += (
+                int(tokens.get("output", 0) or 0)
+                + int(tokens.get("tool", 0) or 0)
+                + int(tokens.get("thoughts", 0) or 0)
+            )
+            n_cache_tokens += int(tokens.get("cached", 0) or 0)
+
+        context.n_input_tokens = n_input_tokens
+        context.n_output_tokens = n_output_tokens
+        context.n_cache_tokens = n_cache_tokens
+
+        try:
+            atif_trajectory = self._convert_gemini_to_atif(gemini_trajectory)
+            if atif_trajectory:
+                atif_path = self.logs_dir / "trajectory.json"
+                with open(atif_path, "w", encoding="utf-8") as f:
+                    json.dump(atif_trajectory.to_json_dict(), f, indent=2)
+        except Exception as exc:
+            logger.warning("Error converting Gemini trajectory to ATIF: %s", exc)
+
+    patched._harbor_task_gen_gemini_loader_patched = True  # type: ignore[attr-defined]
+    GeminiCli.populate_context_post_run = patched  # type: ignore[assignment]
+
+
+def _patch_gemini_atif_export() -> None:
+    """Normalize Gemini CLI message shapes before Harbor builds ATIF steps."""
+    try:
+        from harbor.agents.installed.gemini_cli import GeminiCli
+    except Exception:
+        return
+
+    original = GeminiCli._convert_gemini_to_atif
+    if getattr(original, "_harbor_task_gen_gemini_patched", False):
+        return
+
+    def patched(self: Any, gemini_trajectory: dict[str, Any]) -> Any:
+        if not isinstance(gemini_trajectory, dict):
+            return original(self, gemini_trajectory)
+
+        normalized = dict(gemini_trajectory)
+        messages = normalized.get("messages", [])
+        if isinstance(messages, list):
+            normalized_messages: list[Any] = []
+            for message in messages:
+                if not isinstance(message, dict):
+                    normalized_messages.append(message)
+                    continue
+                message_copy = dict(message)
+                if "content" in message_copy:
+                    message_copy["content"] = _normalize_message_content(
+                        message_copy.get("content")
+                    )
+                normalized_messages.append(message_copy)
+            normalized["messages"] = normalized_messages
+
+        return original(self, normalized)
+
+    patched._harbor_task_gen_gemini_patched = True  # type: ignore[attr-defined]
+    GeminiCli._convert_gemini_to_atif = patched  # type: ignore[assignment]
+
+
+def _patch_codex_post_run_logging() -> None:
+    """Surface Codex CLI failures and avoid noisy missing-session spam."""
+    try:
+        from harbor.agents.installed.codex import Codex
+    except Exception:
+        return
+
+    original = Codex.populate_context_post_run
+    if getattr(original, "_harbor_task_gen_codex_patched", False):
+        return
+
+    def patched(self: Any, context: Any) -> None:
+        output_name = getattr(self, "_OUTPUT_FILENAME", "codex.txt")
+        codex_log = self.logs_dir / output_name
+        if error_message := _extract_codex_cli_error(codex_log):
+            raise RuntimeError(f"Codex CLI failed: {error_message}")
+        session_dir = self._get_session_dir()
+        if not session_dir:
+            return
+        return original(self, context)
+
+    patched._harbor_task_gen_codex_patched = True  # type: ignore[attr-defined]
+    Codex.populate_context_post_run = patched  # type: ignore[assignment]
+
+
+def _patch_agent_context_population() -> None:
+    """Prevent post-run context parsing failures from aborting the whole batch."""
+    try:
+        from harbor.trial.trial import Trial
+    except Exception:
+        return
+
+    original = Trial._maybe_populate_agent_context
+    if getattr(original, "_harbor_task_gen_context_patched", False):
+        return
+
+    def patched(self: Any) -> None:
+        try:
+            return original(self)
+        except Exception as exc:
+            self._logger.warning("Failed to populate agent context post-run: %s", exc)
+            return None
+
+    patched._harbor_task_gen_context_patched = True  # type: ignore[attr-defined]
+    Trial._maybe_populate_agent_context = patched  # type: ignore[assignment]
 
 
 def _extract_agent_setup_timeout(
@@ -493,6 +757,11 @@ def main() -> int:
 
     def _run_single_harbor(argv_for_run: list[str]) -> int:
         """Run a single Harbor invocation."""
+        _patch_agent_context_population()
+        _patch_gemini_post_run_loading()
+        _patch_gemini_atif_export()
+        _patch_codex_post_run_logging()
+
         if modal_active:
             timeout_raw = env.get(
                 "HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300"
@@ -516,9 +785,9 @@ def main() -> int:
                 _patch_agent_setup_timeout(setup_timeout_sec)
             return _run_harbor_cli_in_process(argv_for_run, workspace=workspace)
         else:
-            command = [sys.executable, "-m", "harbor.cli.main", *argv_for_run]
-            result = subprocess.run(command, check=False, cwd=workspace, env=env)
-            return int(result.returncode)
+            if agent_setup_override is not None:
+                _patch_agent_setup_timeout(agent_setup_override)
+            return _run_harbor_cli_in_process(argv_for_run, workspace=workspace)
 
     if batch_size is not None:
         # Determine total batches by reading the registry

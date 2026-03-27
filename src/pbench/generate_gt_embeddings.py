@@ -81,7 +81,7 @@ def main() -> None:
         data.append(
             {
                 "property_name": name,
-                "embedding": embedding,
+                "embedding": embedding.tolist(),
             }
         )
 

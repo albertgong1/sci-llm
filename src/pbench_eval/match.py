@@ -1,14 +1,18 @@
 """Functionality to match property names, materials, and conditions."""
 
 # standard imports
-import numpy as np
-import logging
-from tqdm import tqdm
-from collections import OrderedDict
 import asyncio
+from collections import OrderedDict
+import logging
 import json
+import os
+import time
+
+import httpx
+import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
 
 
 # llm imports
@@ -30,9 +34,110 @@ logger = logging.getLogger(__name__)
 #
 # Functionality for matching property names
 #
-BATCH_SIZE = 100
+EMBEDDING_BATCH_SIZE = max(1, int(os.environ.get("PBENCH_EMBED_BATCH_SIZE", "25")))
+EMBEDDING_TIMEOUT_MS = max(
+    1000, int(os.environ.get("PBENCH_EMBED_TIMEOUT_MS", "300000"))
+)
+EMBEDDING_MAX_RETRIES = max(1, int(os.environ.get("PBENCH_EMBED_MAX_RETRIES", "6")))
+EMBEDDING_RETRY_BASE_SEC = float(os.environ.get("PBENCH_EMBED_RETRY_BASE_SEC", "2.0"))
 EMBEDDING_MODEL_NAME = "gemini-embedding-001"
 TOP_K = 3
+
+
+def _is_retryable_embedding_error(exc: Exception) -> bool:
+    """Return whether an embedding failure looks transient and worth retrying."""
+    if isinstance(
+        exc,
+        (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.ReadTimeout,
+            httpx.RemoteProtocolError,
+            httpx.WriteTimeout,
+        ),
+    ):
+        return True
+
+    message = str(exc).lower()
+    retryable_markers = (
+        "temporarily unavailable",
+        "connection reset",
+        "connection aborted",
+        "connection refused",
+        "deadline exceeded",
+        "dns",
+        "failed to lookup address information",
+        "gateway timeout",
+        "internal server error",
+        "operation timed out",
+        "rate limit",
+        "read timeout",
+        "remoteprotocolerror",
+        "service unavailable",
+        "stream disconnected",
+        "timed out",
+        "try again",
+        "unavailable",
+    )
+    return any(marker in message for marker in retryable_markers)
+
+
+def _embed_batch_once(
+    client: genai.Client, property_names: list[str]
+) -> list[np.ndarray]:
+    """Generate one batch of embeddings in order."""
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL_NAME,
+        contents=property_names,
+        config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
+    )
+    return [np.asarray(emb.values) for emb in result.embeddings]
+
+
+def _embed_batch_with_retry(
+    client: genai.Client,
+    property_names: list[str],
+    *,
+    max_retries: int = EMBEDDING_MAX_RETRIES,
+) -> list[np.ndarray]:
+    """Retry transient embedding failures and split batches if needed."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            return _embed_batch_once(client, property_names)
+        except Exception as exc:
+            if not _is_retryable_embedding_error(exc) or attempt == max_retries:
+                if len(property_names) > 1 and _is_retryable_embedding_error(exc):
+                    midpoint = len(property_names) // 2
+                    logger.warning(
+                        "Embedding batch of %d items still timed out after %d attempt(s); splitting the batch.",
+                        len(property_names),
+                        attempt,
+                    )
+                    left_embeddings = _embed_batch_with_retry(
+                        client,
+                        property_names[:midpoint],
+                        max_retries=max_retries,
+                    )
+                    right_embeddings = _embed_batch_with_retry(
+                        client,
+                        property_names[midpoint:],
+                        max_retries=max_retries,
+                    )
+                    return [*left_embeddings, *right_embeddings]
+                raise
+
+            sleep_sec = EMBEDDING_RETRY_BASE_SEC * (2 ** (attempt - 1))
+            logger.warning(
+                "Transient embedding failure on attempt %d/%d for batch size %d: %s. Retrying in %.1fs.",
+                attempt,
+                max_retries,
+                len(property_names),
+                exc,
+                sleep_sec,
+            )
+            time.sleep(sleep_sec)
+
+    raise RuntimeError("Embedding retry loop exhausted unexpectedly.")
 
 
 def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
@@ -45,16 +150,11 @@ def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
         List of embeddings.
 
     """
-    client = genai.Client()
-    embeddings = []
-    for i in range(0, len(property_names), BATCH_SIZE):
-        batch = property_names[i : i + BATCH_SIZE]
-        result = client.models.embed_content(
-            model=EMBEDDING_MODEL_NAME,
-            contents=batch,
-            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
-        )
-        embeddings.extend([emb.values for emb in result.embeddings])
+    client = genai.Client(http_options=types.HttpOptions(timeout=EMBEDDING_TIMEOUT_MS))
+    embeddings: list[np.ndarray] = []
+    for i in range(0, len(property_names), EMBEDDING_BATCH_SIZE):
+        batch = property_names[i : i + EMBEDDING_BATCH_SIZE]
+        embeddings.extend(_embed_batch_with_retry(client, batch))
 
     return embeddings
 

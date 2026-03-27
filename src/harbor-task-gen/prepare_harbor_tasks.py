@@ -52,6 +52,7 @@ from harbor.models.task.paths import TaskPaths
 from huggingface_hub import HfApi
 from slugify import slugify
 import logging
+from mineru import MinerUBundlePaths, MinerUConfig, ensure_mineru_bundle
 
 
 logger = logging.getLogger(__name__)
@@ -164,25 +165,210 @@ def load_definitions(rubric_path: Path) -> dict[str, str]:
     return definitions
 
 
-def dockerfile_contents() -> str:
-    """Render the task environment Dockerfile.
+def load_harbor_task_ordering(registry_path: Path) -> list[str]:
+    """Load ordered task refnos from a Harbor registry.json file."""
+    payload = json.loads(registry_path.read_text())
+    if not isinstance(payload, list) or not payload:
+        raise ValueError(f"Invalid Harbor registry payload in {registry_path}")
 
-    The environment always includes the PDF at `/app/paper.pdf`.
-    The container includes `pdftotext` (poppler-utils) so agents can extract text
-    from the PDF on their own.
-    """
-    install_pdf_tools = (
-        "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
-        "    ca-certificates \\\n"
-        "    poppler-utils \\\n"
-        "    procps \\\n"
-        "  && rm -rf /var/lib/apt/lists/*"
-    )
+    dataset = payload[0]
+    if not isinstance(dataset, dict):
+        raise ValueError(f"Invalid Harbor registry dataset entry in {registry_path}")
 
-    return _format_template(
+    tasks = dataset.get("tasks")
+    if not isinstance(tasks, list):
+        raise ValueError(f"Missing tasks list in Harbor registry {registry_path}")
+
+    ordered_refnos: list[str] = []
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        refno = str(task.get("name") or "").strip()
+        if refno:
+            ordered_refnos.append(refno)
+    return ordered_refnos
+
+
+def build_pdf_lookup(pdf_dir: Path) -> dict[str, Path]:
+    """Index PDFs by lowercase stem for case-insensitive refno resolution."""
+    lookup: dict[str, Path] = {}
+    for pdf_path in sorted(pdf_dir.glob("*.pdf")):
+        key = pdf_path.stem.lower()
+        if key in lookup and lookup[key] != pdf_path:
+            raise ValueError(
+                f"Duplicate PDF stems differing only by case under {pdf_dir}: "
+                f"{lookup[key].name} and {pdf_path.name}"
+            )
+        lookup[key] = pdf_path
+    return lookup
+
+
+def resolve_pdf_path(pdf_lookup: Mapping[str, Path], refno: str) -> Path:
+    """Return the PDF path for a refno using case-insensitive matching."""
+    pdf_path = pdf_lookup.get(refno.lower())
+    if pdf_path is None:
+        raise FileNotFoundError(
+            f"Missing PDF for refno {refno}. Expected a file named like "
+            f"{refno}.pdf under the configured pdf dir (case-insensitive)."
+        )
+    return pdf_path
+
+
+def dockerfile_contents(paper_source: str) -> str:
+    """Render the task environment Dockerfile for the selected paper source."""
+    install_pdf_tools = ""
+    if paper_source != "mineru":
+        install_pdf_tools = (
+            "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
+            "    ca-certificates \\\n"
+            "    poppler-utils \\\n"
+            "    procps \\\n"
+            "  && rm -rf /var/lib/apt/lists/*"
+        )
+
+    dockerfile = _format_template(
         read_template("environment/Dockerfile"),
         {"install_pdf_tools": install_pdf_tools},
     )
+    if paper_source == "mineru":
+        dockerfile = dockerfile.replace("COPY paper.pdf /app/paper.pdf\n", "")
+        dockerfile = f"{dockerfile}\nCOPY paper_mineru /app/paper_mineru\n"
+    return dockerfile
+
+
+def prepare_task_paper_artifacts(
+    env_dir: Path,
+    *,
+    pdf_path: Path,
+    paper_source: str,
+    mineru_bundle: MinerUBundlePaths | None,
+) -> dict[str, str]:
+    """Copy paper artifacts into the task environment and build prompt placeholders."""
+    artifacts = {
+        "pdf_path": "/app/paper.pdf",
+        "paper_source": paper_source,
+        "paper_source_path": "/app/paper.pdf",
+        "paper_source_dir": "",
+        "paper_at_command": "@paper.pdf",
+        "pdf_at_command": "@paper.pdf",
+        "output_at_command": "@paper.pdf",
+        "paper_source_at_command": "@paper.pdf",
+        "mineru_dir_path": "",
+        "mineru_clean_markdown_path": "",
+        "mineru_outline_path": "",
+        "mineru_table_index_path": "",
+        "mineru_tables_path": "",
+        "mineru_captions_path": "",
+        "mineru_raw_markdown_path": "",
+        "mineru_primary_markdown_path": "",
+        "paper_source_description": (
+            "The paper is provided as the original PDF at `/app/paper.pdf`."
+        ),
+        "gemini_at_commands": "`@paper.pdf`",
+        "claude_file_examples": "`/app/paper.pdf`",
+    }
+
+    if paper_source != "mineru":
+        shutil.copy2(pdf_path, env_dir / "paper.pdf")
+        return artifacts
+
+    if mineru_bundle is None:
+        raise ValueError("mineru_bundle is required when paper_source='mineru'.")
+
+    bundle_dest = env_dir / "paper_mineru"
+    bundle_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(mineru_bundle.primary_markdown_path, bundle_dest / "primary.md")
+    if (
+        mineru_bundle.clean_markdown_path is not None
+        and mineru_bundle.clean_markdown_path.exists()
+    ):
+        shutil.copy2(mineru_bundle.clean_markdown_path, bundle_dest / "clean.md")
+    if mineru_bundle.outline_path is not None and mineru_bundle.outline_path.exists():
+        shutil.copy2(mineru_bundle.outline_path, bundle_dest / "outline.md")
+    if (
+        mineru_bundle.table_index_path is not None
+        and mineru_bundle.table_index_path.exists()
+    ):
+        shutil.copy2(mineru_bundle.table_index_path, bundle_dest / "table_index.md")
+    if mineru_bundle.tables_path is not None and mineru_bundle.tables_path.exists():
+        shutil.copy2(mineru_bundle.tables_path, bundle_dest / "tables.md")
+    if mineru_bundle.captions_path is not None and mineru_bundle.captions_path.exists():
+        shutil.copy2(mineru_bundle.captions_path, bundle_dest / "captions.md")
+    if (
+        mineru_bundle.raw_markdown_path is not None
+        and mineru_bundle.raw_markdown_path.exists()
+    ):
+        shutil.copy2(mineru_bundle.raw_markdown_path, bundle_dest / "raw.md")
+    images_dest = bundle_dest / "images"
+    images_dest.mkdir(exist_ok=True)
+    if mineru_bundle.images_dir is not None and mineru_bundle.images_dir.exists():
+        shutil.copytree(
+            mineru_bundle.images_dir,
+            images_dest,
+            dirs_exist_ok=True,
+        )
+    artifacts.update(
+        {
+            "pdf_path": "",
+            "paper_source_path": "/app/paper_mineru/primary.md",
+            "paper_source_dir": "/app/paper_mineru",
+            "output_at_command": "@paper_mineru/primary.md",
+            "paper_source_at_command": "@paper_mineru/primary.md",
+            "mineru_dir_path": "/app/paper_mineru",
+            "mineru_clean_markdown_path": "/app/paper_mineru/clean.md"
+            if (bundle_dest / "clean.md").exists()
+            else "",
+            "mineru_outline_path": "/app/paper_mineru/outline.md"
+            if (bundle_dest / "outline.md").exists()
+            else "",
+            "mineru_table_index_path": "/app/paper_mineru/table_index.md"
+            if (bundle_dest / "table_index.md").exists()
+            else "",
+            "mineru_tables_path": "/app/paper_mineru/tables.md"
+            if (bundle_dest / "tables.md").exists()
+            else "",
+            "mineru_captions_path": "/app/paper_mineru/captions.md"
+            if (bundle_dest / "captions.md").exists()
+            else "",
+            "mineru_raw_markdown_path": "/app/paper_mineru/raw.md"
+            if (bundle_dest / "raw.md").exists()
+            else "",
+            "mineru_primary_markdown_path": "/app/paper_mineru/primary.md",
+            "paper_source_description": (
+                "The paper has been preprocessed with MinerU. Available text views are "
+                "`/app/paper_mineru/primary.md` (full page-ordered reconstruction), "
+                "`/app/paper_mineru/clean.md` (clean reading view), "
+                "`/app/paper_mineru/outline.md` (page/section/figure/table map), and "
+                "`/app/paper_mineru/table_index.md` (compact table preview). "
+                "Additional structured views are "
+                "`/app/paper_mineru/tables.md` (full table TSV blocks), "
+                "`/app/paper_mineru/captions.md` (figure/table captions), and "
+                "`/app/paper_mineru/raw.md` (raw MinerU markdown). "
+                "Inspect `/app/paper_mineru/images/` for extracted figure, table, and equation "
+                "crops when they help resolve a value."
+            ),
+            "gemini_at_commands": (
+                "`@paper_mineru/primary.md`, "
+                "`@paper_mineru/clean.md`, "
+                "`@paper_mineru/outline.md`, "
+                "`@paper_mineru/table_index.md`, "
+                "`@paper_mineru/tables.md`, "
+                "`@paper_mineru/captions.md`, "
+                "`@paper_mineru/raw.md`"
+            ),
+            "claude_file_examples": (
+                "`/app/paper_mineru/primary.md`, "
+                "`/app/paper_mineru/clean.md`, "
+                "`/app/paper_mineru/outline.md`, "
+                "`/app/paper_mineru/table_index.md`, "
+                "`/app/paper_mineru/tables.md`, "
+                "`/app/paper_mineru/captions.md`, "
+                "`/app/paper_mineru/raw.md`, "
+                "`/app/paper_mineru/images/`"
+            ),
+        }
+    )
+    return artifacts
 
 
 def resolve_property_filter(task: str | None) -> set[str] | None:
@@ -307,6 +493,8 @@ def build_task(
     task_dir: Path,
     *,
     pdf_path: Path,
+    paper_source: str,
+    mineru_bundle: MinerUBundlePaths | None,
     task_name: str,
     refno: str,
     rows: list[dict[str, str]],
@@ -321,7 +509,12 @@ def build_task(
     tests_dir.mkdir(parents=True, exist_ok=True)
     solution_dir.mkdir(parents=True, exist_ok=True)
 
-    shutil.copy2(pdf_path, env_dir / "paper.pdf")
+    paper_artifacts = prepare_task_paper_artifacts(
+        env_dir,
+        pdf_path=pdf_path,
+        paper_source=paper_source,
+        mineru_bundle=mineru_bundle,
+    )
 
     questions: list[dict[str, str]] = []
     expected_rows: list[dict[str, str]] = []
@@ -353,7 +546,24 @@ def build_task(
 
     task_meta = {
         "refno": refno,
-        "pdf_path": "/app/paper.pdf",
+        "paper_source": paper_source,
+        "paper_source_path": paper_artifacts["paper_source_path"],
+        "paper_source_dir": paper_artifacts["paper_source_dir"] or None,
+        "pdf_path": paper_artifacts["pdf_path"],
+        "mineru_dir_path": paper_artifacts["mineru_dir_path"] or None,
+        "mineru_clean_markdown_path": (
+            paper_artifacts["mineru_clean_markdown_path"] or None
+        ),
+        "mineru_outline_path": paper_artifacts["mineru_outline_path"] or None,
+        "mineru_table_index_path": paper_artifacts["mineru_table_index_path"] or None,
+        "mineru_tables_path": paper_artifacts["mineru_tables_path"] or None,
+        "mineru_captions_path": paper_artifacts["mineru_captions_path"] or None,
+        "mineru_raw_markdown_path": (
+            paper_artifacts["mineru_raw_markdown_path"] or None
+        ),
+        "mineru_primary_markdown_path": (
+            paper_artifacts["mineru_primary_markdown_path"] or None
+        ),
         "predictions_path": "/app/output/predictions.json",
         "questions": questions,
     }
@@ -369,9 +579,6 @@ def build_task(
         ).strip()
         for idx, item in enumerate(questions)
     )
-    gemini_at_commands = "`@paper.pdf`"
-    paper_at_command = "@paper.pdf"
-    claude_file_examples = "`/app/paper.pdf`"
 
     instruction_template = read_template("instruction.md.template")
     instruction_values = {
@@ -381,7 +588,7 @@ def build_task(
         "task_id": task_dir.name,
         "refno": refno,
         # Standard in-container paths
-        "pdf_path": "/app/paper.pdf",
+        "pdf_path": paper_artifacts["pdf_path"],
         "meta_path": "/app/task_meta.json",
         "predictions_path": "/app/output/predictions.json",
         # Prompt building blocks (optional; templates may ignore these)
@@ -389,9 +596,24 @@ def build_task(
         "questions_json": json.dumps(questions, indent=2),
         "task_meta_json": json.dumps(task_meta, indent=2),
         # Agent affordances (optional)
-        "paper_at_command": paper_at_command,
-        "gemini_at_commands": gemini_at_commands,
-        "claude_file_examples": claude_file_examples,
+        "paper_at_command": paper_artifacts["paper_at_command"],
+        "pdf_at_command": paper_artifacts["pdf_at_command"],
+        "output_at_command": paper_artifacts["output_at_command"],
+        "paper_source_at_command": paper_artifacts["paper_source_at_command"],
+        "paper_source": paper_artifacts["paper_source"],
+        "paper_source_path": paper_artifacts["paper_source_path"],
+        "paper_source_dir": paper_artifacts["paper_source_dir"],
+        "mineru_dir_path": paper_artifacts["mineru_dir_path"],
+        "mineru_clean_markdown_path": paper_artifacts["mineru_clean_markdown_path"],
+        "mineru_outline_path": paper_artifacts["mineru_outline_path"],
+        "mineru_table_index_path": paper_artifacts["mineru_table_index_path"],
+        "mineru_tables_path": paper_artifacts["mineru_tables_path"],
+        "mineru_captions_path": paper_artifacts["mineru_captions_path"],
+        "mineru_raw_markdown_path": paper_artifacts["mineru_raw_markdown_path"],
+        "mineru_primary_markdown_path": paper_artifacts["mineru_primary_markdown_path"],
+        "paper_source_description": paper_artifacts["paper_source_description"],
+        "gemini_at_commands": paper_artifacts["gemini_at_commands"],
+        "claude_file_examples": paper_artifacts["claude_file_examples"],
     }
     instruction = _format_template(instruction_template, instruction_values)
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
@@ -402,7 +624,7 @@ def build_task(
     )
     (task_dir / "task.toml").write_text(task_toml)
 
-    (env_dir / "Dockerfile").write_text(dockerfile_contents())
+    (env_dir / "Dockerfile").write_text(dockerfile_contents(paper_source))
     copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
     copy_template("tests/test.sh", tests_dir / "test.sh")
 
@@ -434,6 +656,8 @@ def build_task_no_score(
     task_dir: Path,
     *,
     pdf_path: Path,
+    paper_source: str,
+    mineru_bundle: MinerUBundlePaths | None,
     task_name: str,
     refno: str,
 ) -> None:
@@ -441,11 +665,33 @@ def build_task_no_score(
     env_dir = task_dir / "environment"
     env_dir.mkdir(parents=True, exist_ok=True)
 
-    shutil.copy2(pdf_path, env_dir / "paper.pdf")
+    paper_artifacts = prepare_task_paper_artifacts(
+        env_dir,
+        pdf_path=pdf_path,
+        paper_source=paper_source,
+        mineru_bundle=mineru_bundle,
+    )
 
     task_meta = {
         "refno": refno,
-        "pdf_path": "/app/paper.pdf",
+        "paper_source": paper_source,
+        "paper_source_path": paper_artifacts["paper_source_path"],
+        "paper_source_dir": paper_artifacts["paper_source_dir"] or None,
+        "pdf_path": paper_artifacts["pdf_path"],
+        "mineru_dir_path": paper_artifacts["mineru_dir_path"] or None,
+        "mineru_clean_markdown_path": (
+            paper_artifacts["mineru_clean_markdown_path"] or None
+        ),
+        "mineru_outline_path": paper_artifacts["mineru_outline_path"] or None,
+        "mineru_table_index_path": paper_artifacts["mineru_table_index_path"] or None,
+        "mineru_tables_path": paper_artifacts["mineru_tables_path"] or None,
+        "mineru_captions_path": paper_artifacts["mineru_captions_path"] or None,
+        "mineru_raw_markdown_path": (
+            paper_artifacts["mineru_raw_markdown_path"] or None
+        ),
+        "mineru_primary_markdown_path": (
+            paper_artifacts["mineru_primary_markdown_path"] or None
+        ),
         "predictions_path": "/app/output/predictions.json",
         "questions": [],
     }
@@ -459,7 +705,7 @@ def build_task_no_score(
         "task_id": task_dir.name,
         "refno": refno,
         # Standard in-container paths
-        "pdf_path": "/app/paper.pdf",
+        "pdf_path": paper_artifacts["pdf_path"],
         "meta_path": "/app/task_meta.json",
         "predictions_path": "/app/output/predictions.json",
         # Prompt building blocks (optional; templates may ignore these)
@@ -467,9 +713,24 @@ def build_task_no_score(
         "questions_json": "[]",
         "task_meta_json": json.dumps(task_meta, indent=2),
         # Agent affordances (optional)
-        "paper_at_command": "@paper.pdf",
-        "gemini_at_commands": "`@paper.pdf`",
-        "claude_file_examples": "`/app/paper.pdf`",
+        "paper_at_command": paper_artifacts["paper_at_command"],
+        "pdf_at_command": paper_artifacts["pdf_at_command"],
+        "output_at_command": paper_artifacts["output_at_command"],
+        "paper_source_at_command": paper_artifacts["paper_source_at_command"],
+        "paper_source": paper_artifacts["paper_source"],
+        "paper_source_path": paper_artifacts["paper_source_path"],
+        "paper_source_dir": paper_artifacts["paper_source_dir"],
+        "mineru_dir_path": paper_artifacts["mineru_dir_path"],
+        "mineru_clean_markdown_path": paper_artifacts["mineru_clean_markdown_path"],
+        "mineru_outline_path": paper_artifacts["mineru_outline_path"],
+        "mineru_table_index_path": paper_artifacts["mineru_table_index_path"],
+        "mineru_tables_path": paper_artifacts["mineru_tables_path"],
+        "mineru_captions_path": paper_artifacts["mineru_captions_path"],
+        "mineru_raw_markdown_path": paper_artifacts["mineru_raw_markdown_path"],
+        "mineru_primary_markdown_path": paper_artifacts["mineru_primary_markdown_path"],
+        "paper_source_description": paper_artifacts["paper_source_description"],
+        "gemini_at_commands": paper_artifacts["gemini_at_commands"],
+        "claude_file_examples": paper_artifacts["claude_file_examples"],
     }
     instruction = _format_template(instruction_template, instruction_values)
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
@@ -480,7 +741,7 @@ def build_task_no_score(
     )
     (task_dir / "task.toml").write_text(task_toml)
 
-    (env_dir / "Dockerfile").write_text(dockerfile_contents())
+    (env_dir / "Dockerfile").write_text(dockerfile_contents(paper_source))
 
 
 def main() -> None:
@@ -549,6 +810,94 @@ def main() -> None:
         help="Directory containing PDFs named <refno>.pdf (default: <workspace>/data/Paper_DB).",
     )
     parser.add_argument(
+        "--paper-source",
+        type=str,
+        default="pdf",
+        choices=["pdf", "mineru"],
+        help=(
+            "Primary paper artifact exposed to agents. `pdf` preserves the current "
+            "behavior, while `mineru` preprocesses each PDF into a MinerU bundle "
+            "and points prompts at the normalized markdown output."
+        ),
+    )
+    parser.add_argument(
+        "--mineru-cache-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directory for normalized MinerU bundles "
+            "(default: <workspace>/out/mineru/<dataset>)."
+        ),
+    )
+    parser.add_argument(
+        "--mineru-binary",
+        type=str,
+        default="mineru",
+        help="MinerU CLI binary name (default: mineru).",
+    )
+    parser.add_argument(
+        "--mineru-backend",
+        type=str,
+        default="hybrid-auto-engine",
+        choices=[
+            "pipeline",
+            "hybrid-auto-engine",
+            "hybrid-http-client",
+            "vlm-auto-engine",
+            "vlm-http-client",
+        ],
+        help="MinerU backend (default: hybrid-auto-engine).",
+    )
+    parser.add_argument(
+        "--mineru-method",
+        type=str,
+        default="auto",
+        choices=["auto", "txt", "ocr"],
+        help="MinerU parsing method (default: auto).",
+    )
+    parser.add_argument(
+        "--mineru-lang",
+        type=str,
+        default=None,
+        help="Optional MinerU OCR language hint.",
+    )
+    parser.add_argument(
+        "--mineru-source",
+        type=str,
+        default=None,
+        choices=["huggingface", "modelscope", "local"],
+        help="Optional MinerU model source override.",
+    )
+    parser.add_argument(
+        "--mineru-device",
+        type=str,
+        default=None,
+        help="Optional MinerU device override such as cpu, mps, or cuda:0.",
+    )
+    parser.add_argument(
+        "--mineru-extra-arg",
+        action="append",
+        default=None,
+        help="Extra raw CLI arg to pass through to MinerU. Repeat as needed.",
+    )
+    parser.add_argument(
+        "--mineru-formula",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable MinerU formula parsing (default: enabled).",
+    )
+    parser.add_argument(
+        "--mineru-table",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable MinerU table parsing (default: enabled).",
+    )
+    parser.add_argument(
+        "--mineru-force",
+        action="store_true",
+        help="Rebuild MinerU bundles even if the cache already exists.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
@@ -559,6 +908,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--limit",
+        "--max-num-papers",
+        "--max_num_papers",
+        dest="limit",
         type=int,
         default=None,
         help="Optional cap on number of tasks (papers) to generate.",
@@ -568,6 +920,16 @@ def main() -> None:
         action="append",
         default=None,
         help="Only build tasks for specific refno(s). Can be passed multiple times.",
+    )
+    parser.add_argument(
+        "--harbor-task-ordering-registry-path",
+        type=Path,
+        default=None,
+        help=(
+            "Optional Harbor registry.json whose task names define the paper order. "
+            "Useful for reproducing the same first-N paper slice across direct and "
+            "Harbor evaluation flows."
+        ),
     )
     parser.add_argument(
         "--force",
@@ -684,14 +1046,41 @@ def main() -> None:
 
     if args.pdf_dir is None:
         args.pdf_dir = resolved_workspace / "data" / "Paper_DB"
+    dataset_short_name = dataset_name.split("/")[-1]
     if args.output_dir is None:
-        # Use the dataset name (last part) for output directory
-        dataset_short_name = dataset_name.split("/")[-1]
         args.output_dir = resolved_workspace / "out" / "harbor" / dataset_short_name
     if not args.pdf_dir.is_absolute():
         args.pdf_dir = resolved_workspace / args.pdf_dir
     if not args.output_dir.is_absolute():
         args.output_dir = resolved_workspace / args.output_dir
+    if args.harbor_task_ordering_registry_path is not None and (
+        not args.harbor_task_ordering_registry_path.is_absolute()
+    ):
+        args.harbor_task_ordering_registry_path = (
+            resolved_workspace / args.harbor_task_ordering_registry_path
+        )
+    if args.mineru_cache_dir is None:
+        args.mineru_cache_dir = (
+            resolved_workspace / "out" / "mineru" / dataset_short_name
+        )
+    if not args.mineru_cache_dir.is_absolute():
+        args.mineru_cache_dir = resolved_workspace / args.mineru_cache_dir
+
+    mineru_config: MinerUConfig | None = None
+    if args.paper_source == "mineru":
+        mineru_config = MinerUConfig(
+            binary=args.mineru_binary,
+            backend=args.mineru_backend,
+            method=args.mineru_method,
+            formula=bool(args.mineru_formula),
+            table=bool(args.mineru_table),
+            lang=args.mineru_lang,
+            source=args.mineru_source,
+            device=args.mineru_device,
+            extra_args=list(args.mineru_extra_arg or []),
+            force=bool(args.mineru_force),
+        )
+        args.mineru_cache_dir.mkdir(parents=True, exist_ok=True)
 
     template_root = templates_dir()
     if not template_root.exists():
@@ -749,22 +1138,63 @@ def main() -> None:
             path for path in args.pdf_dir.iterdir() if path.suffix.lower() == ".pdf"
         )
         refnos = [path.stem for path in pdf_paths]
+    pdf_lookup = build_pdf_lookup(args.pdf_dir)
+    refno_lookup = {refno.lower(): refno for refno in refnos}
+    limit_applied = False
     if args.refno:
-        requested = {value.strip() for value in args.refno if value and value.strip()}
-        missing = sorted(requested - set(refnos))
+        requested = [value.strip() for value in args.refno if value and value.strip()]
+        missing = sorted(
+            value for value in requested if value.lower() not in refno_lookup
+        )
         if missing:
             raise ValueError(f"Unknown refno(s) requested: {missing}")
-        refnos = [refno for refno in refnos if refno in requested]
-    if args.limit is not None:
+        requested_order: list[str] = []
+        seen: set[str] = set()
+        for value in requested:
+            key = value.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            requested_order.append(refno_lookup[key])
+        refnos = requested_order
+    elif args.harbor_task_ordering_registry_path is not None:
+        requested = load_harbor_task_ordering(args.harbor_task_ordering_registry_path)
+        if args.limit is not None:
+            requested = requested[: args.limit]
+            limit_applied = True
+        missing = sorted(
+            value for value in requested if value.lower() not in refno_lookup
+        )
+        if missing:
+            raise ValueError(
+                "The ordering registry references papers that are missing from the "
+                f"current dataset/pdf-dir: {missing[:20]}"
+            )
+        requested_order = []
+        seen = set()
+        for value in requested:
+            key = value.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            requested_order.append(refno_lookup[key])
+        refnos = requested_order
+    if args.limit is not None and not limit_applied:
         refnos = refnos[: args.limit]
 
     if args.no_score and not refnos:
         raise FileNotFoundError(f"No PDFs found under {args.pdf_dir}")
 
+    written_task_dirs: list[Path] = []
     for refno in refnos:
-        pdf_path = args.pdf_dir / f"{refno}.pdf"
-        if not pdf_path.exists():
-            raise FileNotFoundError(f"Missing PDF for refno {refno} at {pdf_path}")
+        pdf_path = resolve_pdf_path(pdf_lookup, refno)
+        mineru_bundle: MinerUBundlePaths | None = None
+        if mineru_config is not None:
+            mineru_bundle = ensure_mineru_bundle(
+                pdf_path=pdf_path,
+                bundle_root=args.mineru_cache_dir,
+                config=mineru_config,
+            )
 
         task_id = (
             f"{slugify(refno)}--{slugify(task_label)}"
@@ -778,6 +1208,8 @@ def main() -> None:
             build_task_no_score(
                 task_dir,
                 pdf_path=pdf_path,
+                paper_source=args.paper_source,
+                mineru_bundle=mineru_bundle,
                 task_name=task_label,
                 refno=refno,
             )
@@ -790,6 +1222,8 @@ def main() -> None:
             build_task(
                 task_dir,
                 pdf_path=pdf_path,
+                paper_source=args.paper_source,
+                mineru_bundle=mineru_bundle,
                 task_name=task_label,
                 refno=refno,
                 rows=rows,
@@ -800,6 +1234,7 @@ def main() -> None:
         except ValueError:
             task_rel = task_dir
         print(f"Wrote task {task_id} -> {task_rel}")
+        written_task_dirs.append(task_dir)
 
     if args.write_job_config:
         job_path = task_root / "job.yaml"
@@ -819,9 +1254,13 @@ def main() -> None:
     # -- Write local registry.json --
     # NOTE: the local registry JSON is consistent with the HF upload registry JSON,
     # just with local task paths.
-    generated_task_dirs = _collect_task_dirs(
-        tasks_dir, disable_verification=bool(args.no_score)
+    generated_task_dirs = _filter_valid_task_dirs(
+        written_task_dirs, disable_verification=bool(args.no_score)
     )
+    if not generated_task_dirs:
+        generated_task_dirs = _collect_task_dirs(
+            tasks_dir, disable_verification=bool(args.no_score)
+        )
     if args.seed is not None:
         generated_task_dirs = _shuffle_task_dirs(generated_task_dirs, args.seed)
     if generated_task_dirs:
@@ -879,6 +1318,18 @@ def _collect_task_dirs(
         for child in sorted(tasks_root.iterdir())
         if child.is_dir()
         and TaskPaths(child).is_valid(disable_verification=disable_verification)
+    ]
+
+
+def _filter_valid_task_dirs(
+    task_dirs: Iterable[Path], *, disable_verification: bool = False
+) -> list[Path]:
+    """Keep Harbor-valid task directories while preserving the caller's order."""
+    return [
+        task_dir
+        for task_dir in task_dirs
+        if task_dir.is_dir()
+        and TaskPaths(task_dir).is_valid(disable_verification=disable_verification)
     ]
 
 

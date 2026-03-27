@@ -16,26 +16,62 @@ uv run pbench-generate-matches \
 """
 
 import argparse
-import json
-import os
-import logging
-import pandas as pd
-from dotenv import load_dotenv
 import asyncio
-from datasets import load_dataset
+import json
+import logging
+import os
 from pathlib import Path
+
+from datasets import load_dataset
+from dotenv import load_dotenv
+import pandas as pd
 from slugify import slugify
 
 from llm_utils import get_llm, InferenceGenerationConfig
 from llm_utils.common import LLMChat
 import pbench
-from pbench_eval.match import generate_property_name_matches
+from pbench_eval.match import generate_embeddings, generate_property_name_matches
 from pbench_eval.harbor_utils import get_harbor_data
 
 logger = logging.getLogger(__name__)
 
 # Concurrency limit for parallel processing
 MAX_CONCURRENT_TASKS = 10
+
+
+def load_or_generate_gt_embeddings(
+    *,
+    gt_embeddings_path: Path,
+    hf_repo: str,
+    hf_split: str,
+    hf_revision: str,
+) -> pd.DataFrame:
+    """Return GT property embeddings, generating them when the cache is missing."""
+    if gt_embeddings_path.exists():
+        return pd.read_json(gt_embeddings_path)
+
+    logger.info(
+        "Ground truth embeddings missing at %s; generating them.", gt_embeddings_path
+    )
+    dataset = load_dataset(hf_repo, split=hf_split, revision=hf_revision)
+    df = dataset.to_pandas()
+    df = df.explode(column="properties").reset_index(drop=True)
+    df = pd.concat(
+        [df.drop(columns=["properties"]), pd.json_normalize(df["properties"])], axis=1
+    )
+    unique_property_names = df["property_name"].dropna().unique().tolist()
+    embeddings = generate_embeddings(unique_property_names)
+
+    gt_embeddings_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = [
+        {
+            "property_name": name,
+            "embedding": embedding.tolist(),
+        }
+        for name, embedding in zip(unique_property_names, embeddings)
+    ]
+    gt_embeddings_path.write_text(json.dumps(payload, indent=2))
+    return pd.DataFrame(payload)
 
 
 async def process_single_group(
@@ -241,7 +277,12 @@ async def main(args: argparse.Namespace) -> None:
         gt_embeddings_path = Path("scoring") / gt_embeddings_filename
 
     logger.info(f"Loading ground truth embeddings from {gt_embeddings_path}...")
-    df_gt_embeddings = pd.read_json(gt_embeddings_path)
+    df_gt_embeddings = load_or_generate_gt_embeddings(
+        gt_embeddings_path=gt_embeddings_path,
+        hf_repo=hf_dataset_name,
+        hf_split=hf_split_name,
+        hf_revision=hf_revision,
+    )
 
     #
     # Load extracted properties

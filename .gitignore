@@ -238,6 +238,9 @@ jobs/
 trials/
 
 # Arjun (sorry I keep a knowledgebase file with sensitive info like keys, etc.)
+
+# Generated scoring caches
+examples/supercon-extraction/scoring/embeddings_*.json
 knowledgebase.md
 
 *logs*/

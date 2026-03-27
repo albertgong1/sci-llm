@@ -62,7 +62,7 @@ for name, embedding in zip(unique_property_names, embeddings):
     data.append(
         {
             "property_name": name,
-            "embedding": embedding,
+            "embedding": embedding.tolist(),
         }
     )
 
