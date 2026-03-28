@@ -20,8 +20,14 @@ def padded_sem(x: list, n: int) -> float:
         Standard error of the mean
 
     """
-    x = [0 if v is None else v for v in x]
-    return np.std(np.concatenate((x, np.zeros(n - len(x)))), ddof=1) / (n**0.5)
+    x = [0.0 if v is None else float(v) for v in x]
+    n_eff = max(int(n), len(x))
+
+    if n_eff <= 1:
+        return 0.0
+
+    padded = np.concatenate((x, np.zeros(n_eff - len(x))))
+    return float(np.std(padded, ddof=1) / (n_eff ** 0.5))
 
 
 def padded_mean(x: list, n: int) -> float:
@@ -36,8 +42,13 @@ def padded_mean(x: list, n: int) -> float:
         Mean value
 
     """
-    x = [0 if v is None else v for v in x]
-    return sum(x) / n
+    x = [0.0 if v is None else float(v) for v in x]
+    n_eff = max(int(n), len(x))
+
+    if n_eff == 0:
+        return 0.0
+
+    return sum(x) / n_eff
 
 
 def mean_sem_with_n(x: list, n: int) -> str:
