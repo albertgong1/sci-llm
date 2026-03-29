@@ -503,3 +503,23 @@ def compute_pairwise_evidence_scores(
             row_scores.append(score_evidence(ev_a, ev_b))
         scores.append(row_scores)
     return scores
+
+def get_trials_lookup_for_non_llm_baseline(df_matches: pd.DataFrame) -> dict[tuple[str, str], int]:
+    trials_lookup = {
+        # count for the text_only extractor
+        ("text_only", "supermat_eval"): df_matches[
+            (df_matches["agent"] == "text_only") & 
+            (df_matches["model"] == "supermat_eval")
+        ]["refno"].nunique(),
+        # count for the chemdataextractor extractor
+        ("chemdataextractor", "supermat_eval"): df_matches[
+            (df_matches["agent"] == "chemdataextractor") & 
+            (df_matches["model"] == "supermat_eval")
+        ]["refno"].nunique(),
+        # count for the grobid extractor
+        ("grobid", "supermat_eval"): df_matches[
+            (df_matches["agent"] == "grobid") & 
+            (df_matches["model"] == "supermat_eval")
+        ]["refno"].nunique(),
+    }
+    return trials_lookup

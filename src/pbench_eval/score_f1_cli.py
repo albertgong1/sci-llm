@@ -37,6 +37,7 @@ from pbench_eval.stats import mean_sem_with_n
 from pbench_eval.cli_utils import add_scoring_args
 from pbench_eval.score_precision_cli import compute_precision_by_refno
 from pbench_eval.score_recall_cli import compute_recall_by_refno
+from pbench_eval.utils import get_trials_lookup_for_non_llm_baseline
 
 logger = logging.getLogger(__name__)
 
@@ -87,16 +88,7 @@ def compute_f1_by_refno(args: Namespace) -> pd.DataFrame:
     # If jobs_dir was not provided, count trajectory JSONs in trajectories directory
     if args.jobs_dir is None:
         if args.non_llm_baseline:
-            trials_lookup = {
-                ("chemdataextractor", "supermat_eval"): f1_by_refno[
-                    (f1_by_refno["agent"] == "chemdataextractor") & 
-                    (f1_by_refno["model"] == "supermat_eval")
-                ]["refno"].nunique(),
-                ("grobid", "supermat_eval"): f1_by_refno[
-                    (f1_by_refno["agent"] == "grobid") & 
-                    (f1_by_refno["model"] == "supermat_eval")
-                ]["refno"].nunique(),
-            }
+            trials_lookup = get_trials_lookup_for_non_llm_baseline(f1_by_refno)
         else:
             trials_lookup = count_zeroshot_trials_per_group(args.output_dir.resolve())
     else:
