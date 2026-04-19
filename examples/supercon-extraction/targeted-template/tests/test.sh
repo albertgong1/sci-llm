@@ -8,8 +8,7 @@ set -e
 
 # Preserve the agent-written predictions file even on verifier failure (Harbor deletes containers).
 if [[ -f /app/predictions.json ]]; then
-  mkdir -p /logs/verifier/app_output
-  cp /app/predictions.json /logs/verifier/app_output/ 2>/dev/null || true
+  cp /app/predictions.json /logs/verifier/predictions.json 2>/dev/null || true
 fi
 
 if [[ -f /app/task_meta.json ]]; then

@@ -227,7 +227,7 @@ def _load_trial_predictions(
 
     """
     # Try to load from predictions.json first
-    log_path = trial_dir / "verifier" / "app_output" / "predictions.json"
+    log_path = trial_dir / "verifier" / "predictions.json"
     if not log_path.exists():
         log_path = trial_dir / "agent" / "gemini-cli.txt"
 
@@ -303,8 +303,8 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     Iterates through batches and trials in the jobs directory structure:
     jobs_dir/
       batch_1/
-        trial_1/verifier/app_output/predictions.json
-        trial_2/verifier/app_output/predictions.json
+        trial_1/verifier/predictions.json
+        trial_2/verifier/predictions.json
       batch_2/
         ...
 
