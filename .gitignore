@@ -231,6 +231,8 @@ arxiv/credentials.json
 arxiv/token.json
 
 *jobs*/
+examples/*/scoring/embeddings*
+examples/*/scoring/gt_property_name*
 
 # Harbor task gen related
 out/
