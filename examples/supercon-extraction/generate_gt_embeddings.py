@@ -20,7 +20,7 @@ from slugify import slugify
 
 import pbench
 
-from match import generate_embeddings
+from check_prediction import generate_embeddings
 
 load_dotenv()
 

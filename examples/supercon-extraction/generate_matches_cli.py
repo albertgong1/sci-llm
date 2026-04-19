@@ -31,7 +31,7 @@ from llm_utils.common import LLMChat
 import pbench
 from pbench_eval.harbor_utils import get_harbor_data
 
-from match import generate_property_name_matches
+from check_prediction import generate_property_name_matches
 
 logger = logging.getLogger(__name__)
 

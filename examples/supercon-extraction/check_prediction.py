@@ -1,14 +1,189 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import logging
 import re
 import sys
 import traceback
+from collections import OrderedDict
 from dataclasses import dataclass
 from json import JSONDecoder
 from pathlib import Path
 from typing import Any
+
+import numpy as np
+import pandas as pd
+from google import genai
+from google.genai import types
+from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
+
+from llm_utils import (
+    Conversation,
+    InferenceGenerationConfig,
+    LLMChat,
+    LLMChatResponse,
+    Message,
+)
+
+logger = logging.getLogger(__name__)
+
+EMBEDDING_BATCH_SIZE = 100
+EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+TOP_K = 3
+
+
+def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
+    """Generate embeddings for a list of property names."""
+    client = genai.Client()
+    embeddings = []
+    for i in range(0, len(property_names), EMBEDDING_BATCH_SIZE):
+        batch = property_names[i : i + EMBEDDING_BATCH_SIZE]
+        result = client.models.embed_content(
+            model=EMBEDDING_MODEL_NAME,
+            contents=batch,
+            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
+        )
+        embeddings.extend([emb.values for emb in result.embeddings])
+
+    return embeddings
+
+
+async def check_if_same_property(
+    llm: LLMChat,
+    inf_gen_config: InferenceGenerationConfig,
+    prompt: str,
+    property_name_1: str,
+    property_name_2: str,
+) -> tuple[dict, dict]:
+    """Check if two property names are the same using an LLM."""
+    if property_name_1.strip() == property_name_2.strip():
+        # Shortcut: if property names are identical, return match
+        result = {
+            "is_match": True,
+            "reason": "Property names are identical",
+            "confidence": "high",
+            "matched_via": "exact",
+            "judge": llm.model_name,
+            "prompt": None,
+        }
+        return result, {}
+
+    conv = Conversation(messages=[Message(role="user", content=[prompt])])
+
+    response: LLMChatResponse = await llm.generate_response_async(conv, inf_gen_config)
+    if response.pred:
+        is_match = response.pred.get("is_match", False)
+        reason = response.pred.get("reason", "No reason provided")
+        confidence = response.pred.get("confidence")
+        matched_via = response.pred.get("matched_via")
+    else:
+        is_match = False
+        reason = "Empty response from LLM"
+        confidence = None
+        matched_via = None
+
+    result = {
+        "is_match": is_match,
+        "reason": reason,
+        "confidence": confidence,
+        "matched_via": matched_via,
+        "judge": llm.model_name,
+        "prompt": prompt,
+    }
+
+    return result, {**response.model_dump(), "judge": llm.model_name}
+
+
+async def generate_property_name_matches(
+    df1: pd.DataFrame,
+    df2: pd.DataFrame,
+    llm: LLMChat,
+    inf_gen_config: InferenceGenerationConfig,
+    prompt_template: str,
+    top_k: int = TOP_K,
+    left_on: list[str] = ["property_name", "context"],
+    right_on: list[str] = ["property_name", "context"],
+    left_suffix: str = "_x",
+    right_suffix: str = "_y",
+) -> pd.DataFrame:
+    """For each row in df1, find the top-k matches in df2 using embeddings + LLM.
+
+    NOTE: this queries the Gemini API and requires setting up GOOGLE_API_KEY environment variable.
+    """
+    Y = df2.drop_duplicates(subset=["property_name"])
+    similarity_matrix = cosine_similarity(
+        np.vstack(df1["embedding"].values),
+        np.vstack(Y["embedding"].values),
+    )
+    top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :top_k]
+
+    matches = []
+    tasks = OrderedDict()
+    idx_to_task_id = {}
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
+        logger.debug(f"Found {len(df2_top_k)} matches for {x['property_name']}")
+        for idx, y in df2_top_k.iterrows():
+            x_variables = {k + "_1": x[k] for k in left_on}
+            y_variables = {k + "_2": y[k] for k in right_on}
+            task_id = (json.dumps(x_variables), json.dumps(y_variables))
+            idx_to_task_id[(i, idx)] = task_id
+            if task_id not in tasks:
+                prompt = prompt_template.format(
+                    **x_variables,
+                    **y_variables,
+                )
+                task = check_if_same_property(
+                    llm, inf_gen_config, prompt, x["property_name"], y["property_name"]
+                )
+                tasks[task_id] = task
+
+    batch_size = len(tasks)  # run all at once
+    results_data = []
+    for i in tqdm(range(0, len(tasks), batch_size), desc="Calling LLM API in batches"):
+        batch_tasks = {k: tasks[k] for k in list(tasks.keys())[i : i + batch_size]}
+        batch_results = await asyncio.gather(*batch_tasks.values())
+        results_data.extend(batch_results)
+    results = {
+        task_id: result for task_id, (result, _) in zip(tasks.keys(), results_data)
+    }
+
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
+        for idx, y in df2_top_k.iterrows():
+            result = results[idx_to_task_id[(i, idx)]]
+            matches.append(
+                {
+                    **x,
+                    **result,
+                    "y_id": idx,
+                }
+            )
+    df_matches = pd.DataFrame(matches)
+    df_matches = df_matches.merge(
+        df2,
+        left_on="y_id",
+        right_index=True,
+        how="left",
+        suffixes=(left_suffix, right_suffix),
+    )
+
+    responses = [response for _, response in results_data]
+    df_responses = pd.json_normalize(responses)
+
+    return df_matches, df_responses
+
+
+def is_material_name_same(material1: str, material2: str) -> bool:
+    """Check if two material names are the same."""
+    return material1 == material2
 
 
 @dataclass(frozen=True)

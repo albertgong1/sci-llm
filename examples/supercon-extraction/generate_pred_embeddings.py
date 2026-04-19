@@ -22,7 +22,7 @@ from slugify import slugify
 import pbench
 from pbench_eval.harbor_utils import get_harbor_data
 
-from match import generate_embeddings
+from check_prediction import generate_embeddings
 
 load_dotenv()
 

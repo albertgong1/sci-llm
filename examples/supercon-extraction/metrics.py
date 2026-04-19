@@ -9,7 +9,7 @@ import json
 
 from pbench_eval.utils import scorer_pymatgen, score_value, score_evidence
 
-from match import generate_embeddings, generate_property_name_matches
+from check_prediction import generate_embeddings, generate_property_name_matches
 
 logger = logging.getLogger(__name__)
 

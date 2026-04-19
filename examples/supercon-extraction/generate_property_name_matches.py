@@ -32,7 +32,7 @@ from llm_utils import (
 # pbench imports
 from llm_utils.common import LLMChat
 import pbench
-from match import generate_property_name_matches
+from check_prediction import generate_property_name_matches
 
 # local imports
 from utils import (
