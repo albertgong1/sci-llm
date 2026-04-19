@@ -29,8 +29,9 @@ from slugify import slugify
 from llm_utils import get_llm, InferenceGenerationConfig
 from llm_utils.common import LLMChat
 import pbench
-from pbench_eval.match import generate_property_name_matches
 from pbench_eval.harbor_utils import get_harbor_data
+
+from match import generate_property_name_matches
 
 logger = logging.getLogger(__name__)
 
@@ -283,14 +284,22 @@ async def main(args: argparse.Namespace) -> None:
         df = pd.concat(dfs, ignore_index=True)
 
     # Optionally restrict to refnos listed in a registry file
-    registry_path = Path(args.registry_path) if args.registry_path else output_dir / "registry_data.json"
+    registry_path = (
+        Path(args.registry_path)
+        if args.registry_path
+        else output_dir / "registry_data.json"
+    )
     registry_limit = args.registry_limit
     if registry_limit > 0 and registry_path.exists():
         allowed_refnos = load_registry_refnos(registry_path, registry_limit)
         allowed_refnos_slugified = {slugify(refno.lower()) for refno in allowed_refnos}
         original_rows = len(df)
         df = df[
-            df["refno"].astype(str).str.lower().apply(lambda x: slugify(x)).isin(allowed_refnos_slugified)
+            df["refno"]
+            .astype(str)
+            .str.lower()
+            .apply(lambda x: slugify(x))
+            .isin(allowed_refnos_slugified)
         ].copy()
         logger.info(
             "Filtered predictions using %s: kept %d rows across first %d registry tasks (from %d rows)",

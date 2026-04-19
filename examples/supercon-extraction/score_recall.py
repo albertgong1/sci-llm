@@ -20,7 +20,7 @@ import logging
 
 # pbench imports
 import pbench
-from pbench_eval.metrics import compute_recall_per_material_property
+from metrics import compute_recall_per_material_property
 from utils import RUBRIC_PATH, count_trials_per_agent_model, mean_sem_with_n
 
 logger = logging.getLogger(__name__)

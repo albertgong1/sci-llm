@@ -7,8 +7,9 @@ from typing import Literal
 from llm_utils import get_llm, InferenceGenerationConfig
 import json
 
-from pbench_eval.match import generate_embeddings, generate_property_name_matches
 from pbench_eval.utils import scorer_pymatgen, score_value, score_evidence
+
+from match import generate_embeddings, generate_property_name_matches
 
 logger = logging.getLogger(__name__)
 
