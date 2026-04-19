@@ -255,3 +255,5 @@ examples/harbor-workspace/out/*
 !examples/harbor-workspace/logs/.gitkeep
 examples/harbor-workspace/jobs/*
 examples/harbor-workspace/trials/*
+
+.vscode/
