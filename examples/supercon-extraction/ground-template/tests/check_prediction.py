@@ -546,9 +546,7 @@ def main() -> None:
         description="Harbor verifier for property extraction."
     )
     parser.add_argument("--expected", type=str, default="/tests/expected.json")
-    parser.add_argument(
-        "--predictions", type=str, default="/app/output/predictions.json"
-    )
+    parser.add_argument("--predictions", type=str, default="/app/predictions.json")
     parser.add_argument("--reward", type=str, default="/logs/verifier/reward.txt")
     parser.add_argument("--details", type=str, default="/logs/verifier/details.json")
     args = parser.parse_args()
