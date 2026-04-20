@@ -2,16 +2,20 @@
 """Mass extract properties from PDFs using unsupervised LLM extraction.
 
 This script processes all PDF papers and extracts comprehensive property data
-using an LLM with an unsupervised extraction prompt.
+using an LLM with an unsupervised extraction prompt. Predictions are saved as
+per-paper JSON files in the shape consumed by the Harbor verifier:
 
-The script expects to be run from a directory containing:
-- prompts/unsupervised_extraction_prompt.md (or custom prompt path)
-- data/Paper_DB/ (directory containing the PDF files to process)
+    {
+      "refno": "...",
+      "agent": "zeroshot",
+      "model": "...",
+      "paper_pdf_path": "...",
+      "properties": [{"id": "prop_000", "material_or_system": "...", ...}, ...]
+    }
 
 Usage:
 ```bash
-# From examples/biosurfactants-extraction/ directory
-uv run pbench-extract \
+uv run pbench-eval \
     --server gemini \
     --model_name gemini-3-pro-preview \
     -od out/ \
@@ -20,17 +24,15 @@ uv run pbench-extract \
     -log_level INFO
 ```
 
-For this example, the results will be saved in `out/preds/*.csv`.
+Predictions land in `out/preds/*.json`.
 """
 
 import argparse
 import asyncio
 import json
 import logging
-import re
 from pathlib import Path
 
-import pandas as pd
 from slugify import slugify
 from datasets import load_dataset
 from dotenv import load_dotenv
@@ -41,139 +43,20 @@ import pbench
 
 logger = logging.getLogger(__name__)
 
-# Maximum number of conditions to store in CSV
-MAX_CONDITIONS = 10
-
 # Default concurrency limit for parallel processing
 MAX_CONCURRENT_TASKS = 20
 
 
 def load_prompt(prompt_path: Path) -> str:
-    """Load the extraction prompt from a markdown file.
-
-    Args:
-        prompt_path: Path to the prompt markdown file
-
-    Returns:
-        The prompt text as a string
-
-    """
+    """Load the extraction prompt from a markdown file."""
     with open(prompt_path, "r") as f:
         return f.read()
 
 
 def load_hf_refnos(hf_repo: str, hf_split: str, hf_revision: str | None) -> set[str]:
-    """Load refnos from a HuggingFace dataset.
-
-    Args:
-        hf_repo: HuggingFace dataset repository name
-        hf_split: Dataset split to load
-        hf_revision: Optional dataset revision/version
-
-    Returns:
-        Set of refnos from the dataset
-
-    """
+    """Load refnos from a HuggingFace dataset."""
     dataset = load_dataset(hf_repo, split=hf_split, revision=hf_revision)
-    refnos = {row["refno"] for row in dataset}
-    return refnos
-
-
-def parse_json_response(response_text: str) -> dict | None:
-    """Parse JSON from LLM response, handling markdown code blocks.
-
-    Args:
-        response_text: Raw response text from LLM
-
-    Returns:
-        Parsed JSON dict or None if parsing fails
-
-    """
-    # Try direct JSON parsing first
-    try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
-        pass
-
-    # Try to extract from markdown code blocks
-    json_match = re.search(r"```json\s*(.*?)\s*```", response_text, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group(1))
-        except json.JSONDecodeError:
-            pass
-
-    # Try to find any JSON object in the text
-    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group(0))
-        except json.JSONDecodeError:
-            pass
-
-    return None
-
-
-def json_property_to_csv_row(prop: dict) -> pd.Series:
-    """Convert a JSON property object to a CSV row as pandas Series.
-
-    Args:
-        prop: Property dict from JSON response
-
-    Returns:
-        pandas Series with CSV columns
-
-    """
-    # Get conditions and flatten them
-    conditions = prop.get("conditions") or prop.get("critical_matrix") or {}
-
-    # Create a dict to hold the flattened condition columns
-    condition_cols = {}
-    for i in range(1, MAX_CONDITIONS + 1):
-        condition_cols[f"condition{i}_name"] = ""
-        condition_cols[f"condition{i}_value"] = ""
-
-    # Fill in the conditions that exist
-    if isinstance(conditions, dict):
-        for idx, (cond_name, cond_value) in enumerate(conditions.items(), start=1):
-            if idx <= MAX_CONDITIONS:
-                condition_cols[f"condition{idx}_name"] = str(cond_name)
-                condition_cols[f"condition{idx}_value"] = str(cond_value)
-
-    # Get location info
-    location = prop.get("location", {})
-
-    # Build Series
-    row_data = {
-        # "id": "", # NOTE: will be automatically assigned when writing to CSV
-        # "refno": refno, # NOTE: will be automatically assigned when writing to CSV
-        "material_or_system": prop.get("material_or_system", ""),
-        "sample_label": prop.get("sample_label", ""),
-        "property_name": prop.get("property_name", ""),
-        "category": prop.get("category", ""),
-        "value_string": prop.get("value_string", ""),
-        "value_number": "",
-        "units": "",
-        "method": prop.get("method", ""),
-        "notes": prop.get("notes", ""),
-        "location.page": location.get("page", ""),
-        "location.section": location.get("section", ""),
-        "location.source_type": location.get("source_type", ""),
-        "location.evidence": location.get("evidence", ""),
-        "location.figure_or_table": location.get("figure_or_table", ""),
-    }
-
-    # Add the flattened condition columns
-    row_data.update(condition_cols)
-
-    # NOTE: values below will be populated later by the validator app
-    # "paper_pdf_path": "",
-    # "validated": False,
-    # "validator_name": "",
-    # "validation_date": "",
-    # "flagged": False,
-
-    return pd.Series(row_data)
+    return {row["refno"] for row in dataset}
 
 
 async def process_paper(
@@ -181,82 +64,39 @@ async def process_paper(
     prompt: str,
     llm: llm_utils.LLMChat,
     inf_gen_config: llm_utils.InferenceGenerationConfig,
-    model_name: str,
-) -> tuple[list[pd.Series], LLMChatResponse | None]:
-    """Process a single paper by prompting the LLM one page at a time to extract properties.
-
-    Args:
-        paper_path: Path to the PDF file
-        prompt: Extraction prompt text
-        llm: LLMChat instance
-        inf_gen_config: InferenceGenerationConfig instance
-        model_name: Name of the LLM model used for extraction
-
-    Returns:
-        Tuple of (list of pandas Series, LLMChatResponse object)
-
-    """
-    # Extract refno from filename and create file object for the paper
+) -> tuple[list[dict], LLMChatResponse | None]:
+    """Extract properties from a single PDF. Returns (properties, raw response)."""
     refno = paper_path.stem
     file = File(path=paper_path)
 
-    conv = Conversation(
-        messages=[
-            Message(role="user", content=[file, prompt]),
-        ]
-    )
-    # Get LLM response (NOTE: 429 errors will be raised as exceptions here)
+    conv = Conversation(messages=[Message(role="user", content=[file, prompt])])
     response = await llm.generate_response_async(conv, inf_gen_config)
-    # Check for errors
     if response.error:
         logger.warning(f"LLM error for {refno}: {response.error}")
 
-    # Extract properties from response JSON
+    # NOTE: with output_format="json", response.pred is already parsed JSON.
+    properties: list[dict] = []
     try:
-        # NOTE: Since we specified output_format="json", response.pred is already parsed JSON
-        json_data = response.pred
-        # Check for properties array
+        json_data = response.pred or {}
         if "properties" not in json_data:
             logger.warning(f"No 'properties' key in JSON for {refno}")
-        properties = json_data["properties"]
-        if not isinstance(properties, list):
+        props = json_data.get("properties", [])
+        if not isinstance(props, list):
             logger.warning(f"'properties' is not a list for {refno}")
+            props = []
+        properties = [p for p in props if isinstance(p, dict)]
     except Exception as e:
         logger.error(f"Error processing {refno}: {e}")
-        properties = []
 
-    # Flatten results and convert to CSV rows
-    all_rows: list[pd.Series] = []
-    property_counter = 0
+    # Stamp a stable id on each property; drop the temporary _page_num field
+    # from per-page extraction modes if present.
+    for i, prop in enumerate(properties):
+        prop.pop("_page_num", None)
+        prop.setdefault("id", f"prop_{i:03d}")
 
-    # for properties, _ in page_results:
-    for prop in properties:
-        try:
-            # Remove the temporary page_num field before converting
-            prop.pop("_page_num", None)
-            row_series: pd.Series = json_property_to_csv_row(prop)
-
-            # Assign metadata
-            row_series["id"] = f"prop_{property_counter:03d}"
-            row_series["refno"] = refno
-            row_series["paper_pdf_path"] = str(paper_path)
-            row_series["agent"] = "zeroshot"
-            row_series["model"] = model_name
-            row_series["validated"] = None
-            row_series["validator_name"] = ""
-            row_series["validation_date"] = ""
-            row_series["flagged"] = False
-
-            all_rows.append(row_series)
-            property_counter += 1
-
-        except Exception as e:
-            logger.warning(f"Failed to convert property from {refno}: {e}")
-            continue
-
-    logger.info(f"Total properties extracted from {refno}: {len(all_rows)}")
+    logger.info(f"Total properties extracted from {refno}: {len(properties)}")
     llm.delete_file(file)
-    return all_rows, response
+    return properties, response
 
 
 async def process_single_paper_task(
@@ -271,55 +111,44 @@ async def process_single_paper_task(
     force: bool,
     semaphore: asyncio.Semaphore,
 ) -> None:
-    """Process a single paper with semaphore-controlled concurrency.
-
-    Args:
-        pdf_path: Path to the PDF file
-        prompt: Extraction prompt text
-        llm: LLMChat instance
-        inf_gen_config: InferenceGenerationConfig instance
-        model_name: Name of the LLM model used for extraction
-        model_name_safe: Sanitized model name for filenames
-        preds_dir: Directory to save predictions
-        trajectory_dir: Directory to save trajectory data
-        force: Whether to overwrite existing files
-        semaphore: Semaphore to limit concurrency
-
-    """
+    """Process a single paper with semaphore-controlled concurrency."""
     async with semaphore:
         refno = pdf_path.stem
         logger.info(f"Processing {refno}...")
 
-        # Construct output path
         reasoning_effort = inf_gen_config.reasoning_effort
         reasoning_suffix = (
             f"__reasoning_effort={reasoning_effort}" if reasoning_effort else ""
         )
-        output_filename = f"extracted_properties__model={model_name_safe}{reasoning_suffix}__refno={refno}.csv"
+        output_filename = f"extracted_properties__model={model_name_safe}{reasoning_suffix}__refno={refno}.json"
         output_path = preds_dir / output_filename
 
-        # Skip if output file already exists and --force is not set
         if output_path.exists() and not force:
             logger.info(
                 f"Skipping {refno} as {output_path} already exists. Use --force to overwrite."
             )
             return
 
-        # Process the paper
-        rows, response = await process_paper(
-            pdf_path, prompt, llm, inf_gen_config, model_name
+        properties, response = await process_paper(
+            pdf_path, prompt, llm, inf_gen_config
         )
 
-        # Save to CSV
-        if len(rows) > 0:
-            # Create DataFrame from list of Series
-            df = pd.DataFrame(rows)
-            df.to_csv(output_path, index=False)
-            logger.info(f"Saved {len(rows)} properties from {refno} to {output_path}")
+        if properties:
+            payload = {
+                "refno": refno,
+                "agent": "zeroshot",
+                "model": model_name,
+                "paper_pdf_path": str(pdf_path),
+                "properties": properties,
+            }
+            with open(output_path, "w") as f:
+                json.dump(payload, f, indent=2)
+            logger.info(
+                f"Saved {len(properties)} properties from {refno} to {output_path}"
+            )
         else:
             logger.warning(f"No properties extracted from {refno}")
 
-        # Save trajectory to JSON (prompt, llm response, inf gen config)
         trajectory_filename = f"trajectory__agent=zeroshot__model={model_name_safe}{reasoning_suffix}__refno={refno}.json"
         trajectory_path = trajectory_dir / trajectory_filename
         trajectory_data = {
@@ -334,7 +163,6 @@ async def process_single_paper_task(
 
 async def extract_properties(args: argparse.Namespace) -> None:
     """Main function to extract properties from all PDFs."""
-    # Load extraction prompt (relative to current working directory)
     prompt_path = args.prompt_path
     if not prompt_path.exists():
         raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
@@ -342,14 +170,12 @@ async def extract_properties(args: argparse.Namespace) -> None:
     logger.info(f"Loading prompt from {prompt_path}")
     prompt = load_prompt(prompt_path)
 
-    # Get list of PDFs (relative to current working directory)
     paper_dir = args.data_dir / "Paper_DB"
     if not paper_dir.exists():
         raise FileNotFoundError(f"Paper directory not found: {paper_dir}")
 
     pdf_files = sorted(paper_dir.glob("*.pdf"))
 
-    # Filter out excluded files if exclude list is provided
     if args.exclude_list and args.exclude_list.exists():
         logger.info(f"Loading exclude list from {args.exclude_list}")
         with open(args.exclude_list, "r") as f:
@@ -362,7 +188,6 @@ async def extract_properties(args: argparse.Namespace) -> None:
         if excluded_count > 0:
             logger.info(f"Excluded {excluded_count} PDF file(s) based on exclude list")
 
-    # Default ordering is by filename
     refnos_ordering: list[str] = [pdf.stem for pdf in pdf_files]
     if args.harbor_task_ordering_registry_path is not None:
         logger.info(
@@ -371,37 +196,25 @@ async def extract_properties(args: argparse.Namespace) -> None:
         with open(args.harbor_task_ordering_registry_path, "r") as f:
             harbor_task_ordering = json.load(f)
 
-        # Load the refnos from harbor_task_ordering[0]["tasks"][:]["name"]
-        if False:
-            refnos_ordering = [
-                task["name"].strip().upper()
-                for task in harbor_task_ordering[0]["tasks"]
-            ]
-        else:
-            refnos_ordering = [
-                task["name"] for task in harbor_task_ordering[0]["tasks"]
-            ]
+        refnos_ordering = [task["name"] for task in harbor_task_ordering[0]["tasks"]]
 
     if args.max_num_papers is not None:
         refnos_ordering = refnos_ordering[: args.max_num_papers]
 
-    # Reorder the pdf_files based on the refnos_ordering
+    # Reorder the pdf_files based on refnos_ordering. Slugify both sides because
+    # Harbor registry refnos are slugified.
     reordered_pdf_files = []
     for refno in refnos_ordering:
         for pdf in pdf_files:
-            # NOTE: refno from Harbor registry has been sluggified, so we need to slugify
-            # both sides during matching
             if slugify(pdf.stem) == slugify(refno):
                 reordered_pdf_files.append(pdf)
                 break
 
-    # Filter by refno if specified
     if args.refno is not None:
         reordered_pdf_files = [
             pdf for pdf in reordered_pdf_files if pdf.stem == args.refno
         ]
 
-    # Filter by HuggingFace dataset refnos if specified
     if args.hf_repo is not None and args.hf_split is not None:
         logger.info(
             f"Loading refnos from HuggingFace dataset: {args.hf_repo} "
@@ -425,30 +238,21 @@ async def extract_properties(args: argparse.Namespace) -> None:
         logger.warning("No PDF files found to process")
         return
 
-    # Initialize LLM
     llm = llm_utils.get_llm(args.server, args.model_name)
-
-    # Create inference config
     inf_gen_config = llm_utils.InferenceGenerationConfig(
         max_output_tokens=args.max_output_tokens,
         output_format="json",
         reasoning_effort=args.openai_reasoning_effort,
     )
 
-    # Setup output directories
     preds_dir = args.output_dir / "preds"
     preds_dir.mkdir(parents=True, exist_ok=True)
     trajectory_dir = args.output_dir / "trajectories"
     trajectory_dir.mkdir(parents=True, exist_ok=True)
 
-    # Sanitize model name for filename
     model_name_safe = args.model_name.replace("/", "--")
+    semaphore = asyncio.Semaphore(args.max_concurrent)
 
-    # Create semaphore to limit concurrency
-    max_concurrent = args.max_concurrent
-    semaphore = asyncio.Semaphore(max_concurrent)
-
-    # Build list of tasks for all papers
     tasks = [
         process_single_paper_task(
             pdf_path=pdf_path,
@@ -466,7 +270,7 @@ async def extract_properties(args: argparse.Namespace) -> None:
     ]
 
     logger.info(
-        f"Processing {len(tasks)} papers with max {max_concurrent} concurrent tasks..."
+        f"Processing {len(tasks)} papers with max {args.max_concurrent} concurrent tasks..."
     )
     await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -486,13 +290,6 @@ def main() -> None:
         default=Path("prompts/unsupervised_extraction_prompt.md"),
         help="Path to the unsupervised extraction prompt (default: prompts/unsupervised_extraction_prompt.md)",
     )
-    # parser.add_argument(
-    #     "--file_no",
-    #     "-fn",
-    #     type=int,
-    #     default=None,
-    #     help="Specific file number to process (1-indexed). If None, process all files",
-    # )
     parser.add_argument(
         "--refno",
         type=str,
@@ -510,7 +307,7 @@ def main() -> None:
         "--harbor_task_ordering_registry_path",
         type=Path,
         default=None,
-        help="Path to the registry_data.json file that defines the ordering of the papers to process (default: None)",
+        help="Path to the registry_data.json file that defines the ordering of papers (default: None)",
     )
     parser.add_argument(
         "--max_num_papers",
@@ -518,7 +315,6 @@ def main() -> None:
         default=None,
         help="Maximum number of papers to process (default: None)",
     )
-    # LLM generation arguments
     parser.add_argument(
         "--max_output_tokens",
         type=int,
