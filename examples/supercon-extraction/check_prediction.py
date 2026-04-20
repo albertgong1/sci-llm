@@ -180,7 +180,6 @@ async def generate_property_name_matches(
     df2: pd.DataFrame,
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
-    prompt_template: str,
     top_k: int = TOP_K,
     left_on: list[str] = ["property_name", "context"],
     right_on: list[str] = ["property_name", "context"],
@@ -188,6 +187,7 @@ async def generate_property_name_matches(
     right_suffix: str = "_y",
 ) -> pd.DataFrame:
     """For each row in df1, find the top-k matches in df2 using embeddings + LLM."""
+    prompt_template = PROPERTY_MATCHING_PROMPT
     Y = df2.drop_duplicates(subset=["property_name"])
     similarity_matrix = cosine_similarity(
         np.vstack(df1["embedding"].values),
@@ -1051,7 +1051,6 @@ def add_property_name_embeddings(df: pd.DataFrame) -> pd.DataFrame:
 async def compute_mean_recall_precision(
     df_pred: pd.DataFrame,
     df_gt: pd.DataFrame,
-    property_matching_prompt_template: str,
     conversion_df: pd.DataFrame | None,
 ) -> tuple[float, float]:
     """Calculate mean recall and precision for a single task (single refno)."""
@@ -1086,7 +1085,6 @@ async def compute_mean_recall_precision(
         df_gt_for_merge,
         llm,
         inf_gen_config,
-        property_matching_prompt_template,
         left_on=["property_name", "context"],
         right_on=["property_name", "context"],
         left_suffix="_pred",
@@ -1099,7 +1097,6 @@ async def compute_mean_recall_precision(
         df_pred_for_merge,
         llm,
         inf_gen_config,
-        property_matching_prompt_template,
         left_on=["property_name", "context"],
         right_on=["property_name", "context"],
         left_suffix="_gt",
@@ -1201,7 +1198,6 @@ async def _async_main(args: argparse.Namespace) -> None:
     mean_recall, mean_precision = await compute_mean_recall_precision(
         df_pred,
         df_gt,
-        PROPERTY_MATCHING_PROMPT,
         conversion_df=None,
     )
 
