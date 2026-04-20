@@ -15,6 +15,7 @@ uv run python generate_matches_cli.py \
 """
 
 import argparse
+import json
 import os
 import logging
 import pandas as pd
@@ -41,7 +42,7 @@ async def process_single_group(
     agent: str,
     model: str,
     refno: str,
-    group: pd.DataFrame,
+    properties: list[dict],
     df_gt: pd.DataFrame,
     pred_embeddings_dir: Path,
     pred_matches_dir: Path,
@@ -56,12 +57,10 @@ async def process_single_group(
     semaphore: asyncio.Semaphore,
     context_column: str,
 ) -> None:
-    """Process a single (agent, model, refno) group."""
+    """Process one (agent, model, refno) trial — its full list of properties."""
     async with semaphore:
         logger.info(f"Processing {agent=} {model=} {refno=}...")
-
-        # Prepare predicted data
-        df_pred = group
+        df_pred = pd.json_normalize(properties)
         df_pred_embeddings = pd.read_parquet(
             pred_embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
         )
@@ -70,24 +69,13 @@ async def process_single_group(
             on="property_name",
             how="left",
         )
-        # Use configurable context column
         if context_column in df_pred.columns:
             df_pred["context"] = df_pred[context_column]
         else:
             df_pred["context"] = ""
 
         # Prepare ground truth data for this refno
-        if False:
-            df_gt_refno = df_gt[df_gt["refno"].str.lower() == refno.lower()].drop(
-                columns=["refno"]
-            )
-        else:
-            # NOTE: For Harbor evaluation, the refno for predictions is inferred from the trial dirname,
-            # which is slugified. The refno in the GT is not slugified, so we need to slugify it for matching.
-            df_gt_refno = df_gt[
-                df_gt["refno"].str.lower().apply(lambda x: slugify(x))
-                == slugify(refno.lower())
-            ].drop(columns=["refno"])
+        df_gt_refno = df_gt[df_gt["refno"] == refno].drop(columns=["refno"])
 
         # Define paths
         pred_matches_path = (
@@ -223,21 +211,30 @@ async def main(args: argparse.Namespace) -> None:
     # Load extracted properties
     #
     if jobs_dir is not None:
-        # Load predictions from Harbor jobs directory
+        # Load predictions from Harbor jobs directory — one row per trial with a
+        # `properties` list column.
         df = get_harbor_data(jobs_dir)
     else:
-        # Load predictions from CSV files
+        # Load predictions from per-refno JSON files (zeroshot output format).
         pred_properties_dir = output_dir / preds_dirname
-        pred_properties_files = list(pred_properties_dir.glob("*.csv"))
+        pred_properties_files = list(pred_properties_dir.glob("*.json"))
         if not pred_properties_files:
             raise FileNotFoundError(
                 f"No properties files found in {pred_properties_dir}"
             )
-        dfs = []
+        trials = []
         for file in pred_properties_files:
-            df = pd.read_csv(file)
-            dfs.append(df)
-        df = pd.concat(dfs, ignore_index=True)
+            with file.open() as f:
+                payload = json.load(f)
+            trials.append(
+                {
+                    "agent": payload.get("agent"),
+                    "model": payload.get("model"),
+                    "refno": payload["refno"],
+                    "properties": payload["properties"],
+                }
+            )
+        df = pd.DataFrame(trials)
 
     #
     # Load ground truth properties
@@ -291,17 +288,18 @@ async def main(args: argparse.Namespace) -> None:
     max_concurrent = args.max_concurrent
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    # Build list of tasks for all groups
+    # Build list of tasks — one per trial row.
     tasks = []
-    for (agent, model, refno), group in df.groupby(["agent", "model", "refno"]):
-        if args.refno is not None and refno != args.refno:
+    for _, row in df.iterrows():
+        if args.refno is not None and row["refno"] != args.refno:
             continue
         tasks.append(
             process_single_group(
-                agent=agent,
-                model=model,
-                refno=refno,
-                group=group,
+                # Coerce None → "" so slugify doesn't choke (oracle batches have no model_name).
+                agent=row["agent"] or "",
+                model=row["model"] or "",
+                refno=row["refno"],
+                properties=row["properties"],
                 df_gt=df_gt,
                 pred_embeddings_dir=pred_embeddings_dir,
                 pred_matches_dir=pred_matches_dir,

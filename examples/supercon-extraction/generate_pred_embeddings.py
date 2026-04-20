@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 
 import pandas as pd
@@ -52,18 +53,22 @@ else:
     if args.output_dir is None:
         parser.error("--output_dir is required when not using --jobs_dir")
     preds_dir = args.output_dir / preds_dirname
-    preds_files = list(preds_dir.glob("*.csv"))
+    preds_files = list(preds_dir.glob("*.json"))
     if not preds_files:
-        raise FileNotFoundError(f"No CSV files found in {preds_dir}")
-    dfs = []
+        raise FileNotFoundError(f"No JSON files found in {preds_dir}")
+    trials = []
     for file in preds_files:
-        file_df = pd.read_csv(file)
-        assert "refno" in file_df.columns, "refno column not found in predictions CSV"
-        assert file_df["refno"].nunique() == 1, (
-            "Expected only one unique refno per predictions CSV"
+        with file.open() as f:
+            payload = json.load(f)
+        trials.append(
+            {
+                "agent": payload.get("agent"),
+                "model": payload.get("model"),
+                "refno": payload["refno"],
+                "properties": payload["properties"],
+            }
         )
-        dfs.append(file_df)
-    df = pd.concat(dfs, ignore_index=True)
+    df = pd.DataFrame(trials)
 
 if args.output_dir is None:
     parser.error("--output_dir is required")
@@ -71,9 +76,11 @@ if args.output_dir is None:
 embeddings_dir = args.output_dir / "pred_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
 
-for (agent, model, refno), group in df.groupby(
-    ["agent", "model", "refno"], dropna=False
-):
+for _, row in df.iterrows():
+    # Coerce None → "" so slugify doesn't choke (oracle batches have no model_name).
+    agent = row["agent"] or ""
+    model = row["model"] or ""
+    refno = row["refno"]
     save_path = embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
     if save_path.exists() and not force:
         logger.info(
@@ -82,12 +89,11 @@ for (agent, model, refno), group in df.groupby(
         continue
 
     logger.info(f"Generating embeddings for {agent=} {model=} {refno=}...")
-    preds_df = group[group["refno"] == refno]
-    property_names = preds_df["property_name"].dropna().tolist()
+    property_names = [
+        p["property_name"] for p in row["properties"] if p.get("property_name")
+    ]
     unique_property_names = list(set(property_names))
     embeddings = generate_embeddings(unique_property_names)
-    assert len(preds_df["refno"].unique()) == 1, "Expected only one refno per file"
-    refno = preds_df["refno"].unique()[0]
     embeddings_df = pd.DataFrame(
         {
             "refno": [refno] * len(unique_property_names),
