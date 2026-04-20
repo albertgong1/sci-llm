@@ -349,17 +349,11 @@ def main() -> None:
     grouped = load_dataset(
         dataset_name, split=dataset_split, revision=dataset_revision
     ).to_pandas()
-    refnos = grouped["refno"].tolist()
-
-    if args.refno:
-        requested = {value.strip() for value in args.refno if value and value.strip()}
-        missing = sorted(requested - set(refnos))
-        if missing:
-            raise ValueError(f"Unknown refno(s) requested: {missing}")
-        refnos = [refno for refno in refnos if refno in requested]
 
     for _, row in grouped.iterrows():
         refno = row["refno"]
+        if args.refno and refno not in args.refno:
+            continue
         properties = list(row["properties"])
         pdf_path = pdf_dir / f"{refno}.pdf"
         if not pdf_path.exists():
