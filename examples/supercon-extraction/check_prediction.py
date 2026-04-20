@@ -1195,10 +1195,18 @@ async def _async_main(args: argparse.Namespace) -> None:
         predictions = json.load(f)["properties"]
     df_pred = _properties_to_df(predictions, refno=refno, id_column="id_pred")
 
+    # Optional SI unit-conversion table (same format as
+    # score_precision_cli.py / score_recall_cli.py consume): CSV indexed
+    # by property_unit with a `conversion_factor` column. If the file
+    # isn't present the scorer falls back to same-unit comparison only.
+    conversion_df = None
+    if Path(args.conversion_factors_path).exists():
+        conversion_df = pd.read_csv(args.conversion_factors_path, index_col=0)
+
     mean_recall, mean_precision = await compute_mean_recall_precision(
         df_pred,
         df_gt,
-        conversion_df=None,
+        conversion_df=conversion_df,
     )
 
     reward = float(
@@ -1242,6 +1250,16 @@ def main() -> None:
     parser.add_argument("--predictions", type=str, default="/app/predictions.json")
     parser.add_argument("--reward", type=str, default="/logs/verifier/reward.txt")
     parser.add_argument("--details", type=str, default="/logs/verifier/details.json")
+    parser.add_argument(
+        "--conversion_factors_path",
+        type=str,
+        default="/tests/si_conversion_factors.csv",
+        help=(
+            "Optional CSV (indexed by property_unit, with a "
+            "`conversion_factor` column) used for SI unit conversion during "
+            "value scoring. Silently skipped if the file is missing."
+        ),
+    )
     args = parser.parse_args()
 
     reward_path = Path(args.reward)

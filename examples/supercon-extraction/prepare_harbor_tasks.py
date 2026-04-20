@@ -213,6 +213,10 @@ def build_task(
         templates_dir / "tests/check_prediction.py", tests_dir / "check_prediction.py"
     )
     shutil.copy2(templates_dir / "tests/test.sh", tests_dir / "test.sh")
+    shutil.copy2(
+        templates_dir / "tests/si_conversion_factors.csv",
+        tests_dir / "si_conversion_factors.csv",
+    )
 
     solution_script = f"""\
 #!/bin/bash
