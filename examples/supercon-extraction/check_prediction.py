@@ -21,10 +21,8 @@ import re
 import sys
 import traceback
 from collections import OrderedDict
-from dataclasses import dataclass
-from json import JSONDecoder
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -1094,277 +1092,71 @@ async def compute_mean_recall_precision(
 #
 # Harbor verifier I/O helpers
 #
-@dataclass(frozen=True)
-class Prediction:
-    """Normalized view of one predicted property record."""
-
-    material: str
-    property_name: str
-    value_string: str
-    value_unit: str
-    location_evidence: str
-    raw: dict[str, Any]
+# Number of condition slots to flatten into the row (mirrors zeroshot.py's
+# json_property_to_csv_row schema).
+MAX_CONDITIONS = 10
 
 
-def _load_json(path: Path) -> Any:
-    """Load JSON from disk."""
-    with path.open() as f:
-        return json.load(f)
+def json_property_to_csv_row(prop: dict) -> pd.Series:
+    """Flatten one property dict into a pandas Series.
+
+    Mirrors the schema produced by ``zeroshot.py``'s ``json_property_to_csv_row``
+    so predictions written by the zeroshot agent and ground-truth entries share a
+    common shape.
+    """
+    conditions = prop.get("conditions") or {}
+
+    condition_cols: dict[str, str] = {}
+    for i in range(1, MAX_CONDITIONS + 1):
+        condition_cols[f"condition{i}_name"] = ""
+        condition_cols[f"condition{i}_value"] = ""
+
+    for idx, (cond_name, cond_value) in enumerate(conditions.items(), start=1):
+        if idx <= MAX_CONDITIONS:
+            condition_cols[f"condition{idx}_name"] = str(cond_name)
+            condition_cols[f"condition{idx}_value"] = str(cond_value)
+
+    location = prop.get("location") or {}
+
+    row_data = {
+        "material_or_system": prop.get("material_or_system") or "",
+        "sample_label": prop.get("sample_label") or "",
+        "property_name": prop.get("property_name") or "",
+        "category": prop.get("category") or "",
+        "value_string": prop.get("value_string") or "",
+        "value_unit": prop.get("value_unit") or "",
+        "method": prop.get("method") or "",
+        "notes": prop.get("notes") or "",
+        "rubric": prop.get("rubric") or "",
+        "location.page": location.get("page") or "",
+        "location.section": location.get("section") or "",
+        "location.source_type": location.get("source_type") or "",
+        "location.evidence": location.get("evidence") or "",
+        "location.figure_or_table": location.get("figure_or_table") or "",
+    }
+    row_data.update(condition_cols)
+
+    return pd.Series(row_data)
 
 
-def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
-    """Extract the first JSON array from mixed text (handles fenced blocks)."""
-
-    def looks_like_predictions_array(obj: Any) -> bool:
-        if not isinstance(obj, list) or not obj:
-            return False
-        first = obj[0]
-        if not isinstance(first, dict):
-            return False
-        return "property_name" in first and (
-            "material" in first or "material_or_system" in first
-        )
-
-    fence_match = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if looks_like_predictions_array(obj):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\[", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-        except Exception:
-            continue
-        if looks_like_predictions_array(obj):
-            return obj
-    return None
-
-
-def _extract_first_json_object(text: str) -> dict[str, Any] | None:
-    """Extract the first JSON object from mixed text (handles fenced blocks)."""
-
-    def looks_like_properties_object(obj: Any) -> bool:
-        if not isinstance(obj, dict):
-            return False
-        props = obj.get("properties")
-        if not isinstance(props, list) or not props:
-            return False
-        first = props[0]
-        if not isinstance(first, dict):
-            return False
-        return "property_name" in first and (
-            "material_or_system" in first or "material" in first
-        )
-
-    fence_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if looks_like_properties_object(obj):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\{", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-        except Exception:
-            continue
-        if looks_like_properties_object(obj):
-            return obj
-    return None
-
-
-def _extract_text_from_jsonlines_log(text: str) -> str | None:
-    """Decode assistant output embedded in JSONL agent logs (e.g., Claude Code)."""
-    decoded_parts: list[str] = []
-    any_json = False
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if not line.startswith("{"):
-            return None
-        try:
-            obj = json.loads(line)
-        except Exception:
-            return None
-        any_json = True
-
-        if isinstance(obj, dict):
-            message = obj.get("message")
-            if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and isinstance(
-                            block.get("text"), str
-                        ):
-                            decoded_parts.append(block["text"])
-
-            result_text = obj.get("result")
-            if isinstance(result_text, str):
-                decoded_parts.append(result_text)
-
-    if not any_json:
-        return None
-
-    combined = "\n\n".join(
-        part.strip() for part in decoded_parts if part and part.strip()
-    )
-    return combined or None
-
-
-def _coerce_predictions_payload(payload: Any) -> list[dict[str, Any]]:
-    """Coerce multiple supported prediction JSON shapes into a list[dict]."""
-    if isinstance(payload, dict) and isinstance(payload.get("properties"), list):
-        return [p for p in payload["properties"] if isinstance(p, dict)]
-    if isinstance(payload, list):
-        return [p for p in payload if isinstance(p, dict)]
-    if isinstance(payload, dict):
-        values = list(payload.values())
-        if values and all(isinstance(v, dict) for v in values):
-            return [v for v in values if isinstance(v, dict)]
-    raise ValueError("Unrecognized predictions JSON format")
-
-
-def _as_prediction(raw: dict[str, Any]) -> Prediction:
-    """Map a raw property dict to a normalized Prediction."""
-    material = raw.get("material")
-    if material is None:
-        material = (
-            raw.get("material_or_system")
-            or raw.get("material_system")
-            or raw.get("system")
-        )
-    property_name = raw.get("property_name") or raw.get("name")
-
-    value_string = (
-        raw.get("value_string")
-        or raw.get("value")
-        or raw.get("pred_value")
-        or raw.get("property_value")
-        or ""
-    )
-    value_unit = (
-        raw.get("value_unit")
-        or raw.get("pred_unit")
-        or raw.get("unit")
-        or raw.get("property_unit")
-        or ""
-    )
-    location_evidence = ""
-    location = raw.get("location")
-    if isinstance(location, dict):
-        location_evidence = str(location.get("evidence") or "")
-    elif "location.evidence" in raw:
-        location_evidence = str(raw.get("location.evidence") or "")
-
-    return Prediction(
-        material=str(material or ""),
-        property_name=str(property_name or ""),
-        value_string=str(value_string or ""),
-        value_unit=str(value_unit or ""),
-        location_evidence=location_evidence,
-        raw=raw,
-    )
-
-
-def load_predictions(predictions_path: Path) -> list[Prediction]:
-    """Load predictions from disk or fall back to parsing agent logs."""
-    if predictions_path.exists():
-        payload = _load_json(predictions_path)
-        return [_as_prediction(p) for p in _coerce_predictions_payload(payload)]
-
-    agent_logs_dir = Path("/logs/agent")
-    if agent_logs_dir.exists():
-        for log_path in sorted(agent_logs_dir.glob("*.txt")):
-            try:
-                content = log_path.read_text()
-            except Exception:
-                continue
-            decoded = _extract_text_from_jsonlines_log(content)
-            text = decoded or content
-
-            extracted_obj = _extract_first_json_object(text)
-            if extracted_obj is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_obj)
-                ]
-
-            extracted_arr = _extract_first_json_array(text)
-            if extracted_arr is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_arr)
-                ]
-
-    raise FileNotFoundError(
-        f"Missing predictions file at {predictions_path} and could not parse JSON from /logs/agent/*.txt"
-    )
+def _properties_to_df(
+    properties: list[dict], *, refno: str, id_column: str
+) -> pd.DataFrame:
+    """Build a DataFrame from a list of property dicts using json_property_to_csv_row."""
+    rows: list[pd.Series] = []
+    for i, prop in enumerate(properties):
+        row = json_property_to_csv_row(prop)
+        row["refno"] = refno
+        row["agent"] = "verifier"
+        row["model"] = "verifier"
+        row[id_column] = prop.get("id") or i
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 #
 # Harbor verifier main
 #
-def _ground_truth_to_df(expected: dict[str, Any]) -> pd.DataFrame:
-    """Build df_gt from the expected.json ground_truth list."""
-    refno = str(expected.get("refno") or "")
-    rows = []
-    for truth in expected.get("ground_truth") or []:
-        if not isinstance(truth, dict):
-            continue
-        rows.append(
-            {
-                "refno": refno,
-                "agent": "verifier",
-                "model": "verifier",
-                "id_gt": truth.get("id") or "",
-                "property_name": truth.get("property_name") or "",
-                "value_string": truth.get("value_string") or "",
-                "value_unit": truth.get("value_unit") or "",
-                "material_or_system": truth.get("material_or_system")
-                or truth.get("material")
-                or "",
-                "rubric": truth.get("rubric") or "",
-                "location.evidence": (
-                    (truth.get("location") or {}).get("evidence", "")
-                    if isinstance(truth.get("location"), dict)
-                    else ""
-                ),
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def _predictions_to_df(predictions: list[Prediction], refno: str) -> pd.DataFrame:
-    """Build df_pred from a list of Prediction records."""
-    rows = []
-    for i, pred in enumerate(predictions):
-        rows.append(
-            {
-                "refno": refno,
-                "agent": "verifier",
-                "model": "verifier",
-                "id_pred": i,
-                "property_name": pred.property_name,
-                "value_string": pred.value_string,
-                "value_unit": pred.value_unit,
-                "material_or_system": pred.material,
-                "location.evidence": pred.location_evidence,
-            }
-        )
-    return pd.DataFrame(rows)
-
-
 async def _async_main(args: argparse.Namespace) -> None:
     """Async body of main — loads inputs, runs the pipeline, writes outputs."""
     expected_path = Path(args.expected)
@@ -1372,17 +1164,15 @@ async def _async_main(args: argparse.Namespace) -> None:
     reward_path = Path(args.reward)
     details_path = Path(args.details)
 
-    expected = _load_json(expected_path)
+    with expected_path.open() as f:
+        expected = json.load(f)
     refno = str(expected.get("refno") or "")
 
-    df_gt = _ground_truth_to_df(expected)
-    if df_gt.empty:
-        raise ValueError("expected.json contains no ground_truth entries")
+    df_gt = _properties_to_df(expected["ground_truth"], refno=refno, id_column="id_gt")
 
-    predictions = load_predictions(predictions_path)
-    df_pred = _predictions_to_df(predictions, refno)
-    if df_pred.empty:
-        raise ValueError("predictions.json contains no usable prediction entries")
+    with predictions_path.open() as f:
+        predictions = json.load(f)["properties"]
+    df_pred = _properties_to_df(predictions, refno=refno, id_column="id_pred")
 
     mean_recall, mean_precision = await compute_mean_recall_precision(
         df_pred,
@@ -1406,7 +1196,7 @@ async def _async_main(args: argparse.Namespace) -> None:
                 "mean_precision": float(mean_precision),
                 "task": expected.get("task"),
                 "refno": expected.get("refno"),
-                "n_predictions": len(predictions),
+                "n_predictions": len(df_pred),
                 "n_ground_truth": len(df_gt),
             },
             indent=2,
