@@ -38,6 +38,10 @@ from huggingface_hub import HfApi
 from slugify import slugify
 import logging
 
+import llm_utils as _llm_utils
+
+_LLM_UTILS_SRC = Path(_llm_utils.__file__).parent
+
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +197,14 @@ def build_task(
     shutil.copy2(templates_dir / "task.toml.template", task_dir / "task.toml")
 
     (env_dir / "Dockerfile").write_text(dockerfile_contents(templates_dir))
+    # Bundle the monorepo-local llm_utils package into the build context so the
+    # verifier Dockerfile's `COPY llm_utils /opt/llm_utils` step can find it.
+    llm_utils_dst = env_dir / "llm_utils"
+    if llm_utils_dst.exists():
+        shutil.rmtree(llm_utils_dst)
+    shutil.copytree(
+        _LLM_UTILS_SRC, llm_utils_dst, ignore=shutil.ignore_patterns("__pycache__")
+    )
     shutil.copy2(
         templates_dir / "tests/check_prediction.py", tests_dir / "check_prediction.py"
     )

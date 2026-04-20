@@ -39,7 +39,7 @@ from pbench_eval.token_utils import (
 from pbench_eval.stats import mean_sem_with_n
 from pbench_eval.cli_utils import load_rubric
 
-from metrics import compute_recall_per_material_property
+from check_prediction import compute_recall_per_material_property
 
 logger = logging.getLogger(__name__)
 
