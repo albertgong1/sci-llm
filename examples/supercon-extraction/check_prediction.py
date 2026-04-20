@@ -1073,9 +1073,17 @@ async def compute_mean_recall_precision(
     df_pred["context"] = df_pred["location.evidence"]
     df_gt["context"] = df_gt.apply(construct_context, axis=1)
 
+    # Avoid column-name collisions in the merge inside
+    # generate_property_name_matches. Columns present on both sides get
+    # suffixed to `_pred`/`_gt`, but compute_recall/precision_per_material_property
+    # reads (refno, agent, model) and rubric unsuffixed. Keep refno/agent/model
+    # only on df_pred and rubric only on df_gt so each ends up unsuffixed.
+    df_gt_for_merge = df_gt.drop(columns=["refno", "agent", "model"], errors="ignore")
+    df_pred_for_merge = df_pred.drop(columns=["rubric"], errors="ignore")
+
     df_pred_matches, _ = await generate_property_name_matches(
-        df_pred,
-        df_gt,
+        df_pred_for_merge,
+        df_gt_for_merge,
         llm,
         inf_gen_config,
         property_matching_prompt_template,
@@ -1087,8 +1095,8 @@ async def compute_mean_recall_precision(
     df_recall = compute_recall_per_material_property(df_pred_matches, conversion_df)
 
     df_gt_matches, _ = await generate_property_name_matches(
-        df_gt,
-        df_pred,
+        df_gt_for_merge,
+        df_pred_for_merge,
         llm,
         inf_gen_config,
         property_matching_prompt_template,
