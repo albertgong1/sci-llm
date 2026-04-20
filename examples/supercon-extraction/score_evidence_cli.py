@@ -13,6 +13,7 @@ uv run pbench-score-evidence \
 """
 
 import argparse
+import json
 import logging
 from pathlib import Path
 import sys
@@ -334,6 +335,11 @@ def cli_main() -> None:
         for jobs_dir in args.jobs_dir_list:
             logger.info(f"Loading predictions from Harbor jobs: {jobs_dir}")
             df = get_harbor_data(jobs_dir)
+            df = df.explode("properties").reset_index(drop=True)
+            df = pd.concat(
+                [df.drop(columns=["properties"]), pd.json_normalize(df["properties"])],
+                axis=1,
+            )
             # Add run_id column and set it to output_dir name
             run_id = jobs_dir.name
             df["run_id"] = run_id
@@ -342,26 +348,39 @@ def cli_main() -> None:
     else:
         dfs = []
         for output_dir in args.output_dir_list:
-            if False:
-                pred_properties_dir = args.output_dir / args.preds_dirname
-            else:
-                pred_properties_dir = output_dir / args.preds_dirname
+            pred_properties_dir = output_dir / args.preds_dirname
             if not pred_properties_dir.exists():
                 logger.error(f"Directory not found: {pred_properties_dir}")
                 sys.exit(1)
 
-            csv_files = list(pred_properties_dir.glob("*.csv"))
-            if not csv_files:
-                logger.error(f"No CSV files found in {pred_properties_dir}")
+            json_files = list(pred_properties_dir.glob("*.json"))
+            if not json_files:
+                logger.error(f"No JSON files found in {pred_properties_dir}")
                 sys.exit(1)
 
-            logger.info(f"Found {len(csv_files)} CSV file(s) in {pred_properties_dir}")
-            for csv_file in csv_files:
-                df = pd.read_csv(csv_file, dtype={"refno": str})
-                # Add run_id column and set it to output_dir name
-                run_id = output_dir.name
-                df["run_id"] = run_id
-                dfs.append(df)
+            logger.info(
+                f"Found {len(json_files)} JSON file(s) in {pred_properties_dir}"
+            )
+            trials = []
+            for json_file in json_files:
+                with json_file.open() as f:
+                    payload = json.load(f)
+                trials.append(
+                    {
+                        "agent": payload.get("agent"),
+                        "model": payload.get("model"),
+                        "refno": payload["refno"],
+                        "properties": payload["properties"],
+                    }
+                )
+            df = pd.DataFrame(trials)
+            df = df.explode("properties").reset_index(drop=True)
+            df = pd.concat(
+                [df.drop(columns=["properties"]), pd.json_normalize(df["properties"])],
+                axis=1,
+            )
+            df["run_id"] = output_dir.name
+            dfs.append(df)
         df_pred = pd.concat(dfs, ignore_index=True)
 
     logger.info(f"Loaded {len(df_pred)} prediction rows")
