@@ -776,18 +776,26 @@ def compute_recall_per_material_property(
     material_column: str = "material_or_system",
     rubric_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Score recall for a dataframe of predicted-ground truth pairs."""
+    """Score recall for a dataframe of predicted-ground truth pairs.
+
+    Assumes df contains a single (refno, agent, model) combination — group
+    upstream if you need to aggregate across multiple.
+    """
     if matching_mode == "conditions" and rubric_df is None:
         raise ValueError("rubric_df is required when matching_mode='conditions'")
 
-    grouped = df.groupby(["refno", "agent", "model", "id_gt"], dropna=False)
+    refno = df["refno"].iloc[0]
+    agent = df["agent"].iloc[0]
+    model = df["model"].iloc[0]
+
+    grouped = df.groupby("id_gt", dropna=False)
     logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
     results = []
 
     gt_material_col = f"{material_column}_gt"
     pred_material_col = f"{material_column}_pred"
 
-    for (refno, agent, model, id_gt), group in grouped:
+    for id_gt, group in grouped:
         matching_rows = []
         property_name = group["property_name_gt"].iloc[0]
 
@@ -900,18 +908,26 @@ def compute_precision_per_material_property(
     material_column: str = "material_or_system",
     rubric_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Score precision for a dataframe of predicted-ground truth pairs."""
+    """Score precision for a dataframe of predicted-ground truth pairs.
+
+    Assumes df contains a single (refno, agent, model) combination — group
+    upstream if you need to aggregate across multiple.
+    """
     if matching_mode == "conditions" and rubric_df is None:
         raise ValueError("rubric_df is required when matching_mode='conditions'")
 
-    grouped = df.groupby(["refno", "agent", "model", "id_pred"], dropna=False)
+    refno = df["refno"].iloc[0]
+    agent = df["agent"].iloc[0]
+    model = df["model"].iloc[0]
+
+    grouped = df.groupby("id_pred", dropna=False)
     logger.info(f"Processing {len(grouped)} unique predicted materials...")
     results = []
 
     gt_material_col = f"{material_column}_gt"
     pred_material_col = f"{material_column}_pred"
 
-    for (refno, agent, model, id_pred), group in grouped:
+    for id_pred, group in grouped:
         matching_rows = []
         property_name = group["property_name_pred"].iloc[0]
 
