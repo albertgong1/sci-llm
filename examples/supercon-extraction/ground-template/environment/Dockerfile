@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir \
 
 # Bundle the monorepo-local llm_utils package so check_prediction.py can import
 # it. prepare_harbor_tasks.py copies src/llm_utils into this build context.
-# Harbor must set GOOGLE_API_KEY in the verifier's environment at runtime.
+# GOOGLE_API_KEY is forwarded into the verifier at runtime via [verifier.env]
+# in task.toml; no ENV directive is needed here.
 COPY llm_utils /opt/llm_utils
 ENV PYTHONPATH=/opt
 

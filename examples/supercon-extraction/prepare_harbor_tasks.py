@@ -194,7 +194,11 @@ def build_task(
     instruction = _format_template(instruction_template, instruction_values)
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
 
-    shutil.copy2(templates_dir / "task.toml.template", task_dir / "task.toml")
+    task_toml_template = (templates_dir / "task.toml.template").read_text()
+    task_toml = _format_template(
+        task_toml_template, {"task_name": task_dir.name, "refno": refno}
+    )
+    (task_dir / "task.toml").write_text(task_toml)
 
     (env_dir / "Dockerfile").write_text(dockerfile_contents(templates_dir))
     # Bundle the monorepo-local llm_utils package into the build context so the
