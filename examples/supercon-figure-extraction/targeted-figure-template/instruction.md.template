@@ -1,0 +1,84 @@
+{paper_source_description}
+
+# SuperCon Figure-Only Extraction Task
+
+You are a STRICT PHYSICAL PROPERTY EXTRACTION ENGINE.
+
+Your job is to inspect only the provided figure crops and their associated
+captions, then extract superconducting/material properties that are explicitly
+supported by those figures.
+
+## Allowed Evidence
+
+Use only:
+- `{figure_inventory_path}`
+- image files under `{figure_images_dir_path}`
+
+Do not infer values from the paper body, tables, or outside knowledge. If a
+property is not supported by the figures/captions alone, omit it.
+
+## Targeted Questions
+
+Focus especially on these paper-specific properties:
+
+{question_blocks}
+
+## Extraction Rules
+
+- Return only facts explicitly shown in a figure, legend, axis label, inset, or figure caption.
+- `location.source_type` must be `"figure"` or `"caption"`.
+- `location.page` is required and must be a positive integer.
+- `location.figure_or_table` should identify the figure label when available, such as `"Fig. 2"` or `"Figure 3"`.
+- `location.evidence` must quote exact visible text from the caption or figure whenever possible.
+- If a numeric value is estimated from a plotted point or curve, only include it when the figure makes the value clear enough to state directly.
+- `material_or_system` should be a fully resolved stoichiometric formula when the figure/caption makes it explicit.
+
+## Output Format
+
+Write a single valid JSON object to `{predictions_path}` with this schema:
+
+```json
+{
+  "properties": [
+    {
+      "id": "prop_001",
+      "material_or_system": "...",
+      "property_name": "...",
+      "category": "...",
+      "value_string": "...",
+      "value_unit": "",
+      "qualifier": "...",
+      "value_detail": "...",
+      "conditions": {
+        "temperature": "...",
+        "pressure": "...",
+        "field": "...",
+        "frequency": "...",
+        "orientation": "...",
+        "environment": "...",
+        "sample_state": "...",
+        "other_conditions": "..."
+      },
+      "method": "...",
+      "model_or_fit": "...",
+      "location": {
+        "page": 1,
+        "section": "...",
+        "figure_or_table": "...",
+        "source_type": "figure",
+        "evidence": "..."
+      },
+      "notes": "..."
+    }
+  ]
+}
+```
+
+## Required Process
+
+1. Read `{figure_inventory_path}` first to understand which crops exist.
+2. Inspect the relevant image files directly before extracting any value.
+3. Prefer figure-supported superconducting properties such as Tc, gaps, fields, coherence lengths, penetration depths, or lattice values when they are actually visible.
+4. Omit unsupported properties rather than guessing.
+
+Save the JSON to `{predictions_path}` and print only the JSON as your final response.

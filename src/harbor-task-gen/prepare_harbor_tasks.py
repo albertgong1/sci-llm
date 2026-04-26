@@ -98,6 +98,16 @@ def copy_template(relative_path: str, dest_path: Path) -> None:
     shutil.copy2(templates_dir() / relative_path, dest_path)
 
 
+def copy_template_if_exists(relative_path: str, dest_path: Path) -> bool:
+    """Copy a template file when it exists under the workspace template folder."""
+    src_path = templates_dir() / relative_path
+    if not src_path.exists():
+        return False
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src_path, dest_path)
+    return True
+
+
 _LBRACE_SENTINEL = "\0LBRACE\0"
 _RBRACE_SENTINEL = "\0RBRACE\0"
 
@@ -217,7 +227,7 @@ def resolve_pdf_path(pdf_lookup: Mapping[str, Path], refno: str) -> Path:
 def dockerfile_contents(paper_source: str) -> str:
     """Render the task environment Dockerfile for the selected paper source."""
     install_pdf_tools = ""
-    if paper_source != "mineru":
+    if paper_source == "pdf":
         install_pdf_tools = (
             "RUN apt-get update && apt-get install -y --no-install-recommends \\\n"
             "    ca-certificates \\\n"
@@ -233,7 +243,137 @@ def dockerfile_contents(paper_source: str) -> str:
     if paper_source == "mineru":
         dockerfile = dockerfile.replace("COPY paper.pdf /app/paper.pdf\n", "")
         dockerfile = f"{dockerfile}\nCOPY paper_mineru /app/paper_mineru\n"
+    if paper_source == "mineru_figures":
+        dockerfile = dockerfile.replace("COPY paper.pdf /app/paper.pdf\n", "")
+        dockerfile = (
+            f"{dockerfile}\nCOPY paper_mineru_figures /app/paper_mineru_figures\n"
+        )
     return dockerfile
+
+
+def _extract_figure_label(caption: str, index: int) -> str:
+    """Return a stable label for a figure caption."""
+    match = re.search(r"\b(fig(?:ure)?\.?\s*\d+[A-Za-z]?)\b", caption, re.IGNORECASE)
+    if match:
+        label = match.group(1).strip()
+        label = re.sub(r"^fig\.?", "Figure", label, flags=re.IGNORECASE)
+        return label
+    return f"Figure {index}"
+
+
+def _join_text_list(value: Any) -> str:
+    """Normalize a MinerU caption/footnote payload into a single string."""
+    if isinstance(value, list):
+        return " ".join(str(part).strip() for part in value if str(part).strip())
+    if isinstance(value, str):
+        return value.strip()
+    return ""
+
+
+def _build_figure_inventory(
+    mineru_bundle: MinerUBundlePaths, bundle_name: str
+) -> list[dict[str, Any]]:
+    """Build a figure-only inventory from a normalized MinerU bundle."""
+    items: list[dict[str, Any]] = []
+    content_list_path = mineru_bundle.content_list_path
+    if content_list_path is None or not content_list_path.exists():
+        return items
+
+    payload = json.loads(content_list_path.read_text())
+    if not isinstance(payload, list):
+        return items
+
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type") or "").strip().lower() != "image":
+            continue
+
+        rel_img_path = str(item.get("img_path") or "").strip()
+        if not rel_img_path:
+            continue
+
+        image_name = Path(rel_img_path).name
+        src_image_path = mineru_bundle.bundle_dir / rel_img_path
+        if not src_image_path.exists():
+            continue
+
+        caption = _join_text_list(item.get("image_caption"))
+        footnote = _join_text_list(item.get("image_footnote"))
+        page_idx = item.get("page_idx")
+        page = int(page_idx) + 1 if isinstance(page_idx, int) else None
+        figure_index = len(items) + 1
+        items.append(
+            {
+                "index": figure_index,
+                "label": _extract_figure_label(caption, figure_index),
+                "page": page,
+                "image_path": f"/app/{bundle_name}/images/{image_name}",
+                "image_name": image_name,
+                "caption": caption,
+                "footnote": footnote,
+                "bbox": item.get("bbox"),
+            }
+        )
+
+    return items
+
+
+def _render_figure_inventory_markdown(figures: list[dict[str, Any]]) -> str:
+    """Render a figure inventory as agent-facing markdown."""
+    lines = [
+        "# Figure Inventory",
+        "",
+        "Use only these figure crops and their captions as evidence for extraction.",
+        "",
+    ]
+    if not figures:
+        lines.extend(
+            [
+                "No MinerU figure crops were detected for this paper.",
+                "",
+                "Return an empty `properties` array if the images directory is empty.",
+            ]
+        )
+        return "\n".join(lines).strip() + "\n"
+
+    for figure in figures:
+        page_text = f"page {figure['page']}" if figure["page"] is not None else "page ?"
+        lines.extend(
+            [
+                f"## {figure['label']} ({page_text})",
+                "",
+                f"- Image file: `{figure['image_path']}`",
+            ]
+        )
+        if figure["caption"]:
+            lines.extend(["- Caption:", "", figure["caption"]])
+        if figure["footnote"]:
+            lines.extend(["", "- Footnote:", "", figure["footnote"]])
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def copy_verifier_assets(tests_dir: Path) -> None:
+    """Copy verifier assets, falling back to shared supercon files when omitted."""
+    check_prediction_path = tests_dir / "check_prediction.py"
+    if not copy_template_if_exists("tests/check_prediction.py", check_prediction_path):
+        shutil.copy2(
+            repo_root() / "examples" / "supercon-extraction" / "check_prediction.py",
+            check_prediction_path,
+        )
+
+    test_script_path = tests_dir / "test.sh"
+    if not copy_template_if_exists("tests/test.sh", test_script_path):
+        shutil.copy2(
+            repo_root()
+            / "examples"
+            / "supercon-extraction"
+            / "ground-template"
+            / "tests"
+            / "test.sh",
+            test_script_path,
+        )
 
 
 def prepare_task_paper_artifacts(
@@ -261,6 +401,8 @@ def prepare_task_paper_artifacts(
         "mineru_captions_path": "",
         "mineru_raw_markdown_path": "",
         "mineru_primary_markdown_path": "",
+        "figure_inventory_path": "",
+        "figure_images_dir_path": "",
         "paper_source_description": (
             "The paper is provided as the original PDF at `/app/paper.pdf`."
         ),
@@ -268,12 +410,67 @@ def prepare_task_paper_artifacts(
         "claude_file_examples": "`/app/paper.pdf`",
     }
 
-    if paper_source != "mineru":
+    if paper_source == "pdf":
         shutil.copy2(pdf_path, env_dir / "paper.pdf")
         return artifacts
 
     if mineru_bundle is None:
-        raise ValueError("mineru_bundle is required when paper_source='mineru'.")
+        raise ValueError(
+            "mineru_bundle is required when paper_source starts with 'mineru'."
+        )
+
+    if paper_source == "mineru_figures":
+        bundle_dest = env_dir / "paper_mineru_figures"
+        bundle_dest.mkdir(parents=True, exist_ok=True)
+        images_dest = bundle_dest / "images"
+        images_dest.mkdir(exist_ok=True)
+        if mineru_bundle.images_dir is not None and mineru_bundle.images_dir.exists():
+            shutil.copytree(
+                mineru_bundle.images_dir,
+                images_dest,
+                dirs_exist_ok=True,
+            )
+
+        figures = _build_figure_inventory(mineru_bundle, bundle_dest.name)
+        (bundle_dest / "figures.md").write_text(
+            _render_figure_inventory_markdown(figures)
+        )
+        (bundle_dest / "figures.json").write_text(json.dumps(figures, indent=2) + "\n")
+
+        gemini_paths = ["`@paper_mineru_figures/figures.md`"]
+        for figure in figures[:4]:
+            gemini_paths.append(
+                f"`@paper_mineru_figures/images/{figure['image_name']}`"
+            )
+        if not figures:
+            gemini_paths.append("`/app/paper_mineru_figures/images/`")
+
+        artifacts.update(
+            {
+                "pdf_path": "",
+                "paper_source_path": "/app/paper_mineru_figures/figures.md",
+                "paper_source_dir": "/app/paper_mineru_figures",
+                "output_at_command": "@paper_mineru_figures/figures.md",
+                "paper_source_at_command": "@paper_mineru_figures/figures.md",
+                "mineru_dir_path": "/app/paper_mineru_figures",
+                "figure_inventory_path": "/app/paper_mineru_figures/figures.md",
+                "figure_images_dir_path": "/app/paper_mineru_figures/images",
+                "paper_source_description": (
+                    "The paper has been reduced to MinerU-extracted figure evidence only. "
+                    "Use `/app/paper_mineru_figures/figures.md` as the figure inventory, "
+                    "`/app/paper_mineru_figures/figures.json` for structured metadata, and "
+                    "inspect the actual crops under `/app/paper_mineru_figures/images/`. "
+                    "Do not rely on full-paper prose or tables in this experiment."
+                ),
+                "gemini_at_commands": ", ".join(gemini_paths),
+                "claude_file_examples": (
+                    "`/app/paper_mineru_figures/figures.md`, "
+                    "`/app/paper_mineru_figures/figures.json`, "
+                    "`/app/paper_mineru_figures/images/`"
+                ),
+            }
+        )
+        return artifacts
 
     bundle_dest = env_dir / "paper_mineru"
     bundle_dest.mkdir(parents=True, exist_ok=True)
@@ -564,6 +761,8 @@ def build_task(
         "mineru_primary_markdown_path": (
             paper_artifacts["mineru_primary_markdown_path"] or None
         ),
+        "figure_inventory_path": paper_artifacts["figure_inventory_path"] or None,
+        "figure_images_dir_path": paper_artifacts["figure_images_dir_path"] or None,
         "predictions_path": "/app/predictions.json",
         "questions": questions,
     }
@@ -611,6 +810,8 @@ def build_task(
         "mineru_captions_path": paper_artifacts["mineru_captions_path"],
         "mineru_raw_markdown_path": paper_artifacts["mineru_raw_markdown_path"],
         "mineru_primary_markdown_path": paper_artifacts["mineru_primary_markdown_path"],
+        "figure_inventory_path": paper_artifacts["figure_inventory_path"],
+        "figure_images_dir_path": paper_artifacts["figure_images_dir_path"],
         "paper_source_description": paper_artifacts["paper_source_description"],
         "gemini_at_commands": paper_artifacts["gemini_at_commands"],
         "claude_file_examples": paper_artifacts["claude_file_examples"],
@@ -625,8 +826,7 @@ def build_task(
     (task_dir / "task.toml").write_text(task_toml)
 
     (env_dir / "Dockerfile").write_text(dockerfile_contents(paper_source))
-    copy_template("tests/check_prediction.py", tests_dir / "check_prediction.py")
-    copy_template("tests/test.sh", tests_dir / "test.sh")
+    copy_verifier_assets(tests_dir)
 
     solution_predictions = [
         {
@@ -691,6 +891,8 @@ def build_task_no_score(
         "mineru_primary_markdown_path": (
             paper_artifacts["mineru_primary_markdown_path"] or None
         ),
+        "figure_inventory_path": paper_artifacts["figure_inventory_path"] or None,
+        "figure_images_dir_path": paper_artifacts["figure_images_dir_path"] or None,
         "predictions_path": "/app/predictions.json",
         "questions": [],
     }
@@ -727,6 +929,8 @@ def build_task_no_score(
         "mineru_captions_path": paper_artifacts["mineru_captions_path"],
         "mineru_raw_markdown_path": paper_artifacts["mineru_raw_markdown_path"],
         "mineru_primary_markdown_path": paper_artifacts["mineru_primary_markdown_path"],
+        "figure_inventory_path": paper_artifacts["figure_inventory_path"],
+        "figure_images_dir_path": paper_artifacts["figure_images_dir_path"],
         "paper_source_description": paper_artifacts["paper_source_description"],
         "gemini_at_commands": paper_artifacts["gemini_at_commands"],
         "claude_file_examples": paper_artifacts["claude_file_examples"],
@@ -812,11 +1016,12 @@ def main() -> None:
         "--paper-source",
         type=str,
         default="pdf",
-        choices=["pdf", "mineru"],
+        choices=["pdf", "mineru", "mineru_figures"],
         help=(
             "Primary paper artifact exposed to agents. `pdf` preserves the current "
-            "behavior, while `mineru` preprocesses each PDF into a MinerU bundle "
-            "and points prompts at the normalized markdown output."
+            "behavior, `mineru` exposes the full MinerU bundle, and "
+            "`mineru_figures` restricts the task to MinerU figure crops plus "
+            "figure inventory files."
         ),
     )
     parser.add_argument(
@@ -1066,7 +1271,7 @@ def main() -> None:
         args.mineru_cache_dir = resolved_workspace / args.mineru_cache_dir
 
     mineru_config: MinerUConfig | None = None
-    if args.paper_source == "mineru":
+    if args.paper_source in {"mineru", "mineru_figures"}:
         mineru_config = MinerUConfig(
             binary=args.mineru_binary,
             backend=args.mineru_backend,
