@@ -188,7 +188,7 @@ async def check_if_same_property(
             "reason": "Property names are identical",
             "confidence": "high",
             "matched_via": "exact",
-            "judge": None,
+            "judge": llm.model_name,
             "prompt": None,
         }
         return result, {}

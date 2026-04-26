@@ -216,7 +216,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.DS_Store
-*data/
+*data*/
 *.tar
 *.zip
 !arxiv/tests/test_data/
@@ -231,6 +231,8 @@ arxiv/credentials.json
 arxiv/token.json
 
 *jobs*/
+examples/*/scoring/embeddings*
+examples/*/scoring/gt_property_name*
 
 # Harbor task gen related
 out/
@@ -256,3 +258,5 @@ examples/harbor-workspace/out/*
 !examples/harbor-workspace/logs/.gitkeep
 examples/harbor-workspace/jobs/*
 examples/harbor-workspace/trials/*
+
+.vscode/

@@ -7,8 +7,11 @@ Usage:
 
 """
 
+import pbench
+
 import numpy as np
 import pandas as pd
+from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from pathlib import Path
@@ -19,6 +22,14 @@ from pbench_eval.plotting_utils import (
     OUTWARD,
     get_display_label,
 )
+
+parser = ArgumentParser(
+    description="Plot failure rate as a horizontal bar plot for SuperCon tasks."
+)
+parser = pbench.add_base_args(parser)
+args = parser.parse_args()
+
+pbench.setup_logging(args.log_level)
 
 # Output directories for SuperCon data
 output_dirs = [
@@ -93,7 +104,7 @@ ax.spines["bottom"].set_position(("outward", OUTWARD))
 plt.tight_layout()
 
 # Save figure
-figures_dir = Path("figures")
+figures_dir = args.output_dir / "figures"
 figures_dir.mkdir(parents=True, exist_ok=True)
 fig_path = figures_dir / "failure_rate.pdf"
 plt.savefig(fig_path, bbox_inches="tight")

@@ -247,7 +247,7 @@ fig.legend(
     frameon=False,
     bbox_to_anchor=(0.5, -0.35),
 )
-figures_dir = Path("figures")
+figures_dir = args.output_dir / "figures"
 figures_dir.mkdir(parents=True, exist_ok=True)
 fig_name = f"f1_vs_{args.x_axis}_supercon_tc.pdf"
 fig_path = figures_dir / fig_name
