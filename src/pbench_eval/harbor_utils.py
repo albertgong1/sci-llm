@@ -16,6 +16,17 @@ from typing import Any
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+_VALID_JSON_ESCAPE_STARTS: set[str] = {
+    '"',
+    "\\",
+    "/",
+    "b",
+    "f",
+    "n",
+    "r",
+    "t",
+    "u",
+}
 
 
 def _extract_text_from_jsonlines_log(text: str) -> str | None:
@@ -103,6 +114,117 @@ def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
     return None
 
 
+def _escape_invalid_json_backslashes(text: str) -> str:
+    """Escape bare backslashes so slightly malformed model JSON can still parse."""
+    escaped_chars: list[str] = []
+    idx = 0
+    while idx < len(text):
+        char = text[idx]
+        if char != "\\":
+            escaped_chars.append(char)
+            idx += 1
+            continue
+
+        if idx + 1 >= len(text):
+            escaped_chars.append("\\\\")
+            idx += 1
+            continue
+
+        next_char = text[idx + 1]
+        if next_char in _VALID_JSON_ESCAPE_STARTS:
+            escaped_chars.append(char)
+            escaped_chars.append(next_char)
+            idx += 2
+            continue
+
+        escaped_chars.append("\\\\")
+        idx += 1
+
+    return "".join(escaped_chars)
+
+
+def _parse_json_payload(text: str) -> dict[str, Any] | list[dict[str, Any]] | None:
+    """Parse a direct JSON payload, repairing invalid backslash escapes if needed."""
+    for candidate in (text, _escape_invalid_json_backslashes(text)):
+        try:
+            payload = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(payload, (dict, list)):
+            return payload
+    return None
+
+
+def _load_prediction_candidates(trial_dir: Path) -> list[Path]:
+    """Return ordered prediction sources for a Harbor trial."""
+    candidates: list[Path] = []
+
+    for predictions_path in (
+        trial_dir / "verifier" / "predictions.json",
+        trial_dir / "verifier" / "app_output" / "predictions.json",
+    ):
+        if predictions_path.exists():
+            candidates.append(predictions_path)
+
+    agent_dir = trial_dir / "agent"
+    if not agent_dir.exists():
+        return candidates
+
+    for preferred_name in ("gemini-cli.txt", "codex.txt"):
+        preferred_path = agent_dir / preferred_name
+        if preferred_path.exists():
+            candidates.append(preferred_path)
+
+    for log_path in sorted(agent_dir.glob("*.txt")):
+        if log_path not in candidates:
+            candidates.append(log_path)
+
+    return candidates
+
+
+def _normalize_predictions(
+    predictions: dict[str, Any] | list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Normalize supported prediction payload variants to {'properties': [...]}."""
+    property_keys = {
+        "id",
+        "material_or_system",
+        "property_name",
+        "value_string",
+        "value_unit",
+        "location",
+        "conditions",
+        "category",
+        "notes",
+        "method",
+    }
+
+    if isinstance(predictions, list):
+        if all(
+            isinstance(prop, dict) and bool(property_keys.intersection(prop))
+            for prop in predictions
+        ):
+            return {"properties": predictions}
+        return None
+
+    properties = predictions.get("properties")
+    if not isinstance(properties, list):
+        return None
+    if not all(isinstance(prop, dict) for prop in properties):
+        return None
+    return predictions
+
+
+def _is_prediction_payload(
+    predictions: dict[str, Any] | list[dict[str, Any]],
+) -> bool:
+    """Return whether a parsed payload matches the Harbor prediction schema."""
+    normalized = _normalize_predictions(predictions)
+    if normalized is None:
+        return False
+    return isinstance(normalized.get("properties"), list)
+
+
 def _load_trial_predictions(
     trial_dir: Path,
 ) -> dict[str, Any] | list[dict[str, Any]] | None:
@@ -115,29 +237,31 @@ def _load_trial_predictions(
         Parsed JSON data (either dict or list), or None if not found
 
     """
-    # Try to load from predictions.json first
-    log_path = trial_dir / "verifier" / "predictions.json"
-    if not log_path.exists():
-        log_path = trial_dir / "agent" / "gemini-cli.txt"
+    for log_path in _load_prediction_candidates(trial_dir):
+        try:
+            content = log_path.read_text()
+        except Exception:
+            continue
 
-    try:
-        content = log_path.read_text()
-    except Exception:
-        return None
+        parsed_payload = _parse_json_payload(content)
+        if parsed_payload is not None and _is_prediction_payload(parsed_payload):
+            return parsed_payload
 
-    # First try to extract text from JSONL format
-    decoded = _extract_text_from_jsonlines_log(content)
-    text = decoded or content
+        # JSONL agent logs need to be decoded back into assistant text first.
+        decoded = _extract_text_from_jsonlines_log(content)
+        text = decoded or content
 
-    # Try to extract JSON object first
-    extracted_obj = _extract_first_json_object(text)
-    if extracted_obj is not None:
-        return extracted_obj
+        parsed_payload = _parse_json_payload(text)
+        if parsed_payload is not None and _is_prediction_payload(parsed_payload):
+            return parsed_payload
 
-    # Fall back to extracting JSON array
-    extracted_arr = _extract_first_json_array(text)
-    if extracted_arr is not None:
-        return extracted_arr
+        extracted_obj = _extract_first_json_object(text)
+        if extracted_obj is not None and _is_prediction_payload(extracted_obj):
+            return extracted_obj
+
+        extracted_arr = _extract_first_json_array(text)
+        if extracted_arr is not None and _is_prediction_payload(extracted_arr):
+            return extracted_arr
 
     return None
 
@@ -237,6 +361,12 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
             predictions = _load_trial_predictions(trial_dir)
             if predictions is None:
                 logger.warning(f"No valid predictions found in trial: {trial_dir}")
+                continue
+            predictions = _normalize_predictions(predictions)
+            if predictions is None:
+                logger.warning(
+                    f"Unsupported prediction payload found in trial: {trial_dir}"
+                )
                 continue
             if "properties" not in predictions:
                 logger.warning(

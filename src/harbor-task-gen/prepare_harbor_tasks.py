@@ -564,7 +564,7 @@ def build_task(
         "mineru_primary_markdown_path": (
             paper_artifacts["mineru_primary_markdown_path"] or None
         ),
-        "predictions_path": "/app/output/predictions.json",
+        "predictions_path": "/app/predictions.json",
         "questions": questions,
     }
     (env_dir / "task_meta.json").write_text(json.dumps(task_meta, indent=2))
@@ -590,7 +590,7 @@ def build_task(
         # Standard in-container paths
         "pdf_path": paper_artifacts["pdf_path"],
         "meta_path": "/app/task_meta.json",
-        "predictions_path": "/app/output/predictions.json",
+        "predictions_path": "/app/predictions.json",
         # Prompt building blocks (optional; templates may ignore these)
         "question_blocks": question_blocks,
         "questions_json": json.dumps(questions, indent=2),
@@ -641,8 +641,7 @@ def build_task(
 #!/bin/bash
 set -euo pipefail
 
-mkdir -p /app/output
-cat > /app/output/predictions.json <<'EOF'
+cat > /app/predictions.json <<'EOF'
 {json.dumps(solution_predictions, indent=2)}
 EOF
 """
@@ -692,7 +691,7 @@ def build_task_no_score(
         "mineru_primary_markdown_path": (
             paper_artifacts["mineru_primary_markdown_path"] or None
         ),
-        "predictions_path": "/app/output/predictions.json",
+        "predictions_path": "/app/predictions.json",
         "questions": [],
     }
     (env_dir / "task_meta.json").write_text(json.dumps(task_meta, indent=2))
@@ -707,7 +706,7 @@ def build_task_no_score(
         # Standard in-container paths
         "pdf_path": paper_artifacts["pdf_path"],
         "meta_path": "/app/task_meta.json",
-        "predictions_path": "/app/output/predictions.json",
+        "predictions_path": "/app/predictions.json",
         # Prompt building blocks (optional; templates may ignore these)
         "question_blocks": "No required properties for this run.",
         "questions_json": "[]",

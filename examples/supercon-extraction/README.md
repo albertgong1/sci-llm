@@ -34,6 +34,40 @@ TODO:
 > \[!TIP\]
 > To run on Modal, simply add the `--modal` flag to any of the commands below.
 
+### Stable 200-paper PDF vs MinerU workflow
+
+Build both registries with the existing compare-source builder:
+
+```bash
+./scripts/build_harbor_compare_sources.sh --force
+```
+
+Run the paired PDF vs MinerU workflow with the existing compare-source runner:
+
+```bash
+HARBOR_COMPARE_SCORE_ROOT=jobs-compare-stable-scores \
+./scripts/run_harbor_compare_sources.sh jobs-compare-stable --modal --n-concurrent 10
+```
+
+This writes:
+- jobs under `jobs-compare-stable/{pdf,mineru}`
+- final scores under `jobs-compare-stable-scores/{pdf,mineru}`
+- rolling status in each score directory via `progress_status.json`
+- build/run/score manifests that pin the exact dataset and scoring configuration
+
+If you want to score the finished jobs again without rerunning Harbor:
+
+```bash
+./scripts/score_harbor_compare_sources.sh jobs-compare-stable jobs-compare-stable-scores
+```
+
+For legacy `origin/main` comparability, set both:
+
+```bash
+export HARBOR_COMPARE_DATASET=supercon-extraction@main
+export SUPERCON_GT_HF_REVISION=main
+```
+
 1. Please run the following command to execute the Harbor tasks in batches of size 10:
 
 ```bash

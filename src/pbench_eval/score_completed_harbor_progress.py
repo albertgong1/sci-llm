@@ -234,17 +234,42 @@ def _write_progress_metadata(
     output_dir: Path,
     completed_batches: list[Path],
     snapshot_dir: Path,
+    jobs_dir: Path,
     source: str | None,
 ) -> None:
     """Persist the current completed-batch state alongside the rolling scores."""
     payload = {
         "source": source,
-        "jobs_dir": str(snapshot_dir.parent.resolve()),
+        "jobs_dir": str(jobs_dir.resolve()),
         "snapshot_dir": str(snapshot_dir.resolve()),
         "n_completed_batches": len(completed_batches),
         "completed_batches": [batch_dir.name for batch_dir in completed_batches],
     }
     (output_dir / "progress_status.json").write_text(json.dumps(payload, indent=2))
+
+
+def _write_score_manifest(
+    output_dir: Path, args: argparse.Namespace, snapshot_dir: Path
+) -> None:
+    """Persist the rolling-score configuration alongside the current snapshot."""
+    payload = {
+        "mode": "rolling",
+        "jobs_dir": str(args.jobs_dir.resolve()),
+        "output_dir": str(output_dir.resolve()),
+        "snapshot_dir": str(snapshot_dir.resolve()),
+        "source": args.source,
+        "match_model": args.model_name,
+        "hf_repo": args.hf_repo,
+        "hf_split": args.hf_split,
+        "hf_revision": args.hf_revision,
+        "prompt_path": str(args.prompt_path),
+        "rubric_path": str(args.rubric_path),
+        "conversion_factors_path": str(args.conversion_factors_path),
+        "matching_mode": args.matching_mode,
+        "log_level": args.log_level,
+        "force": bool(args.force),
+    }
+    (output_dir / "score_manifest.json").write_text(json.dumps(payload, indent=2))
 
 
 def _snapshot_has_valid_trials(snapshot_dir: Path) -> bool:
@@ -343,7 +368,10 @@ def main() -> None:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     completed_batches = _sync_completed_batch_snapshot(jobs_dir, snapshot_dir)
-    _write_progress_metadata(output_dir, completed_batches, snapshot_dir, args.source)
+    _write_progress_metadata(
+        output_dir, completed_batches, snapshot_dir, jobs_dir, args.source
+    )
+    _write_score_manifest(output_dir, args, snapshot_dir)
 
     if not completed_batches:
         logger.warning("No completed Harbor batches found under %s", jobs_dir)

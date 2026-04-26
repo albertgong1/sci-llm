@@ -31,6 +31,52 @@ continue_on_error=${HARBOR_SCORE_CONTINUE_ON_ERROR:-1}
 score_failures=0
 scored_sources=0
 
+write_score_manifest() {
+  local output_dir=$1
+  local source=$2
+  mkdir -p "${output_dir}"
+  python3 - "${output_dir}/score_manifest.json" "${jobs_root}" "${output_dir}" "${source}" "${match_model}" "${hf_repo}" "${hf_split}" "${hf_revision}" "${prompt_path}" "${rubric_path}" "${conversion_factors_path}" "${matching_mode}" "${log_level}" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+(
+    manifest_path,
+    jobs_root,
+    output_dir,
+    source,
+    match_model,
+    hf_repo,
+    hf_split,
+    hf_revision,
+    prompt_path,
+    rubric_path,
+    conversion_factors_path,
+    matching_mode,
+    log_level,
+) = sys.argv[1:]
+
+payload = {
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "mode": "full",
+    "jobs_root": jobs_root,
+    "output_dir": output_dir,
+    "source": source,
+    "match_model": match_model,
+    "hf_repo": hf_repo,
+    "hf_split": hf_split,
+    "hf_revision": hf_revision,
+    "prompt_path": prompt_path,
+    "rubric_path": rubric_path,
+    "conversion_factors_path": conversion_factors_path,
+    "matching_mode": matching_mode,
+    "log_level": log_level,
+}
+Path(manifest_path).write_text(json.dumps(payload, indent=2) + "\n")
+PY
+}
+
 if [ ! -d "${jobs_root}" ]; then
   echo "Jobs root not found: ${jobs_root}"
   exit 1
@@ -84,6 +130,7 @@ while IFS= read -r source; do
   fi
 
   mkdir -p "${output_dir}"
+  write_score_manifest "${output_dir}" "${source}"
   scored_sources=$((scored_sources + 1))
 
   echo "========================================"

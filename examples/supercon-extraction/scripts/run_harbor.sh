@@ -27,6 +27,7 @@ fail_fast_on_quota=${HARBOR_FAIL_FAST_ON_QUOTA:-1}
 block_provider_on_quota=${HARBOR_BLOCK_PROVIDER_ON_QUOTA:-1}
 quota_error_threshold=${HARBOR_QUOTA_ERROR_THRESHOLD:-3}
 quota_error_poll_sec=${HARBOR_QUOTA_ERROR_POLL_SEC:-5}
+run_manifest_path=${HARBOR_RUN_MANIFEST_PATH:-${jobs_dir}/run_manifest.json}
 user_force_all=0
 blocked_providers=""
 modal_requested=0
@@ -57,7 +58,7 @@ fi
 #   HARBOR_INCLUDE_FLASH=1
 #   HARBOR_COMBINATIONS=$'codex:openai/gpt-5.2-2025-12-11:reasoning_effort=medium'
 #   HARBOR_BATCH_SIZE=50
-#   HARBOR_BATCH_START=2
+#   HARBOR_BATCH_START=1
 #   HARBOR_NUM_BATCHES=4
 #   HARBOR_OPENAI_N_CONCURRENT=1
 #   HARBOR_OPENAI_BATCH_COOLDOWN_SEC=30
@@ -93,7 +94,7 @@ else
   fi
 fi
 BATCH_SIZE=${HARBOR_BATCH_SIZE:-50}
-BATCH_START=${HARBOR_BATCH_START:-2}
+BATCH_START=${HARBOR_BATCH_START:-1}
 NUM_BATCHES=${HARBOR_NUM_BATCHES:-4}
 openai_batch_cooldown_sec=${HARBOR_OPENAI_BATCH_COOLDOWN_SEC:-0}
 progress_score_after_batch=${HARBOR_PROGRESS_SCORE_AFTER_BATCH:-0}
@@ -102,6 +103,53 @@ progress_score_source=${HARBOR_PROGRESS_SCORE_SOURCE:-}
 progress_score_snapshot_dir=${HARBOR_PROGRESS_SCORE_SNAPSHOT_DIR:-}
 progress_score_continue_on_error=${HARBOR_PROGRESS_SCORE_CONTINUE_ON_ERROR:-1}
 overall_failures=0
+
+write_run_manifest() {
+  local manifest_path=$1
+  mkdir -p "$(dirname "${manifest_path}")"
+  HARBOR_RUN_MANIFEST_COMBINATIONS="${combinations_spec}" \
+  HARBOR_RUN_MANIFEST_EXTRA_ARGS="${cmd_args[*]-}" \
+  python3 - "${manifest_path}" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+payload = {
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "jobs_dir": os.environ.get("HARBOR_RUN_JOBS_DIR"),
+    "tasks_registry_path": os.environ.get("HARBOR_RUN_TASKS_REGISTRY_PATH"),
+    "tasks_dataset": os.environ.get("HARBOR_RUN_TASKS_DATASET"),
+    "use_hf_tasks": os.environ.get("HARBOR_RUN_USE_HF_TASKS") == "1",
+    "hf_tasks_repo": os.environ.get("HARBOR_RUN_HF_TASKS_REPO"),
+    "hf_tasks_version": os.environ.get("HARBOR_RUN_HF_TASKS_VERSION"),
+    "batch_size": int(os.environ.get("HARBOR_RUN_BATCH_SIZE", "0") or 0),
+    "batch_start": int(os.environ.get("HARBOR_RUN_BATCH_START", "0") or 0),
+    "num_batches": int(os.environ.get("HARBOR_RUN_NUM_BATCHES", "0") or 0),
+    "resume_existing": os.environ.get("HARBOR_RUN_RESUME_EXISTING") == "1",
+    "continue_on_error": os.environ.get("HARBOR_RUN_CONTINUE_ON_ERROR") == "1",
+    "fail_fast_on_quota": os.environ.get("HARBOR_RUN_FAIL_FAST_ON_QUOTA") == "1",
+    "block_provider_on_quota": os.environ.get("HARBOR_RUN_BLOCK_PROVIDER_ON_QUOTA")
+    == "1",
+    "modal_requested": os.environ.get("HARBOR_RUN_MODAL_REQUESTED") == "1",
+    "progress_score_after_batch": os.environ.get(
+        "HARBOR_RUN_PROGRESS_SCORE_AFTER_BATCH"
+    )
+    == "1",
+    "progress_score_output_dir": os.environ.get("HARBOR_RUN_PROGRESS_SCORE_OUTPUT_DIR"),
+    "progress_score_source": os.environ.get("HARBOR_RUN_PROGRESS_SCORE_SOURCE"),
+    "combinations": [
+        line
+        for line in os.environ.get("HARBOR_RUN_MANIFEST_COMBINATIONS", "").splitlines()
+        if line.strip()
+    ],
+    "extra_args_shell": os.environ.get("HARBOR_RUN_MANIFEST_EXTRA_ARGS", ""),
+}
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n")
+PY
+}
 
 get_job_model_slug() {
   local model_name=$1
@@ -304,6 +352,26 @@ run_progress_scoring() {
   fi
   return 0
 }
+
+mkdir -p "${jobs_dir}"
+HARBOR_RUN_JOBS_DIR="${jobs_dir}" \
+HARBOR_RUN_TASKS_REGISTRY_PATH="${tasks_registry_path}" \
+HARBOR_RUN_TASKS_DATASET="${tasks_dataset}" \
+HARBOR_RUN_USE_HF_TASKS="${use_hf_tasks}" \
+HARBOR_RUN_HF_TASKS_REPO="${hf_tasks_repo}" \
+HARBOR_RUN_HF_TASKS_VERSION="${hf_tasks_version}" \
+HARBOR_RUN_BATCH_SIZE="${BATCH_SIZE}" \
+HARBOR_RUN_BATCH_START="${BATCH_START}" \
+HARBOR_RUN_NUM_BATCHES="${NUM_BATCHES}" \
+HARBOR_RUN_RESUME_EXISTING="${resume_existing}" \
+HARBOR_RUN_CONTINUE_ON_ERROR="${continue_on_error}" \
+HARBOR_RUN_FAIL_FAST_ON_QUOTA="${fail_fast_on_quota}" \
+HARBOR_RUN_BLOCK_PROVIDER_ON_QUOTA="${block_provider_on_quota}" \
+HARBOR_RUN_MODAL_REQUESTED="${modal_requested}" \
+HARBOR_RUN_PROGRESS_SCORE_AFTER_BATCH="${progress_score_after_batch}" \
+HARBOR_RUN_PROGRESS_SCORE_OUTPUT_DIR="${progress_score_output_dir}" \
+HARBOR_RUN_PROGRESS_SCORE_SOURCE="${progress_score_source}" \
+write_run_manifest "${run_manifest_path}"
 
 while IFS= read -r combo; do
   if [ -z "${combo}" ]; then

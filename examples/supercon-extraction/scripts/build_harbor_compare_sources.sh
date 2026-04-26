@@ -25,6 +25,53 @@ mineru_binary=${SUPERCON_MINERU_BINARY:-./scripts/run_mineru_cli.sh}
 mineru_backend=${SUPERCON_MINERU_BACKEND:-pipeline}
 mineru_method=${SUPERCON_MINERU_METHOD:-}
 
+write_build_manifest() {
+  local output_dir=$1
+  local source=$2
+  mkdir -p "${output_dir}"
+  python3 - "${output_dir}/build_manifest.json" "${workspace_root}" "${template_name}" "${pdf_dir}" "${registry_path}" "${max_num_papers}" "${gt_hf_repo}" "${gt_hf_split}" "${gt_hf_revision}" "${source}" "${mineru_binary}" "${mineru_cache_dir}" "${mineru_backend}" "${mineru_method}" <<'PY'
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+(
+    manifest_path,
+    workspace_root,
+    template_name,
+    pdf_dir,
+    registry_path,
+    max_num_papers,
+    gt_hf_repo,
+    gt_hf_split,
+    gt_hf_revision,
+    source,
+    mineru_binary,
+    mineru_cache_dir,
+    mineru_backend,
+    mineru_method,
+) = sys.argv[1:]
+
+payload = {
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "workspace_root": workspace_root,
+    "template_name": template_name,
+    "pdf_dir": pdf_dir,
+    "registry_path": registry_path,
+    "max_num_papers": int(max_num_papers),
+    "gt_hf_repo": gt_hf_repo,
+    "gt_hf_split": gt_hf_split,
+    "gt_hf_revision": gt_hf_revision,
+    "source": source,
+    "mineru_binary": mineru_binary,
+    "mineru_cache_dir": mineru_cache_dir,
+    "mineru_backend": mineru_backend,
+    "mineru_method": mineru_method,
+}
+Path(manifest_path).write_text(json.dumps(payload, indent=2) + "\n")
+PY
+}
+
 if [ ! -d "${pdf_dir}" ]; then
   echo "Paper directory not found: ${pdf_dir}"
   exit 1
@@ -89,4 +136,12 @@ while IFS= read -r source; do
   printf ' %q' "${cmd[@]}"
   printf '\n'
   "${cmd[@]}"
+  case "${source}" in
+    pdf)
+      write_build_manifest "${pdf_output_dir}" "${source}"
+      ;;
+    mineru)
+      write_build_manifest "${mineru_output_dir}" "${source}"
+      ;;
+  esac
 done <<< "${compare_sources}"

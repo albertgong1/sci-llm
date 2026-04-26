@@ -28,16 +28,15 @@ batch_start=${HARBOR_BATCH_START:-1}
 num_batches=${HARBOR_NUM_BATCHES:-4}
 score_after=${HARBOR_COMPARE_SCORE_AFTER:-0}
 score_root=${HARBOR_COMPARE_SCORE_ROOT:-${jobs_root}-scores}
-progress_score_after_batch=${HARBOR_COMPARE_PROGRESS_SCORE_AFTER_BATCH:-0}
+progress_score_after_batch=${HARBOR_COMPARE_PROGRESS_SCORE_AFTER_BATCH:-1}
 progress_score_root=${HARBOR_COMPARE_PROGRESS_SCORE_ROOT:-${score_root}}
 compare_continue_on_error=${HARBOR_COMPARE_CONTINUE_ON_ERROR:-1}
 harbor_resume_existing=${HARBOR_RESUME_EXISTING:-1}
 harbor_continue_on_error=${HARBOR_CONTINUE_ON_ERROR:-${compare_continue_on_error}}
+compare_manifest_path=${HARBOR_COMPARE_MANIFEST_PATH:-${jobs_root}/compare_manifest.json}
 modal_requested=0
 n_concurrent_set=0
 compare_failures=0
-
-declare -a cmd_args
 if [ ${#cmd_args[@]} -gt 0 ]; then
   for arg in "${cmd_args[@]}"; do
     case "${arg}" in
@@ -54,6 +53,57 @@ fi
 if [ "${modal_requested}" = "1" ] && [ "${n_concurrent_set}" = "0" ]; then
   cmd_args+=(--n-concurrent "${HARBOR_MODAL_N_CONCURRENT:-10}")
 fi
+
+mkdir -p "${jobs_root}"
+HARBOR_COMPARE_JOBS_ROOT="${jobs_root}" \
+HARBOR_COMPARE_SCORE_ROOT_VALUE="${score_root}" \
+HARBOR_COMPARE_DATASET_VALUE="${compare_dataset}" \
+HARBOR_COMPARE_PDF_REGISTRY_VALUE="${pdf_registry}" \
+HARBOR_COMPARE_MINERU_REGISTRY_VALUE="${mineru_registry}" \
+HARBOR_COMPARE_BATCH_SIZE_VALUE="${batch_size}" \
+HARBOR_COMPARE_BATCH_START_VALUE="${batch_start}" \
+HARBOR_COMPARE_NUM_BATCHES_VALUE="${num_batches}" \
+HARBOR_COMPARE_SCORE_AFTER_VALUE="${score_after}" \
+HARBOR_COMPARE_PROGRESS_SCORE_AFTER_BATCH_VALUE="${progress_score_after_batch}" \
+HARBOR_COMPARE_CONTINUE_ON_ERROR_VALUE="${compare_continue_on_error}" \
+HARBOR_COMPARE_RESUME_EXISTING_VALUE="${harbor_resume_existing}" \
+HARBOR_COMPARE_MANIFEST_SOURCES="${compare_sources}" \
+HARBOR_COMPARE_MANIFEST_CMD_ARGS="${cmd_args[*]-}" \
+python3 - "${compare_manifest_path}" <<'PY'
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+payload = {
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+    "jobs_root": os.environ.get("HARBOR_COMPARE_JOBS_ROOT"),
+    "score_root": os.environ.get("HARBOR_COMPARE_SCORE_ROOT_VALUE"),
+    "compare_dataset": os.environ.get("HARBOR_COMPARE_DATASET_VALUE"),
+    "pdf_registry": os.environ.get("HARBOR_COMPARE_PDF_REGISTRY_VALUE"),
+    "mineru_registry": os.environ.get("HARBOR_COMPARE_MINERU_REGISTRY_VALUE"),
+    "batch_size": int(os.environ.get("HARBOR_COMPARE_BATCH_SIZE_VALUE", "0") or 0),
+    "batch_start": int(os.environ.get("HARBOR_COMPARE_BATCH_START_VALUE", "0") or 0),
+    "num_batches": int(os.environ.get("HARBOR_COMPARE_NUM_BATCHES_VALUE", "0") or 0),
+    "score_after": os.environ.get("HARBOR_COMPARE_SCORE_AFTER_VALUE") == "1",
+    "progress_score_after_batch": os.environ.get(
+        "HARBOR_COMPARE_PROGRESS_SCORE_AFTER_BATCH_VALUE"
+    )
+    == "1",
+    "continue_on_error": os.environ.get("HARBOR_COMPARE_CONTINUE_ON_ERROR_VALUE")
+    == "1",
+    "resume_existing": os.environ.get("HARBOR_COMPARE_RESUME_EXISTING_VALUE") == "1",
+    "sources": [
+        line
+        for line in os.environ.get("HARBOR_COMPARE_MANIFEST_SOURCES", "").splitlines()
+        if line.strip()
+    ],
+    "extra_args_shell": os.environ.get("HARBOR_COMPARE_MANIFEST_CMD_ARGS", ""),
+}
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n")
+PY
 
 while IFS= read -r source; do
   if [ -z "${source}" ]; then

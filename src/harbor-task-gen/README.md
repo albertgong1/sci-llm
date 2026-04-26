@@ -316,10 +316,10 @@ if failures:
 ```
 
 ### Notes on preserving outputs
-The verifier entrypoint (`tests/test.sh`) copies `/app/output/` into
-`/logs/verifier/app_output/` **even when the verifier fails**, so agent-written artifacts
-survive Harbor's container cleanup. Rebuild tasks with `prepare_harbor_tasks.py --force`
-to apply template changes.
+The verifier entrypoint (`tests/test.sh`) copies `/app/predictions.json` into
+`/logs/verifier/predictions.json` **even when the verifier fails**, so the final
+prediction payload survives Harbor's container cleanup. Rebuild tasks with
+`prepare_harbor_tasks.py --force` to apply template changes.
 
 ## Flag Reference
 
