@@ -367,6 +367,36 @@ def _patch_modal_download_logs(timeout_sec: int) -> None:
     Trial._maybe_download_logs = patched  # type: ignore[assignment]
 
 
+def _patch_gemini_cli_trust() -> None:
+    """Bypass Gemini CLI trusted-folder checks for headless Harbor runs."""
+    try:
+        from harbor.agents.installed.gemini_cli import GeminiCli
+    except Exception:
+        return
+
+    if getattr(GeminiCli, "_codex_trust_patch_applied", False):
+        return
+
+    original = GeminiCli.create_run_agent_commands
+
+    def patched(self: Any, instruction: str) -> list[Any]:
+        commands = original(self, instruction)
+        patched_commands: list[Any] = []
+        for exec_input in commands:
+            command = exec_input.command
+            if command.startswith("gemini ") and "--skip-trust" not in command:
+                command = command.replace("gemini ", "gemini --skip-trust ", 1)
+            env = dict(exec_input.env or {})
+            env.setdefault("GEMINI_CLI_TRUST_WORKSPACE", "true")
+            patched_commands.append(
+                exec_input.model_copy(update={"command": command, "env": env})
+            )
+        return patched_commands
+
+    GeminiCli.create_run_agent_commands = patched  # type: ignore[assignment]
+    GeminiCli._codex_trust_patch_applied = True
+
+
 def _normalize_message_content(content: Any) -> str:
     """Convert list/block message payloads into plain text for ATIF export."""
     if content is None:
@@ -760,6 +790,7 @@ def main() -> int:
         _patch_agent_context_population()
         _patch_gemini_post_run_loading()
         _patch_gemini_atif_export()
+        _patch_gemini_cli_trust()
         _patch_codex_post_run_logging()
 
         if modal_active:

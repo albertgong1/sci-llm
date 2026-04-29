@@ -261,6 +261,36 @@ def _patch_modal_download_logs(timeout_sec: int) -> None:
     Trial._maybe_download_logs = patched  # type: ignore[assignment]
 
 
+def _patch_gemini_cli_trust() -> None:
+    """Bypass Gemini CLI trusted-folder checks for headless Harbor runs."""
+    try:
+        from harbor.agents.installed.gemini_cli import GeminiCli
+    except Exception:
+        return
+
+    if getattr(GeminiCli, "_codex_trust_patch_applied", False):
+        return
+
+    original = GeminiCli.create_run_agent_commands
+
+    def patched(self: Any, instruction: str) -> list[Any]:
+        commands = original(self, instruction)
+        patched_commands: list[Any] = []
+        for exec_input in commands:
+            command = exec_input.command
+            if command.startswith("gemini ") and "--skip-trust" not in command:
+                command = command.replace("gemini ", "gemini --skip-trust ", 1)
+            env = dict(exec_input.env or {})
+            env.setdefault("GEMINI_CLI_TRUST_WORKSPACE", "true")
+            patched_commands.append(
+                exec_input.model_copy(update={"command": command, "env": env})
+            )
+        return patched_commands
+
+    GeminiCli.create_run_agent_commands = patched  # type: ignore[assignment]
+    GeminiCli._codex_trust_patch_applied = True
+
+
 def _extract_agent_setup_timeout(
     argv: list[str],
 ) -> tuple[list[str], int | None]:
@@ -414,6 +444,7 @@ def main() -> int:
             if existing_pythonpath
             else src_path
         )
+    _patch_gemini_cli_trust()
     if modal_active:
         timeout_raw = env.get("HARBOR_MODAL_LOG_DOWNLOAD_TIMEOUT_SEC", "300").strip()
         if timeout_raw and timeout_raw != "0":
@@ -441,7 +472,7 @@ def main() -> int:
 
     if exit_code != 0:
         _summarize_failure(argv, workspace=workspace)
-    
+
     # Try to score external trials (Codex/Terminus) if script exists
     _maybe_score_external_trials(workspace, run_roots, pre_run_mtime)
 
@@ -458,25 +489,25 @@ def main() -> int:
 
 
 def _maybe_score_external_trials(
-    workspace: Path, 
-    run_roots: list[Path], 
-    pre_run_mtime: float | None
+    workspace: Path, run_roots: list[Path], pre_run_mtime: float | None
 ) -> None:
     """Invoke score_harbor_trials.py if present to fix up Codex/Terminus results."""
     # Assume scoring script is in examples/harbor-workspace
     # This path construction assumes standard repo layout
-    scoring_script = _repo_root() / "examples" / "harbor-workspace" / "score_harbor_trials.py"
+    scoring_script = (
+        _repo_root() / "examples" / "harbor-workspace" / "score_harbor_trials.py"
+    )
     if not scoring_script.exists():
         return
 
     # Find new trials created during this run
     new_trials: list[Path] = []
-    
+
     # Check roots (usually workspace/trials or workspace/jobs)
     for root in run_roots:
         if not root.exists():
             continue
-            
+
         # Helper to decide if a path is new
         def is_new(p: Path) -> bool:
             return pre_run_mtime is None or p.stat().st_mtime > pre_run_mtime
@@ -498,17 +529,17 @@ def _maybe_score_external_trials(
             for trial_dir in root.iterdir():
                 if trial_dir.is_dir() and is_new(trial_dir):
                     new_trials.append(trial_dir)
-    
+
     if not new_trials:
         return
 
     print(f"Running external scoring verification on {len(new_trials)} new trials...")
     subprocess.run(
         [
-            sys.executable, 
-            str(scoring_script), 
-            "--trial-paths", 
-            *[str(p) for p in new_trials]
+            sys.executable,
+            str(scoring_script),
+            "--trial-paths",
+            *[str(p) for p in new_trials],
         ],
         check=False,
     )
@@ -738,7 +769,11 @@ def _rewrite_openai_model(argv: list[str]) -> list[str]:
     def _fix(value: str) -> str:
         if "/" in value:
             return value
-        if value.startswith("gpt-") or value.startswith("o1-") or value.startswith("o3-"):
+        if (
+            value.startswith("gpt-")
+            or value.startswith("o1-")
+            or value.startswith("o3-")
+        ):
             return f"openai/{value}"
         return value
 
@@ -770,11 +805,14 @@ def _rewrite_openai_model(argv: list[str]) -> list[str]:
 
 def _rewrite_qwen_model(argv: list[str]) -> list[str]:
     """Ensure Qwen model names are routed via OpenRouter (user preference)."""
-
     # Check if we are running the native qwen-coder agent
     is_native_agent = False
     for i, arg in enumerate(argv):
-        if arg in ("-a", "--agent") and i + 1 < len(argv) and argv[i + 1] == "qwen-coder":
+        if (
+            arg in ("-a", "--agent")
+            and i + 1 < len(argv)
+            and argv[i + 1] == "qwen-coder"
+        ):
             is_native_agent = True
             break
         if arg.startswith("--agent=") and "qwen-coder" in arg:
@@ -790,13 +828,13 @@ def _rewrite_qwen_model(argv: list[str]) -> list[str]:
         # If already has a provider prefix (like openrouter/), leave it
         if value.startswith("openrouter/") or value.startswith("dashscope/"):
             return value
-        
+
         # If it looks like a Qwen model ID (starts with qwen or qwen/)
         if value.lower().startswith("qwen"):
             if "/" in value:
                 return f"openrouter/{value}"
             return f"openrouter/{value}"
-            
+
         return value
 
     rewritten: list[str] = []
@@ -827,10 +865,14 @@ def _rewrite_qwen_model(argv: list[str]) -> list[str]:
 
 def _apply_qwen_coder_defaults(argv: list[str]) -> None:
     """If using qwen-coder agent, ensure OpenAI-compatible env vars point to OpenRouter."""
-    print(f"DEBUG: argv={argv}") 
+    print(f"DEBUG: argv={argv}")
     is_qwen_code = False
     for i, arg in enumerate(argv):
-        if arg in ("-a", "--agent") and i + 1 < len(argv) and argv[i + 1] == "qwen-coder":
+        if (
+            arg in ("-a", "--agent")
+            and i + 1 < len(argv)
+            and argv[i + 1] == "qwen-coder"
+        ):
             is_qwen_code = True
             break
         if arg.startswith("--agent=") and "qwen-coder" in arg:
@@ -844,14 +886,14 @@ def _apply_qwen_coder_defaults(argv: list[str]) -> None:
         if "-p" in argv:
             path_idx = argv.index("-p") + 1
         elif "--path" in argv:
-             path_idx = argv.index("--path") + 1
-        
+            path_idx = argv.index("--path") + 1
+
         if path_idx > 0 and path_idx < len(argv):
-             job_path = Path(argv[path_idx])
-             config_path = job_path / "config.json"
-             if config_path.exists():
-                 try:
-                     with open(config_path) as f:
+            job_path = Path(argv[path_idx])
+            config_path = job_path / "config.json"
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
                         config = json.load(f)
                         # Config has "agents": [{"name": "qwen-coder", ...}]
                         agents = config.get("agents", [])
@@ -859,31 +901,39 @@ def _apply_qwen_coder_defaults(argv: list[str]) -> None:
                             for agent in agents:
                                 if agent.get("name") == "qwen-coder":
                                     is_qwen_code = True
-                                    print(f"DEBUG: Detected qwen-coder agent in resumed job config: {config_path}")
+                                    print(
+                                        f"DEBUG: Detected qwen-coder agent in resumed job config: {config_path}"
+                                    )
                                     break
-                 except Exception as e:
-                     print(f"DEBUG: Failed to read config {config_path}: {e}")
+                except Exception as e:
+                    print(f"DEBUG: Failed to read config {config_path}: {e}")
 
     if is_qwen_code:
-        print(f"DEBUG: Detected qwen-coder agent. Checking env vars...")
-        
+        print("DEBUG: Detected qwen-coder agent. Checking env vars...")
+
         # If we have an OpenRouter key, we should USE it as the OpenAI key for this agent,
         # because we are likely defaulting the Base URL to OpenRouter.
         # This overrides any native OpenAI key that might be present (e.g. for Codex).
         if "OPENROUTER_API_KEY" in os.environ:
-            print("DEBUG: Overwriting OPENAI_API_KEY with OPENROUTER_API_KEY (to match OpenRouter URL)")
+            print(
+                "DEBUG: Overwriting OPENAI_API_KEY with OPENROUTER_API_KEY (to match OpenRouter URL)"
+            )
             os.environ["OPENAI_API_KEY"] = os.environ["OPENROUTER_API_KEY"]
         elif "OPENAI_API_KEY" in os.environ:
-             print("DEBUG: Using existing OPENAI_API_KEY (No OpenRouter key found).")
+            print("DEBUG: Using existing OPENAI_API_KEY (No OpenRouter key found).")
         else:
-             print("DEBUG: Warning: No API key found (OPENAI_API_KEY or OPENROUTER_API_KEY missing).")
+            print(
+                "DEBUG: Warning: No API key found (OPENAI_API_KEY or OPENROUTER_API_KEY missing)."
+            )
 
         # If User didn't specify a base URL, default to OpenRouter
         if "OPENAI_BASE_URL" not in os.environ:
             print("DEBUG: Setting OPENAI_BASE_URL to OpenRouter default")
             os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
         else:
-            print(f"DEBUG: OPENAI_BASE_URL already set: {os.environ['OPENAI_BASE_URL']}")
+            print(
+                f"DEBUG: OPENAI_BASE_URL already set: {os.environ['OPENAI_BASE_URL']}"
+            )
 
 
 def _extract_hf_args(argv: list[str]) -> tuple[list[str], dict[str, str]]:
