@@ -18,6 +18,7 @@ from src.google_util.sheets import (
     GoogleSheetFileLinkConfig,
 )
 from src.util import get_path_with_suffix
+from src.pppdb.parse_db import get_pppdb_data
 
 
 def get_super_con_papers(
@@ -320,6 +321,49 @@ def upload_to_google_sheets(
     print(f"Sheet URL: https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
 
 
+def get_pppdb_arxiv_info(testing_limit: int | None = None) -> None:
+    df_papers: list[str] = get_pppdb_data()[-1]
+    papers = [{"doi_link": x} for x in df_papers][:testing_limit]
+    parsed = get_real_doi_from_base_doi(papers)
+    # using the true dois, search for them
+    returned_results = get_arxiv_search_results_by_dois([x["true_doi"] for x in parsed])
+
+    normed = []
+    for paper_info, arxiv_search_results in zip(parsed, returned_results):
+        for arxiv_search_result in arxiv_search_results:
+            to_save: dict[str, str] = {
+                **paper_info,
+                **arxiv_search_result,
+            }
+            normed.append(to_save)
+
+    # save just in case something goes wrong in the next step
+    df = pd.json_normalize(normed)
+    df.to_csv(
+        ARTIFACTS_ROOT / "pppdb_dois_augmented.csv",
+        index=False,
+    )
+
+    for i, paper_result in enumerate(normed):
+        paper_details = get_arxiv_paper_detail_result_by_abs_links(
+            [paper_result["arxiv_url_abstract"]]
+        )[0]
+        normed[i] = {
+            **paper_result,
+            **paper_details,
+            "arxiv_comment_suggests_has_supplement": get_has_supplement_from_arxiv_comment(
+                paper_details["arxiv_comments"]
+            ),
+        }
+
+    # will overwrite the intermediate df
+    df = pd.json_normalize(normed)
+    df.to_csv(
+        ARTIFACTS_ROOT / "pppdb_dois_augmented.csv",
+        index=False,
+    )
+
+
 if __name__ == "__main__":
     # --- supercon ---
     # get_super_con_arxiv_info()
@@ -327,8 +371,11 @@ if __name__ == "__main__":
     # upload_super_con_to_google_sheets(g_search_results, "SuperCon Arxiv Papers", "SuperCon Arxiv")
 
     # --- charge density ---
-    get_charge_density_wave_arxiv_info()
-    g_drive_file = get_charge_density_wave_arxiv_downloads()
-    upload_to_google_sheets(
-        g_drive_file, "Charge Density Wave PDFs", "Charge Density Wave Arxiv"
-    )
+    # get_charge_density_wave_arxiv_info()
+    # g_drive_file = get_charge_density_wave_arxiv_downloads()
+    # upload_to_google_sheets(
+    #     g_drive_file, "Charge Density Wave PDFs", "Charge Density Wave Arxiv"
+    # )
+
+    # --- PPPDB ---
+    get_pppdb_arxiv_info()
