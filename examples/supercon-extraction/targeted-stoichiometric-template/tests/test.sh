@@ -6,10 +6,9 @@ python /tests/check_prediction.py 2>&1 | tee /logs/verifier/log.txt
 status=${PIPESTATUS[0]}
 set -e
 
-# Preserve *all* agent-written outputs even on verifier failure (Harbor deletes containers).
-if [[ -d /app/output ]]; then
-  mkdir -p /logs/verifier/app_output
-  cp -R /app/output/. /logs/verifier/app_output/ 2>/dev/null || true
+# Preserve the agent-written predictions file even on verifier failure (Harbor deletes containers).
+if [[ -f /app/predictions.json ]]; then
+  cp /app/predictions.json /logs/verifier/predictions.json 2>/dev/null || true
 fi
 
 if [[ -f /app/task_meta.json ]]; then

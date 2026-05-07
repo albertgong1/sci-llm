@@ -112,6 +112,31 @@ def compute_recall_by_refno(args: Namespace) -> pd.DataFrame:
     logger.info(
         f"Loaded {len(df_matches)} total rows using {model_name} for property matching"
     )
+    if args.non_llm_baseline:
+        here = Path(__file__)
+        repo_root = here.parent.parent.parent
+        eval_data_root = repo_root / "pbench_out"
+        registry_data_path = eval_data_root / "registry_data.json"
+        if not (registry_data_path.exists() and registry_data_path.is_file()):
+            raise RuntimeError(
+                f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}"
+            )
+        registry_data = json.loads(Path(registry_data_path).read_text())
+        assert isinstance(registry_data, list)
+        eval_subset = registry_data[0]["tasks"]
+
+        # only take the first 200
+        first_n = 200
+        refnos = [x["name"] for x in eval_subset][:first_n]
+
+        num_rows_original = df_matches.shape[0]
+        df_matches["refno_normed"] = df_matches["refno"].str.lower()
+        df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
+        del df_matches["refno_normed"]
+        num_rows_after_filtering = df_matches.shape[0]
+        print(
+            f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}"
+        )
 
     group_cols = ["agent", "model"]
 
@@ -232,6 +257,11 @@ def cli_main() -> None:
         default="refno",
         help="Column to group recall by (default: refno)",
     )
+    parser.add_argument(
+        "--non_llm_baseline",
+        action="store_true",
+        help="Flag for special logic for non-agent and non-LLM eval.",
+    )
 
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
@@ -341,6 +371,50 @@ def cli_main() -> None:
                     .to_dict()
                     .items()
                 }
+        elif args.non_llm_baseline:
+            here = Path(__file__)
+            repo_root = here.parent.parent.parent
+            eval_data_root = repo_root / "pbench_out"
+            registry_data_path = eval_data_root / "registry_data.json"
+            if not (registry_data_path.exists() and registry_data_path.is_file()):
+                raise RuntimeError(
+                    f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}"
+                )
+            registry_data = json.loads(Path(registry_data_path).read_text())
+            assert isinstance(registry_data, list)
+            eval_subset = registry_data[0]["tasks"]
+
+            # only take the first 200
+            first_n = 200
+            refnos = [x["name"] for x in eval_subset][:first_n]
+
+            num_rows_original = df_matches.shape[0]
+            df_matches["refno_normed"] = df_matches["refno"].str.lower()
+            df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
+
+            hits = set(df_matches["refno_normed"].tolist())
+            expected = set(refnos)
+            missing = expected - hits
+            if missing:
+                raise ValueError(
+                    f"You are missing {len(missing)} paper(s). Re-run extraction for: {missing}"
+                )
+
+            del df_matches["refno_normed"]
+            num_rows_after_filtering = df_matches.shape[0]
+            trials_lookup = {
+                ("chemdataextractor", "supermat_eval"): df_matches[
+                    (df_matches["agent"] == "chemdataextractor")
+                    & (df_matches["model"] == "supermat_eval")
+                ]["refno"].nunique(),
+                ("grobid", "supermat_eval"): df_matches[
+                    (df_matches["agent"] == "grobid")
+                    & (df_matches["model"] == "supermat_eval")
+                ]["refno"].nunique(),
+            }
+            print(
+                f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}"
+            )
         else:
             trials_lookup = count_zeroshot_trials_per_group(
                 args.output_dir.resolve(),
