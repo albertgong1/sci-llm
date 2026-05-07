@@ -11,6 +11,9 @@ MARKER_SIZE = 3
 LINE_ALPHA = 0.75
 OUTWARD = 4
 
+NEURIPS_WIDTH = 5.5  # in inches
+NEURIPS_HEIGHT = 2.25  # in inches
+
 
 def get_display_label(agent: str, model: str, multiline: bool = True) -> str:
     """Get a consistent display label for an agent+model combination.

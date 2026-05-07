@@ -14,9 +14,10 @@ from pathlib import Path
 
 from pbench_eval.plotting_utils import (
     TICK_FONT_SIZE,
-    LABEL_FONT_SIZE,
     LEGEND_FONT_SIZE,
     OUTWARD,
+    NEURIPS_WIDTH,
+    NEURIPS_HEIGHT,
     get_display_label,
 )
 
@@ -112,8 +113,10 @@ x_metric_label = "avg_x_metric"
 legend_handles = []
 domains = ["supercon", "tc"]
 
-# 1x2 layout, single-column width
-fig, axs_array = plt.subplots(1, 2, figsize=(3.25, 1.75), gridspec_kw={"wspace": 0.5})
+# 1x2 layout, NeurIPS width
+fig, axs_array = plt.subplots(
+    1, 2, figsize=(NEURIPS_WIDTH, NEURIPS_HEIGHT), gridspec_kw={"wspace": 0.5}
+)
 axs = list(axs_array)
 
 # --- Plot SuperCon from per-domain output directories ---
@@ -163,11 +166,42 @@ for domain, output_dir in output_dirs:
                     label=legend_label,
                 )
             )
-    ax.set_title("Multi-Property\nExtraction", fontsize=LABEL_FONT_SIZE)
-    ax.set_xlabel(x_axis_label, fontsize=LABEL_FONT_SIZE)
-    ax.set_ylabel("F1 Score", fontsize=LABEL_FONT_SIZE)
+    # Baseline F1 scores from non-LLM extraction methods
+    # (label, F1, color, vertical alignment for text, y offset for text)
+    baselines = [
+        ("Regex", 0.06, "#555555", "bottom", 0.0),  # dark gray
+        ("ChemDataExtractor2", 0.05, "#999999", "top", -0.01),  # light gray
+    ]
+    for (
+        baseline_label,
+        baseline_f1,
+        baseline_color,
+        baseline_va,
+        baseline_text_dy,
+    ) in baselines:
+        ax.axhline(
+            y=baseline_f1,
+            linestyle="--",
+            color=baseline_color,
+            linewidth=1,
+            alpha=0.8,
+        )
+        ax.text(
+            0.02,
+            baseline_f1 + baseline_text_dy,
+            baseline_label,
+            transform=ax.get_yaxis_transform(),
+            fontsize=LEGEND_FONT_SIZE,
+            color=baseline_color,
+            va=baseline_va,
+            ha="left",
+        )
+
+    ax.set_title("Document-Level Property Extraction", fontsize=8)
+    ax.set_xlabel(x_axis_label, fontsize=8)
+    ax.set_ylabel("Accuracy", fontsize=8)
     ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0)
+    ax.set_ylim(bottom=0, top=0.5)
     ax.tick_params(axis="both", labelsize=TICK_FONT_SIZE, direction="out")
     ax.grid(axis="both", alpha=0.3)
     ax.spines["top"].set_visible(False)
@@ -182,7 +216,7 @@ x_sem_col = f"{x_col}_sem"
 
 for task_name in ["tc"]:
     ax = axs[domains.index(task_name)]
-    task_df = csv_data[(csv_data["task"] == task_name) & (csv_data["agent"] != "Qwen")]
+    task_df = csv_data[csv_data["task"] == task_name]
 
     for _, row in task_df.iterrows():
         agent_str: str = row["agent"]
@@ -191,11 +225,31 @@ for task_name in ["tc"]:
         marker = AGENT_MARKERS.get(color_key, "o")
         # Baselines get full alpha, agents get slightly lower
         alpha = 1.0 if row["type"] == "baseline" else 0.7
+        # Qwen does not report cost/tokens — show as a horizontal dashed line
+        if agent_str == "Qwen":
+            ax.axhline(
+                y=row["avg_score"],
+                linestyle="--",
+                color=color,
+                linewidth=1,
+                alpha=0.8,
+            )
+            ax.text(
+                0.02,
+                row["avg_score"],
+                "qwen-code",
+                transform=ax.get_yaxis_transform(),
+                fontsize=LEGEND_FONT_SIZE,
+                color=color,
+                va="bottom",
+                ha="left",
+            )
+            continue
         ax.errorbar(
             row[x_col] / token_scale,
-            row["avg_score"] * 2,  # unnormalize
+            row["avg_score"],
             xerr=row[x_sem_col] / token_scale,
-            yerr=row["avg_score_sem"] * 2,  # unnormalize
+            yerr=row["avg_score_sem"],
             fmt=marker,
             color=color,
             alpha=alpha,
@@ -215,11 +269,11 @@ for task_name in ["tc"]:
                     label=legend_label,
                 )
             )
-    ax.set_title("Open-World\nPrecedent Search", fontsize=LABEL_FONT_SIZE)
-    ax.set_xlabel(x_axis_label, fontsize=LABEL_FONT_SIZE)
-    ax.set_ylabel("Accuracy Score (0–2)", fontsize=LABEL_FONT_SIZE)
+    ax.set_title("Open-Domain Precedent Search", fontsize=8)
+    ax.set_xlabel(x_axis_label, fontsize=8)
+    ax.set_ylabel("Accuracy", fontsize=8)
     ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0)
+    ax.set_ylim(bottom=0, top=0.5)
     ax.tick_params(axis="both", labelsize=TICK_FONT_SIZE, direction="out")
     ax.grid(axis="both", alpha=0.3)
     ax.spines["top"].set_visible(False)
@@ -227,8 +281,7 @@ for task_name in ["tc"]:
     ax.spines["left"].set_position(("outward", OUTWARD))
     ax.spines["bottom"].set_position(("outward", OUTWARD))
 
-# Add legend for agents at the bottom (row 1: GPT variants, row 2: Gemini variants)
-# matplotlib ncol=3 fills top-to-bottom per column, so interleave rows
+# Full legend duplicated in both panels (qwen-code is shown as a text label on the line)
 label_order = [
     "gpt-5.1",
     "gemini-3-pro",
@@ -239,14 +292,19 @@ label_order = [
 ]
 handle_by_label = {h.get_label(): h for h in legend_handles}
 sorted_handles = [handle_by_label[l] for l in label_order if l in handle_by_label]
-fig.legend(
-    handles=sorted_handles,
-    loc="lower center",
-    ncol=3,
-    fontsize=LEGEND_FONT_SIZE,
-    frameon=False,
-    bbox_to_anchor=(0.5, -0.35),
-)
+for ax in axs:
+    leg = ax.legend(
+        handles=sorted_handles,
+        loc="upper right",
+        fontsize=LEGEND_FONT_SIZE,
+        frameon=True,
+        ncol=1,
+        handletextpad=0.4,
+        borderaxespad=0.2,
+    )
+    leg.get_frame().set_edgecolor("#888888")
+    leg.get_frame().set_linewidth(0.4)
+    leg.get_frame().set_facecolor("white")
 figures_dir = args.output_dir / "figures"
 figures_dir.mkdir(parents=True, exist_ok=True)
 fig_name = f"f1_vs_{args.x_axis}_supercon_tc.pdf"
