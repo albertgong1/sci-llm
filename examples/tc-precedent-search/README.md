@@ -162,18 +162,18 @@ uv run python examples/harbor-workspace/collect_harbor_results.py \
 ### 5. Score Results
 
 ```bash
-uv run python src/pbench_eval/score_task.py \
-  --domain precedent-search \
-  --input_preds_dir examples/harbor-workspace/out/harbor/precedent-search/<PRED_FOLDER_NAME> \
+cd examples/tc-precedent-search
+uv run python score_task.py \
+  --input_preds_dir ../harbor-workspace/out/harbor/precedent-search/<PRED_FOLDER_NAME> \
   --file_pattern "*gemini-cli*" \
   --output_tag <OUTPUT_TAG> \
-  --output_dir examples/harbor-workspace/out/harbor
+  --output_dir ../harbor-workspace/out/harbor
 ```
 
 **Inputs:**
 
 - `examples/harbor-workspace/out/harbor/precedent-search/preds/*.json`: The collected JSON results
-- `assets/hard/rubric.csv`: The scoring rubric
+- `examples/tc-precedent-search/rubric.csv`: The scoring rubric
 - `src/pbench_eval/utils.py`: The scoring logic
 
 **Outputs:**
@@ -275,12 +275,12 @@ uv run python examples/harbor-workspace/collect_harbor_results.py \
 #### Step 3: Score (Property Level)
 
 ```bash
-uv run python src/pbench_eval/score_task.py \
-  --domain precedent-search \
-  --input_preds_dir examples/harbor-workspace/out/harbor/precedent-search/<NEW_PRED_FOLDER_NAME> \
+cd examples/tc-precedent-search
+uv run python score_task.py \
+  --input_preds_dir ../harbor-workspace/out/harbor/precedent-search/<NEW_PRED_FOLDER_NAME> \
   --file_pattern "*gemini-cli*" \
   --output_tag gemini_cli_pro_run2 \
-  --output_dir examples/harbor-workspace/out/harbor
+  --output_dir ../harbor-workspace/out/harbor
 ```
 
 *Creates: `examples/harbor-workspace/out/harbor/precedent-search/scores/scored_results_gemini_cli_pro_run2.csv`*
