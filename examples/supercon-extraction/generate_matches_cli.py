@@ -6,11 +6,10 @@ This script uses a two-stage approach:
 
 Example usage:
 ```bash
-uv run pbench-generate-matches \
+uv run python generate_matches_cli.py \
     --output_dir ./out \
     --hf_repo kilian-group/supercon-extraction \
     --hf_split full \
-    --prompt_path prompts/property_matching_prompt.md \
     --model_name gemini-3-pro-preview
 ```
 """
@@ -29,8 +28,9 @@ from slugify import slugify
 from llm_utils import get_llm, InferenceGenerationConfig
 from llm_utils.common import LLMChat
 import pbench
-from pbench_eval.match import generate_property_name_matches
 from pbench_eval.harbor_utils import get_harbor_data
+
+from check_prediction import construct_context, generate_property_name_matches
 
 logger = logging.getLogger(__name__)
 
@@ -38,30 +38,11 @@ logger = logging.getLogger(__name__)
 MAX_CONCURRENT_TASKS = 10
 
 
-def load_registry_refnos(registry_path: Path, limit: int) -> list[str]:
-    """Load the first `limit` refnos/task names from a Harbor registry JSON."""
-    payload = json.loads(registry_path.read_text())
-    tasks: list[dict] = []
-    if isinstance(payload, list):
-        for entry in payload:
-            if isinstance(entry, dict) and isinstance(entry.get("tasks"), list):
-                tasks.extend(task for task in entry["tasks"] if isinstance(task, dict))
-    elif isinstance(payload, dict) and isinstance(payload.get("tasks"), list):
-        tasks.extend(task for task in payload["tasks"] if isinstance(task, dict))
-
-    refnos: list[str] = []
-    for task in tasks[:limit]:
-        name = task.get("name")
-        if isinstance(name, str) and name:
-            refnos.append(name)
-    return refnos
-
-
 async def process_single_group(
     agent: str,
     model: str,
     refno: str,
-    group: pd.DataFrame,
+    properties: list[dict],
     df_gt: pd.DataFrame,
     pred_embeddings_dir: Path,
     pred_matches_dir: Path,
@@ -70,19 +51,16 @@ async def process_single_group(
     gt_responses_dir: Path,
     llm: LLMChat,
     inf_gen_config: InferenceGenerationConfig,
-    prompt_template: str,
     model_name: str,
     top_k: int,
     force: bool,
     semaphore: asyncio.Semaphore,
     context_column: str,
 ) -> None:
-    """Process a single (agent, model, refno) group."""
+    """Process one (agent, model, refno) trial — its full list of properties."""
     async with semaphore:
         logger.info(f"Processing {agent=} {model=} {refno=}...")
-
-        # Prepare predicted data
-        df_pred = group
+        df_pred = pd.json_normalize(properties)
         df_pred_embeddings = pd.read_parquet(
             pred_embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
         )
@@ -91,24 +69,13 @@ async def process_single_group(
             on="property_name",
             how="left",
         )
-        # Use configurable context column
         if context_column in df_pred.columns:
             df_pred["context"] = df_pred[context_column]
         else:
             df_pred["context"] = ""
 
         # Prepare ground truth data for this refno
-        if False:
-            df_gt_refno = df_gt[df_gt["refno"].str.lower() == refno.lower()].drop(
-                columns=["refno"]
-            )
-        else:
-            # NOTE: For Harbor evaluation, the refno for predictions is inferred from the trial dirname,
-            # which is slugified. The refno in the GT is not slugified, so we need to slugify it for matching.
-            df_gt_refno = df_gt[
-                df_gt["refno"].str.lower().apply(lambda x: slugify(x))
-                == slugify(refno.lower())
-            ].drop(columns=["refno"])
+        df_gt_refno = df_gt[df_gt["refno"] == refno].drop(columns=["refno"])
 
         # Define paths
         pred_matches_path = (
@@ -140,7 +107,6 @@ async def process_single_group(
                         df_gt_refno,
                         llm,
                         inf_gen_config,
-                        prompt_template,
                         top_k=top_k,
                         left_on=["property_name", "context"],
                         right_on=["property_name", "context"],
@@ -163,7 +129,6 @@ async def process_single_group(
                         df_pred,
                         llm,
                         inf_gen_config,
-                        prompt_template,
                         top_k=top_k,
                         left_on=["property_name", "context"],
                         right_on=["property_name", "context"],
@@ -208,19 +173,6 @@ async def process_single_group(
                 logger.info(f"Saved gt responses to {gt_responses_path}")
 
 
-def construct_context(row: pd.Series) -> str:
-    """Construct the context from the ground-truth property row.
-
-    Args:
-        row: Ground-truth property row
-
-    Returns:
-        Context string
-
-    """
-    return json.dumps({k: v for k, v in row.items() if k == "value_unit"})
-
-
 async def main(args: argparse.Namespace) -> None:
     """Main function to match property names using LLM."""
     output_dir = args.output_dir
@@ -230,13 +182,6 @@ async def main(args: argparse.Namespace) -> None:
     jobs_dir = args.jobs_dir
     preds_dirname = args.preds_dirname
     context_column = args.context_column
-
-    # Load prompt template from markdown file
-    prompt_path = Path(args.prompt_path)
-    if not prompt_path.exists():
-        raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
-    with open(prompt_path, "r") as f:
-        prompt_template = f.read()
 
     #
     # Load embeddings
@@ -266,41 +211,30 @@ async def main(args: argparse.Namespace) -> None:
     # Load extracted properties
     #
     if jobs_dir is not None:
-        # Load predictions from Harbor jobs directory
+        # Load predictions from Harbor jobs directory — one row per trial with a
+        # `properties` list column.
         df = get_harbor_data(jobs_dir)
     else:
-        # Load predictions from CSV files
+        # Load predictions from per-refno JSON files (zeroshot output format).
         pred_properties_dir = output_dir / preds_dirname
-        pred_properties_files = list(pred_properties_dir.glob("*.csv"))
+        pred_properties_files = list(pred_properties_dir.glob("*.json"))
         if not pred_properties_files:
             raise FileNotFoundError(
                 f"No properties files found in {pred_properties_dir}"
             )
-        dfs = []
+        trials = []
         for file in pred_properties_files:
-            df = pd.read_csv(file)
-            dfs.append(df)
-        df = pd.concat(dfs, ignore_index=True)
-
-    # Optionally restrict to refnos listed in a registry file
-    registry_path = Path(args.registry_path) if args.registry_path else output_dir / "registry_data.json"
-    registry_limit = args.registry_limit
-    if registry_limit > 0 and registry_path.exists():
-        allowed_refnos = load_registry_refnos(registry_path, registry_limit)
-        allowed_refnos_slugified = {slugify(refno.lower()) for refno in allowed_refnos}
-        original_rows = len(df)
-        df = df[
-            df["refno"].astype(str).str.lower().apply(lambda x: slugify(x)).isin(allowed_refnos_slugified)
-        ].copy()
-        logger.info(
-            "Filtered predictions using %s: kept %d rows across first %d registry tasks (from %d rows)",
-            registry_path,
-            len(df),
-            registry_limit,
-            original_rows,
-        )
-    elif registry_limit > 0 and args.registry_path:
-        logger.warning("Registry path does not exist: %s", registry_path)
+            with file.open() as f:
+                payload = json.load(f)
+            trials.append(
+                {
+                    "agent": payload.get("agent"),
+                    "model": payload.get("model"),
+                    "refno": payload["refno"],
+                    "properties": payload["properties"],
+                }
+            )
+        df = pd.DataFrame(trials)
 
     #
     # Load ground truth properties
@@ -354,17 +288,18 @@ async def main(args: argparse.Namespace) -> None:
     max_concurrent = args.max_concurrent
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    # Build list of tasks for all groups
+    # Build list of tasks — one per trial row.
     tasks = []
-    for (agent, model, refno), group in df.groupby(["agent", "model", "refno"]):
-        if args.refno is not None and refno != args.refno:
+    for _, row in df.iterrows():
+        if args.refno is not None and row["refno"] != args.refno:
             continue
         tasks.append(
             process_single_group(
-                agent=agent,
-                model=model,
-                refno=refno,
-                group=group,
+                # Coerce None → "" so slugify doesn't choke (oracle batches have no model_name).
+                agent=row["agent"] or "",
+                model=row["model"] or "",
+                refno=row["refno"],
+                properties=row["properties"],
                 df_gt=df_gt,
                 pred_embeddings_dir=pred_embeddings_dir,
                 pred_matches_dir=pred_matches_dir,
@@ -373,7 +308,6 @@ async def main(args: argparse.Namespace) -> None:
                 gt_responses_dir=gt_responses_dir,
                 llm=llm,
                 inf_gen_config=inf_gen_config,
-                prompt_template=prompt_template,
                 model_name=model_name,
                 top_k=top_k,
                 force=force,
@@ -394,14 +328,6 @@ def cli_main() -> None:
         description="Match property names to ground truth labels using LLM."
     )
     parser = pbench.add_base_args(parser)
-
-    # Required arguments
-    parser.add_argument(
-        "--prompt_path",
-        type=str,
-        required=True,
-        help="Path to the property matching prompt template (markdown file)",
-    )
 
     # Optional arguments
     parser.add_argument(
@@ -441,18 +367,6 @@ def cli_main() -> None:
         type=int,
         default=MAX_CONCURRENT_TASKS,
         help=f"Maximum number of concurrent tasks (default: {MAX_CONCURRENT_TASKS})",
-    )
-    parser.add_argument(
-        "--registry_path",
-        type=str,
-        default=None,
-        help="Optional path to a registry_data.json file; if omitted, OUTPUT_DIR/registry_data.json is used when present.",
-    )
-    parser.add_argument(
-        "--registry_limit",
-        type=int,
-        default=200,
-        help="If a registry file is present, only process the first N task names from it (default: 200). Set to 0 to disable.",
     )
 
     args = parser.parse_args()

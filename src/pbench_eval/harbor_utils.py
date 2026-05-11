@@ -3,143 +3,37 @@
 Usage:
     from pbench_eval.harbor_utils import get_harbor_data
     df = get_harbor_data(jobs_dir)
+
+Each row corresponds to one trial and carries its full `properties` list
+(no per-property explode). Consumers that want per-property rows should
+iterate df.itertuples() and flatten downstream.
 """
 
 import json
 import logging
-import re
-import uuid
-from json import JSONDecoder
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_text_from_jsonlines_log(text: str) -> str | None:
-    """Decode assistant output embedded in JSONL agent logs (e.g., Claude Code)."""
-    decoded_parts: list[str] = []
-    any_json = False
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if not line.startswith("{"):
-            return None
-        try:
-            obj = json.loads(line)
-        except Exception:
-            return None
-        any_json = True
-
-        if isinstance(obj, dict):
-            message = obj.get("message")
-            if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and isinstance(
-                            block.get("text"), str
-                        ):
-                            decoded_parts.append(block["text"])
-
-            result_text = obj.get("result")
-            if isinstance(result_text, str):
-                decoded_parts.append(result_text)
-
-    if not any_json:
+def _load_trial_predictions(trial_dir: Path) -> list[dict] | None:
+    """Load `properties` from a trial's predictions.json (strict schema)."""
+    path = trial_dir / "verifier" / "predictions.json"
+    if not path.exists():
         return None
-
-    combined = "\n\n".join(
-        part.strip() for part in decoded_parts if part and part.strip()
-    )
-    return combined or None
+    with path.open() as f:
+        return json.load(f)["properties"]
 
 
-def _extract_first_json_object(text: str) -> dict[str, Any] | None:
-    """Extract the first JSON object from mixed text (handles fenced blocks)."""
-    fence_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if isinstance(obj, dict):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\{", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-            if isinstance(obj, dict):
-                return obj
-        except Exception:
-            continue
-    return None
-
-
-def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
-    """Extract the first JSON array from mixed text (handles fenced blocks)."""
-    fence_match = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if isinstance(obj, list):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\[", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-            if isinstance(obj, list):
-                return obj
-        except Exception:
-            continue
-    return None
-
-
-def _load_trial_predictions(
-    trial_dir: Path,
-) -> dict[str, Any] | list[dict[str, Any]] | None:
-    """Load JSON predictions from predictions.json file in a single trial directory.
-
-    Args:
-        trial_dir: Path to the Harbor trial directory
-
-    Returns:
-        Parsed JSON data (either dict or list), or None if not found
-
-    """
-    # Try to load from predictions.json first
-    log_path = trial_dir / "verifier" / "predictions.json"
-    if not log_path.exists():
-        log_path = trial_dir / "agent" / "gemini-cli.txt"
-
-    try:
-        content = log_path.read_text()
-    except Exception:
+def _load_trial_refno(trial_dir: Path) -> str | None:
+    """Read refno from the task_meta.json copied into verifier/ by test.sh."""
+    path = trial_dir / "verifier" / "task_meta.json"
+    if not path.exists():
         return None
-
-    # First try to extract text from JSONL format
-    decoded = _extract_text_from_jsonlines_log(content)
-    text = decoded or content
-
-    # Try to extract JSON object first
-    extracted_obj = _extract_first_json_object(text)
-    if extracted_obj is not None:
-        return extracted_obj
-
-    # Fall back to extracting JSON array
-    extracted_arr = _extract_first_json_array(text)
-    if extracted_arr is not None:
-        return extracted_arr
-
-    return None
+    with path.open() as f:
+        return json.load(f)["refno"]
 
 
 def count_trials_per_agent_model(jobs_dir: Path) -> pd.DataFrame:
@@ -160,7 +54,6 @@ def count_trials_per_agent_model(jobs_dir: Path) -> pd.DataFrame:
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
-        # get the agent and model name from the batch_dir config.json
         agent, model = None, None
         config_path = batch_dir / "config.json"
         if config_path.exists():
@@ -192,7 +85,9 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     jobs_dir/
       batch_1/
         trial_1/verifier/predictions.json
+        trial_1/verifier/task_meta.json
         trial_2/verifier/predictions.json
+        trial_2/verifier/task_meta.json
       batch_2/
         ...
 
@@ -200,11 +95,12 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         jobs_dir: Path to the Harbor jobs directory containing batch subdirectories
 
     Returns:
-        DataFrame containing:
+        DataFrame with one row per trial and columns:
+        - agent, model (from the batch's config.json)
         - batch: batch directory name
         - trial_id: trial directory name
-        - refno: reference number (if available in trial data)
-        - exploded predictions: parsed JSON data from the trial
+        - refno: read from trial/verifier/task_meta.json
+        - properties: the raw list[dict] from predictions.json (not exploded)
 
     Raises:
         FileNotFoundError: If jobs_dir doesn't exist
@@ -215,11 +111,10 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
     if not jobs_dir.exists():
         raise FileNotFoundError(f"Jobs directory not found: {jobs_dir}")
 
-    dfs = []
+    rows: list[dict] = []
     for batch_dir in sorted(jobs_dir.iterdir()):
         if not batch_dir.is_dir():
             continue
-        # get the agent and model name from the batch_dir config.json
         agent, model = None, None
         config_path = batch_dir / "config.json"
         if config_path.exists():
@@ -234,44 +129,32 @@ def get_harbor_data(jobs_dir: Path) -> pd.DataFrame:
         for trial_dir in sorted(batch_dir.iterdir()):
             if not trial_dir.is_dir():
                 continue
-            predictions = _load_trial_predictions(trial_dir)
-            if predictions is None:
-                logger.warning(f"No valid predictions found in trial: {trial_dir}")
-                continue
-            if "properties" not in predictions:
-                logger.warning(
-                    f"'properties' key not found in predictions for trial: {trial_dir}"
-                )
-                continue
-            if len(predictions["properties"]) == 0:
-                logger.warning(
-                    f"No properties found in predictions for trial: {trial_dir}"
-                )
-                continue
-            # HACK: if "id" key is missing from any property in the predictions list,
-            # then assign a dummy id to each property based on its index using uuid
-            for prop in predictions["properties"]:
-                if "id" not in prop:
-                    prop["id"] = f"prop_{uuid.uuid4()}"
-            # Get refno from trial_dir name (e.g., "epl0330153__4QUtrB2")
-            refno, _ = trial_dir.name.split("__")
 
-            df = pd.DataFrame(
-                data={
+            refno = _load_trial_refno(trial_dir)
+            if refno is None:
+                logger.warning(f"No task_meta.json found in trial: {trial_dir}")
+                continue
+
+            properties = _load_trial_predictions(trial_dir)
+            if properties is None:
+                logger.warning(f"No predictions.json found in trial: {trial_dir}")
+                continue
+            if len(properties) == 0:
+                logger.warning(f"Empty properties list in trial: {trial_dir}")
+                continue
+
+            rows.append(
+                {
                     "agent": agent,
                     "model": model,
                     "batch": batch_dir.name,
                     "trial_id": trial_dir.name,
                     "refno": refno,
-                    "properties": predictions,
+                    "properties": properties,
                 }
             )
-            # explode predictions into separate rows
-            df = df.explode(column="properties").reset_index(drop=True)
-            df_properties = pd.json_normalize(df["properties"])
-            df = pd.concat([df.drop(columns=["properties"]), df_properties], axis=1)
-            dfs.append(df)
-    if not dfs:
+
+    if not rows:
         raise ValueError(f"No valid trials found in jobs directory: {jobs_dir}")
-    df = pd.concat(dfs, ignore_index=True)
-    return df
+
+    return pd.DataFrame(rows)

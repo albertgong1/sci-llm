@@ -38,6 +38,10 @@ from huggingface_hub import HfApi
 from slugify import slugify
 import logging
 
+import llm_utils as _llm_utils
+
+_LLM_UTILS_SRC = Path(_llm_utils.__file__).parent
+
 
 logger = logging.getLogger(__name__)
 
@@ -190,13 +194,29 @@ def build_task(
     instruction = _format_template(instruction_template, instruction_values)
     (task_dir / "instruction.md").write_text(textwrap.dedent(instruction))
 
-    shutil.copy2(templates_dir / "task.toml.template", task_dir / "task.toml")
+    task_toml_template = (templates_dir / "task.toml.template").read_text()
+    task_toml = _format_template(
+        task_toml_template, {"task_name": task_dir.name, "refno": refno}
+    )
+    (task_dir / "task.toml").write_text(task_toml)
 
     (env_dir / "Dockerfile").write_text(dockerfile_contents(templates_dir))
+    # Bundle the monorepo-local llm_utils package into the build context so the
+    # verifier Dockerfile's `COPY llm_utils /opt/llm_utils` step can find it.
+    llm_utils_dst = env_dir / "llm_utils"
+    if llm_utils_dst.exists():
+        shutil.rmtree(llm_utils_dst)
+    shutil.copytree(
+        _LLM_UTILS_SRC, llm_utils_dst, ignore=shutil.ignore_patterns("__pycache__")
+    )
     shutil.copy2(
         templates_dir / "tests/check_prediction.py", tests_dir / "check_prediction.py"
     )
     shutil.copy2(templates_dir / "tests/test.sh", tests_dir / "test.sh")
+    shutil.copy2(
+        templates_dir / "tests/si_conversion_factors.csv",
+        tests_dir / "si_conversion_factors.csv",
+    )
 
     solution_script = f"""\
 #!/bin/bash
@@ -333,17 +353,11 @@ def main() -> None:
     grouped = load_dataset(
         dataset_name, split=dataset_split, revision=dataset_revision
     ).to_pandas()
-    refnos = grouped["refno"].tolist()
-
-    if args.refno:
-        requested = {value.strip() for value in args.refno if value and value.strip()}
-        missing = sorted(requested - set(refnos))
-        if missing:
-            raise ValueError(f"Unknown refno(s) requested: {missing}")
-        refnos = [refno for refno in refnos if refno in requested]
 
     for _, row in grouped.iterrows():
         refno = row["refno"]
+        if args.refno and refno not in args.refno:
+            continue
         properties = list(row["properties"])
         pdf_path = pdf_dir / f"{refno}.pdf"
         if not pdf_path.exists():

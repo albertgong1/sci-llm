@@ -1,25 +1,37 @@
-"""Script to generate embeddings from property names.
+"""Generate embeddings for predicted property names from Harbor jobs or CSV files.
 
-Reference: https://ai.google.dev/gemini-api/docs/embeddings#task-types
+This script loads predictions from Harbor job directories or CSV files, generates
+embeddings for unique property names using the Gemini embedding model, and saves
+them to parquet files.
+
+Usage:
+    # From Harbor jobs directory
+    uv run python generate_pred_embeddings.py -jd JOBS_DIR -od OUTPUT_DIR
+
+    # From CSV files
+    uv run python generate_pred_embeddings.py -od OUTPUT_DIR -pd preds
 """
 
-# standard imports
-import pandas as pd
-from argparse import ArgumentParser
+import argparse
+import json
 import logging
 
-# pbench imports
-import pbench
-from pbench_eval.match import generate_embeddings
+import pandas as pd
+from dotenv import load_dotenv
 from slugify import slugify
 
-# local imports
-from utils import get_harbor_data
+import pbench
+from pbench_eval.harbor_utils import get_harbor_data
+
+from check_prediction import generate_embeddings
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-
-parser = ArgumentParser(description="Generate embeddings from property names.")
+parser = argparse.ArgumentParser(
+    description="Generate embeddings for predicted property names."
+)
 parser = pbench.add_base_args(parser)
 parser.add_argument(
     "--agent",
@@ -30,39 +42,45 @@ parser.add_argument(
 )
 args = parser.parse_args()
 pbench.setup_logging(args.log_level)
+
 jobs_dir = args.jobs_dir
 force = args.force
 preds_dirname = args.preds_dirname
-# model_name = args.model_name
-# agent = args.agent
 
 if jobs_dir is not None:
-    # Load predictions from Harbor jobs directory
     df = get_harbor_data(jobs_dir)
-    # # filter by agent and model name
-    # df = df[(df["agent"] == agent) & (df["model"] == model_name)]
 else:
-    # Load predictions from CSV files
+    if args.output_dir is None:
+        parser.error("--output_dir is required when not using --jobs_dir")
     preds_dir = args.output_dir / preds_dirname
-    preds_files = list(preds_dir.glob("*.csv"))
+    preds_files = list(preds_dir.glob("*.json"))
     if not preds_files:
-        raise FileNotFoundError(f"No CSV files found in {preds_dir}")
-    dfs = []
+        raise FileNotFoundError(f"No JSON files found in {preds_dir}")
+    trials = []
     for file in preds_files:
-        df = pd.read_csv(file)
-        assert "refno" in df.columns, "refno column not found in predictions CSV"
-        assert df["refno"].nunique() == 1, (
-            "Expected only one unique refno per predictions CSV"
+        with file.open() as f:
+            payload = json.load(f)
+        trials.append(
+            {
+                "agent": payload.get("agent"),
+                "model": payload.get("model"),
+                "refno": payload["refno"],
+                "properties": payload["properties"],
+            }
         )
-        dfs.append(df)
-    df = pd.concat(dfs, ignore_index=True)
+    df = pd.DataFrame(trials)
 
+if args.output_dir is None:
+    parser.error("--output_dir is required")
 
 embeddings_dir = args.output_dir / "pred_embeddings"
 embeddings_dir.mkdir(parents=True, exist_ok=True)
-for (agent, model, refno), group in df.groupby(
-    ["agent", "model", "refno"], dropna=False
-):
+
+for _, row in df.iterrows():
+    # Coerce None → "" so slugify doesn't choke (oracle batches have no model_name).
+    agent = row["agent"] or ""
+    model = row["model"] or ""
+    refno = row["refno"]
     save_path = embeddings_dir / f"{slugify(agent)}_{slugify(model)}_{refno}.parquet"
     if save_path.exists() and not force:
         logger.info(
@@ -70,17 +88,12 @@ for (agent, model, refno), group in df.groupby(
         )
         continue
 
-    print(f"Generating embeddings for {agent=} {model=} {refno=}...")
-    # import pdb; pdb.set_trace()
-    preds_df = group[group["refno"] == refno]
-    property_names = preds_df["property_name"].dropna().tolist()
-    # get unique property names
+    logger.info(f"Generating embeddings for {agent=} {model=} {refno=}...")
+    property_names = [
+        p["property_name"] for p in row["properties"] if p.get("property_name")
+    ]
     unique_property_names = list(set(property_names))
-    # generate embeddings
     embeddings = generate_embeddings(unique_property_names)
-    # save embeddings to parquet
-    assert len(preds_df["refno"].unique()) == 1, "Expected only one refno per file"
-    refno = preds_df["refno"].unique()[0]
     embeddings_df = pd.DataFrame(
         {
             "refno": [refno] * len(unique_property_names),
@@ -91,4 +104,4 @@ for (agent, model, refno), group in df.groupby(
         }
     )
     embeddings_df.to_parquet(save_path)
-    print(f"Saved embeddings to {save_path} with {len(embeddings_df)} rows")
+    logger.info(f"Saved embeddings to {save_path} with {len(embeddings_df)} rows")

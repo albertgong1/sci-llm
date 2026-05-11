@@ -21,8 +21,7 @@ uv run pbench-score-f1 \
     --model_name gemini-3-pro-preview
 ```
 """
-import json
-from pathlib import Path
+
 from argparse import ArgumentParser, Namespace
 from tabulate import tabulate
 import pandas as pd
@@ -35,8 +34,9 @@ from pbench_eval.token_utils import (
 )
 from pbench_eval.stats import mean_sem_with_n
 from pbench_eval.cli_utils import add_scoring_args
-from pbench_eval.score_precision_cli import compute_precision_by_refno
-from pbench_eval.score_recall_cli import compute_recall_by_refno
+
+from score_precision_cli import compute_precision_by_refno
+from score_recall_cli import compute_recall_by_refno
 
 logger = logging.getLogger(__name__)
 
@@ -89,12 +89,12 @@ def compute_f1_by_refno(args: Namespace) -> pd.DataFrame:
         if args.non_llm_baseline:
             trials_lookup = {
                 ("chemdataextractor", "supermat_eval"): f1_by_refno[
-                    (f1_by_refno["agent"] == "chemdataextractor") & 
-                    (f1_by_refno["model"] == "supermat_eval")
+                    (f1_by_refno["agent"] == "chemdataextractor")
+                    & (f1_by_refno["model"] == "supermat_eval")
                 ]["refno"].nunique(),
                 ("grobid", "supermat_eval"): f1_by_refno[
-                    (f1_by_refno["agent"] == "grobid") & 
-                    (f1_by_refno["model"] == "supermat_eval")
+                    (f1_by_refno["agent"] == "grobid")
+                    & (f1_by_refno["model"] == "supermat_eval")
                 ]["refno"].nunique(),
             }
         else:
@@ -116,12 +116,13 @@ def cli_main() -> None:
     parser = pbench.add_base_args(parser)
     parser = add_scoring_args(parser)
     parser.add_argument(
-        '--non_llm_baseline', action='store_true', help='Flag for special logic for non-agent and non-LLM eval.'
+        "--non_llm_baseline",
+        action="store_true",
+        help="Flag for special logic for non-agent and non-LLM eval.",
     )
 
     args = parser.parse_args()
     pbench.setup_logging(args.log_level)
-
 
     f1_by_refno = compute_f1_by_refno(args)
 

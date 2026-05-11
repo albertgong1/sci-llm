@@ -24,7 +24,6 @@ uv run pbench-score-recall \
 """
 
 import json
-import re
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -33,14 +32,14 @@ import pandas as pd
 import logging
 
 import pbench
-from pbench_eval.metrics import compute_recall_per_material_property
-from pbench_eval.harbor_utils import count_trials_per_agent_model
 from pbench_eval.token_utils import (
     count_trials_per_group,
     count_zeroshot_trials_per_group,
 )
 from pbench_eval.stats import mean_sem_with_n
 from pbench_eval.cli_utils import load_rubric
+
+from check_prediction import compute_recall_per_material_property
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +94,9 @@ def compute_recall_by_refno(args: Namespace) -> pd.DataFrame:
         eval_data_root = repo_root / "pbench_out"
         registry_data_path = eval_data_root / "registry_data.json"
         if not (registry_data_path.exists() and registry_data_path.is_file()):
-            raise RuntimeError(f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}")
+            raise RuntimeError(
+                f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}"
+            )
         registry_data = json.loads(Path(registry_data_path).read_text())
         assert isinstance(registry_data, list)
         eval_subset = registry_data[0]["tasks"]
@@ -109,7 +110,9 @@ def compute_recall_by_refno(args: Namespace) -> pd.DataFrame:
         df_matches = df_matches[df_matches["refno_normed"].isin(refnos)]
         del df_matches["refno_normed"]
         num_rows_after_filtering = df_matches.shape[0]
-        print(f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}")
+        print(
+            f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}"
+        )
 
     group_cols = ["agent", "model"]
 
@@ -224,7 +227,9 @@ def cli_main() -> None:
         help="Column name for material matching (default: material_or_system)",
     )
     parser.add_argument(
-        '--non_llm_baseline', action='store_true', help='Flag for special logic for non-agent and non-LLM eval.'
+        "--non_llm_baseline",
+        action="store_true",
+        help="Flag for special logic for non-agent and non-LLM eval.",
     )
 
     args = parser.parse_args()
@@ -270,78 +275,15 @@ def cli_main() -> None:
     ] = {}  # (agent, model, refno) -> reasoning_effort
     has_reasoning_effort = False
     if args.jobs_dir is None:
-        if False:
-            trajectory_dir = args.output_dir / "trajectories"
-            trials_lookup: dict[tuple, int] = {}
-            if trajectory_dir.exists():
-                # First pass: check if any trajectory has reasoning_effort and extract values
-                # Pattern: trajectory__agent={agent}__model={model}__refno={refno}.json
-                for traj_file in trajectory_dir.glob("trajectory__*.json"):
-                    match = re.match(
-                        r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
-                        traj_file.name,
-                    )
-                    if match:
-                        agent, model, refno = match.groups()
-                        model = model.replace("--", "/")
-                        try:
-                            with open(traj_file) as f:
-                                trajectory = json.load(f)
-                            inf_gen_config = trajectory.get("inf_gen_config", {})
-                            reasoning_effort = inf_gen_config.get(
-                                "reasoning_effort", ""
-                            )
-                            if reasoning_effort is None:
-                                reasoning_effort = ""
-                            if reasoning_effort:
-                                has_reasoning_effort = True
-                            reasoning_effort_lookup[(agent, model, refno)] = (
-                                reasoning_effort
-                            )
-                        except Exception:
-                            reasoning_effort_lookup[(agent, model, refno)] = ""
-
-                # Count trials per group
-                trajectory_counts: dict[tuple, int] = {}
-                for traj_file in trajectory_dir.glob("trajectory__*.json"):
-                    match = re.match(
-                        r"trajectory__agent=([^_]+)__model=([^_]+)__refno=(.+)\.json",
-                        traj_file.name,
-                    )
-                    if match:
-                        agent, model, refno = match.groups()
-                        model = model.replace("--", "/")
-                        if has_reasoning_effort:
-                            reasoning_effort = reasoning_effort_lookup.get(
-                                (agent, model, refno), ""
-                            )
-                            key = (agent, model, reasoning_effort)
-                        else:
-                            key = (agent, model)
-                        trajectory_counts[key] = trajectory_counts.get(key, 0) + 1
-                trials_lookup = trajectory_counts
-                logger.info(f"Counted trials from {trajectory_dir}: {trials_lookup}")
-            else:
-                # Fallback to counting unique refnos from data
-                logger.warning(
-                    f"Trajectories directory not found: {trajectory_dir}. "
-                    "Falling back to counting unique refnos from data."
-                )
-                group_cols_fallback = ["agent", "model"]
-                trials_lookup = {
-                    k: v
-                    for k, v in df_matches.groupby(group_cols_fallback)["refno"]
-                    .nunique()
-                    .to_dict()
-                    .items()
-                }
-        elif args.non_llm_baseline:
+        if args.non_llm_baseline:
             here = Path(__file__)
             repo_root = here.parent.parent.parent
             eval_data_root = repo_root / "pbench_out"
             registry_data_path = eval_data_root / "registry_data.json"
             if not (registry_data_path.exists() and registry_data_path.is_file()):
-                raise RuntimeError(f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}")
+                raise RuntimeError(
+                    f"We seem to be missing the registry data... we expect a JSON with the paper refnos to exist at: {registry_data_path.absolute()}"
+                )
             registry_data = json.loads(Path(registry_data_path).read_text())
             assert isinstance(registry_data, list)
             eval_subset = registry_data[0]["tasks"]
@@ -358,21 +300,25 @@ def cli_main() -> None:
             expected = set(refnos)
             missing = expected - hits
             if missing:
-                raise ValueError(f"You are missing {len(missing)} paper(s). Re-run extraction for: {missing}")
+                raise ValueError(
+                    f"You are missing {len(missing)} paper(s). Re-run extraction for: {missing}"
+                )
 
             del df_matches["refno_normed"]
             num_rows_after_filtering = df_matches.shape[0]
             trials_lookup = {
                 ("chemdataextractor", "supermat_eval"): df_matches[
-                    (df_matches["agent"] == "chemdataextractor") & 
-                    (df_matches["model"] == "supermat_eval")
+                    (df_matches["agent"] == "chemdataextractor")
+                    & (df_matches["model"] == "supermat_eval")
                 ]["refno"].nunique(),
                 ("grobid", "supermat_eval"): df_matches[
-                    (df_matches["agent"] == "grobid") & 
-                    (df_matches["model"] == "supermat_eval")
+                    (df_matches["agent"] == "grobid")
+                    & (df_matches["model"] == "supermat_eval")
                 ]["refno"].nunique(),
             }
-            print(f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}")
+            print(
+                f"Registry data filter result for {first_n} paper(s): {num_rows_original:,} -> {num_rows_after_filtering:,}"
+            )
         else:
             trials_lookup = count_zeroshot_trials_per_group(
                 args.output_dir.resolve(),
@@ -380,16 +326,7 @@ def cli_main() -> None:
             )
             has_reasoning_effort = False
     else:
-        if False:
-            # Count number of trials (refnos) per agent/model
-            trials_lookup: dict[tuple, int] = {}
-            trials_df = count_trials_per_agent_model(args.jobs_dir)
-            trials_lookup = {
-                (row["agent"], row["model"]): row["num_trials"]
-                for _, row in trials_df.iterrows()
-            }
-        else:
-            trials_lookup = count_trials_per_group(args.jobs_dir)
+        trials_lookup = count_trials_per_group(args.jobs_dir)
 
     # Determine grouping columns based on whether reasoning_effort exists
     if has_reasoning_effort:

@@ -16,8 +16,6 @@ from tabulate import tabulate
 
 import pbench
 from pbench_eval.cli_utils import add_scoring_args
-from pbench_eval.score_f1_cli import compute_f1_by_refno
-from pbench_eval.score_recall_cli import compute_recall_by_refno
 from pbench_eval.stats import padded_mean, padded_sem
 from pbench_eval.token_utils import (
     collect_harbor_token_usage,
@@ -25,6 +23,9 @@ from pbench_eval.token_utils import (
     count_trials_per_group,
     count_zeroshot_trials_per_group,
 )
+
+from score_f1_cli import compute_f1_by_refno
+from score_recall_cli import compute_recall_by_refno
 
 
 def aggregate_accuracy_tokens(args: Namespace) -> pd.DataFrame:

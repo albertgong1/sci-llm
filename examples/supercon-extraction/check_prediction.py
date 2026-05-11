@@ -1,30 +1,96 @@
+"""Harbor verifier for property extraction.
+
+Scores predictions against a ground-truth property list by (1) matching
+predicted property names to GT property names using embedding similarity
+followed by an LLM same-property judge, then (2) scoring values against GT
+values using the rubric (0.1% SI, pymatgen, or default exact/categorical).
+
+Follows the pipeline in ``compute_mean_recall_precision``: compute mean
+recall (GT → pred direction) and mean precision (pred → GT direction), and
+report the F1 of those two as the Harbor reward.
+"""
+
 from __future__ import annotations
 
 import argparse
+import asyncio
+import difflib
 import json
+import logging
 import re
 import sys
 import traceback
-from dataclasses import dataclass
-from json import JSONDecoder
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import Literal
+
+import numpy as np
+import pandas as pd
+from google import genai
+from google.genai import types
+from pymatgen.core import Composition
+from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
+
+from llm_utils import (
+    Conversation,
+    InferenceGenerationConfig,
+    LLMChat,
+    LLMChatResponse,
+    Message,
+    get_llm,
+)
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class RowKey:
-    """Key used to group ground-truth rows by (material, property_name)."""
+#
+# Constants
+#
+EMBEDDING_BATCH_SIZE = 100
+EMBEDDING_MODEL_NAME = "gemini-embedding-001"
+TOP_K = 3
+SERVER = "gemini"
+MODEL_NAME = "gemini-2.5-flash"
+MAX_OUTPUT_TOKENS = 4096
 
-    material: str
-    property_name: str
+# Prompt template used by generate_property_name_matches. JSON braces are
+# doubled so str.format() leaves them intact.
+PROPERTY_MATCHING_PROMPT = """You are an expert condensed matter physicist evaluating whether two property descriptions refer to the same physical measurement.
 
-    @staticmethod
-    def from_strings(material: str, property_name: str) -> "RowKey":
-        """Build a normalized key from raw strings."""
-        return RowKey(
-            str(material or "").strip().lower(),
-            str(property_name or "").strip().lower(),
-        )
+## Property 1
+- Name: "{property_name_1}"
+- Context: "{context_1}"
+
+## Property 2
+- Name: "{property_name_2}"
+- Context: "{context_2}"
+
+## Matching Rules:
+
+**SAME property if:**
+- Names are synonymous (e.g., "Tc" = "Critical Temperature" = "Superconducting Transition Temperature")
+- Abbreviation differences only (e.g., "Jc" = "Critical Current Density")
+- Capitalization/formatting differences
+
+**DIFFERENT properties if:**
+- Technically distinct measurements:
+  - "Tc onset" ≠ "Tc zero" ≠ "Tc midpoint"
+  - "Jc" ≠ "Ic" (density vs absolute current)
+  - "lattice constant a" ≠ "lattice constant c"
+  - "upper critical field Hc2" ≠ "lower critical field Hc1"
+- Different measurement orientations when orientation matters (e.g., "resistivity (c-axis)" ≠ "resistivity (ab-plane)")
+- Different conditions not reconcilable (e.g., "Tc at 0 GPa" ≠ "Tc at 10 GPa" unless pressure is tracked separately)
+
+## Response Format:
+Return JSON only:
+{{
+  "is_match": boolean,
+  "confidence": "high" | "medium" | "low",
+  "reason": "concise explanation",
+  "matched_via": "direct" | "synonym" | "abbreviation" | "condition_reconciliation" | null
+}}
+"""
 
 
 _SUPERSCRIPT_MAP = str.maketrans(
@@ -45,12 +111,165 @@ _SUPERSCRIPT_MAP = str.maketrans(
 )
 
 
-def _normalize_ws(text: str) -> str:
+#
+# Embedding + LLM-based property-name matching
+#
+def generate_embeddings(property_names: list[str]) -> list[np.ndarray]:
+    """Generate embeddings for a list of property names."""
+    client = genai.Client()
+    embeddings = []
+    for i in range(0, len(property_names), EMBEDDING_BATCH_SIZE):
+        batch = property_names[i : i + EMBEDDING_BATCH_SIZE]
+        result = client.models.embed_content(
+            model=EMBEDDING_MODEL_NAME,
+            contents=batch,
+            config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY"),
+        )
+        embeddings.extend([emb.values for emb in result.embeddings])
+
+    return embeddings
+
+
+async def check_if_same_property(
+    llm: LLMChat,
+    inf_gen_config: InferenceGenerationConfig,
+    prompt: str,
+    property_name_1: str,
+    property_name_2: str,
+) -> tuple[dict, dict]:
+    """Check if two property names are the same using an LLM."""
+    if property_name_1.strip() == property_name_2.strip():
+        result = {
+            "is_match": True,
+            "reason": "Property names are identical",
+            "confidence": "high",
+            "matched_via": "exact",
+            "judge": llm.model_name,
+            "prompt": None,
+        }
+        return result, {}
+
+    conv = Conversation(messages=[Message(role="user", content=[prompt])])
+
+    response: LLMChatResponse = await llm.generate_response_async(conv, inf_gen_config)
+    if response.pred:
+        is_match = response.pred.get("is_match", False)
+        reason = response.pred.get("reason", "No reason provided")
+        confidence = response.pred.get("confidence")
+        matched_via = response.pred.get("matched_via")
+    else:
+        is_match = False
+        reason = "Empty response from LLM"
+        confidence = None
+        matched_via = None
+
+    result = {
+        "is_match": is_match,
+        "reason": reason,
+        "confidence": confidence,
+        "matched_via": matched_via,
+        "judge": llm.model_name,
+        "prompt": prompt,
+    }
+
+    return result, {**response.model_dump(), "judge": llm.model_name}
+
+
+async def generate_property_name_matches(
+    df1: pd.DataFrame,
+    df2: pd.DataFrame,
+    llm: LLMChat,
+    inf_gen_config: InferenceGenerationConfig,
+    top_k: int = TOP_K,
+    left_on: list[str] = ["property_name", "context"],
+    right_on: list[str] = ["property_name", "context"],
+    left_suffix: str = "_x",
+    right_suffix: str = "_y",
+) -> pd.DataFrame:
+    """For each row in df1, find the top-k matches in df2 using embeddings + LLM."""
+    prompt_template = PROPERTY_MATCHING_PROMPT
+    Y = df2.drop_duplicates(subset=["property_name"])
+    similarity_matrix = cosine_similarity(
+        np.vstack(df1["embedding"].values),
+        np.vstack(Y["embedding"].values),
+    )
+    top_k_matches_indices = np.argsort(similarity_matrix, axis=1)[:, ::-1][:, :top_k]
+
+    matches = []
+    tasks = OrderedDict()
+    idx_to_task_id = {}
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
+        logger.debug(f"Found {len(df2_top_k)} matches for {x['property_name']}")
+        for idx, y in df2_top_k.iterrows():
+            x_variables = {k + "_1": x[k] for k in left_on}
+            y_variables = {k + "_2": y[k] for k in right_on}
+            task_id = (json.dumps(x_variables), json.dumps(y_variables))
+            idx_to_task_id[(i, idx)] = task_id
+            if task_id not in tasks:
+                prompt = prompt_template.format(
+                    **x_variables,
+                    **y_variables,
+                )
+                task = check_if_same_property(
+                    llm, inf_gen_config, prompt, x["property_name"], y["property_name"]
+                )
+                tasks[task_id] = task
+
+    batch_size = len(tasks)  # run all at once
+    results_data = []
+    for i in tqdm(range(0, len(tasks), batch_size), desc="Calling LLM API in batches"):
+        batch_tasks = {k: tasks[k] for k in list(tasks.keys())[i : i + batch_size]}
+        batch_results = await asyncio.gather(*batch_tasks.values())
+        results_data.extend(batch_results)
+    results = {
+        task_id: result for task_id, (result, _) in zip(tasks.keys(), results_data)
+    }
+
+    for i in tqdm(range(len(df1)), desc="Processing df1"):
+        x = df1.iloc[i].to_dict()
+        top_k_matches = Y.iloc[top_k_matches_indices[i]]["property_name"].tolist()
+        df2_top_k = df2[df2["property_name"].isin(top_k_matches)]
+        for idx, y in df2_top_k.iterrows():
+            result = results[idx_to_task_id[(i, idx)]]
+            matches.append(
+                {
+                    **x,
+                    **result,
+                    "y_id": idx,
+                }
+            )
+    df_matches = pd.DataFrame(matches)
+    df_matches = df_matches.merge(
+        df2,
+        left_on="y_id",
+        right_index=True,
+        how="left",
+        suffixes=(left_suffix, right_suffix),
+    )
+
+    responses = [response for _, response in results_data]
+    df_responses = pd.json_normalize(responses)
+
+    return df_matches, df_responses
+
+
+def is_material_name_same(material1: str, material2: str) -> bool:
+    """Check if two material names are the same."""
+    return material1 == material2
+
+
+#
+# String normalization helpers (inlined from pbench_eval.utils)
+#
+def normalize_ws(text: str) -> str:
     """Collapse whitespace for more robust string matching."""
     return re.sub(r"\s+", " ", str(text or "")).strip()
 
 
-def _normalize_unicode(text: str) -> str:
+def normalize_unicode(text: str) -> str:
     """Normalize common unicode variants (dashes, superscripts, delta)."""
     s = str(text or "")
     s = (
@@ -66,478 +285,960 @@ def _normalize_unicode(text: str) -> str:
     return s
 
 
-def _normalize_categorical(value: str) -> str:
-    """Normalize a categorical string for comparison."""
-    return _normalize_unicode(_normalize_ws(value)).lower()
-
-
-def _load_json(path: Path) -> Any:
-    """Load JSON from disk."""
-    with path.open() as f:
-        return json.load(f)
-
-
-def parse_numeric_candidates(value: str) -> list[float]:
-    """Extract numeric candidates from a free-form value string (units allowed)."""
+def parse_numeric_candidates(value: str) -> list[tuple[float, str | None]]:
+    """Extract (value, unit) tuples from a free-form value string."""
     if value is None:
         return []
 
-    value_str = _normalize_unicode(str(value)).strip()
+    value_str = normalize_unicode(str(value)).strip()
     if value_str.upper() == "NOT_FOUND" or value_str == "":
         return []
 
     value_str = re.sub(r"\(\d+\)", "", value_str)
 
-    candidates: list[float] = []
+    candidates: list[tuple[float, str | None, int]] = []
+    sci_notation_positions: set[tuple[int, int]] = set()
 
     sci_pattern = re.compile(
-        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:x|×)\s*10(?:\s*\^)?\s*(?P<exp>[-+]?\d+)",
+        r"(?P<base>[-+]?\d*\.?\d+)\s*(?:(?:x|×)\s*10(?:\s*\^)?|[eE])\s*(?P<exp>[-+]?\d+)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?",
         re.IGNORECASE,
     )
     for match in sci_pattern.finditer(value_str):
         try:
             base = float(match.group("base"))
             exp = int(match.group("exp"))
-            candidates.append(base * (10**exp))
+            unit = match.group("unit")
+            candidates.append((base * (10**exp), unit, match.end()))
+            sci_notation_positions.add((match.start(), match.end()))
         except Exception:
             continue
 
-    num_pattern = re.compile(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?")
+    num_pattern = re.compile(
+        r"(?P<num>[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?)\s*(?P<unit>[a-zA-Z0-9/°%.]+)?"
+    )
     for match in num_pattern.finditer(value_str):
         try:
-            candidates.append(float(match.group(0)))
+            match_start = match.start()
+            match_end = match.end()
+            overlaps = any(
+                not (match_end <= sci_start or match_start >= sci_end)
+                for sci_start, sci_end in sci_notation_positions
+            )
+            if overlaps:
+                continue
+
+            num = float(match.group("num"))
+            unit = match.group("unit")
+            candidates.append((num, unit, match.end()))
         except Exception:
             continue
 
     seen: set[str] = set()
-    unique: list[float] = []
-    for num in candidates:
-        key = f"{num:.12g}"
+    unique: list[tuple[float, str | None]] = []
+    for num, unit, end_pos in candidates:
+        key = f"{num:.12g}_{unit}_{end_pos}"
         if key in seen:
             continue
         seen.add(key)
-        unique.append(num)
+        unique.append((num, unit))
 
     return unique
 
 
-def _si_match(
-    pred_num: float, answer_num: float, *, rel_tol: float = 0.001
-) -> tuple[float, float]:
-    """Return (score, rel_error) for a numeric match under relative tolerance."""
-    if answer_num == 0:
-        return (1.0, 0.0) if pred_num == 0 else (0.0, float("inf"))
-    rel_err = abs(pred_num - answer_num) / abs(answer_num)
-    return (1.0, rel_err) if rel_err <= rel_tol else (0.0, rel_err)
+def normalize_formula(formula: str) -> str:
+    """Normalize a chemical formula to alphabetical element order."""
+    comp = Composition(formula)
+    return comp.alphabetical_formula
 
 
-def _strip_purity_annotations(text: str) -> str:
-    """Strip purity suffixes like '(4N)' from element tokens."""
-    return re.sub(r"\(\s*\d+\s*N\s*\)", "", text, flags=re.IGNORECASE).strip()
+#
+# Formula normalization (inlined from pbench_eval.normalize_material)
+#
+def strip_formula(text: str) -> tuple[str, dict[str, float]]:
+    """Extract chemical formula and variable values from text."""
+    text = text.strip()
+    text = text.replace("−", "-").replace("–", "-").replace("—", "-")
+    text = re.sub(r"(\d|\))\s+([A-Z])", r"\1\2", text)
+
+    variable_values = {}
+
+    var_pattern = (
+        r"\(\s*([xyzδ])\s*=\s*([0-9.]+)\s*(?:,\s*([xyzδ])\s*=\s*([0-9.]+)\s*)*\)"
+    )
+    var_match = re.search(var_pattern, text)
+    if var_match:
+        var_str = var_match.group(0)
+        pairs = re.findall(r"([xyzδ])\s*=\s*([0-9.]+)", var_str)
+        for var, val in pairs:
+            variable_values[var] = float(val)
+        text = text[: var_match.start()] + text[var_match.end() :]
+        text = text.strip()
+
+    formula_pattern = r"^([A-Z][a-zA-Z0-9()\-+δ.,/]*)"
+
+    match = re.match(formula_pattern, text)
+    if match:
+        return match.group(1).rstrip(".,"), variable_values
+
+    return text, variable_values
 
 
-def _parse_simple_formula(formula: str) -> dict[str, float] | None:
-    """Parse a simple chemical formula into element->count (conservative)."""
-    cleaned = _normalize_unicode(formula).strip()
-    cleaned = _strip_purity_annotations(cleaned)
-    cleaned = cleaned.replace(" ", "")
-    if not cleaned:
-        return None
-    if "," in cleaned or "(" in cleaned or ")" in cleaned:
-        return None
+def classify_and_normalize(
+    formula: str, variable_values: dict | None = None
+) -> tuple[str, str, list[str]]:
+    """Classify formula type and normalize generic/templated formulas."""
+    if variable_values is None:
+        variable_values = {}
 
-    pos = 0
-    comp: dict[str, float] = {}
-    token = re.compile(r"([A-Z][a-z]?)(\d*\.?\d*)")
-    while pos < len(cleaned):
-        match = token.match(cleaned, pos)
-        if not match:
-            return None
-        element = match.group(1)
-        count_str = match.group(2)
-        count = float(count_str) if count_str else 1.0
-        comp[element] = comp.get(element, 0.0) + count
-        pos = match.end()
-    return comp
+    oxygen_defaults = {"x": 1, "X": 1, "z": 0, "δ": 0, "delta": 0}
+    param_defaults = {"x": 0, "y": 0, "z": 0, "δ": 0, "delta": 0}
+
+    oxygen_defaults.update(variable_values)
+    param_defaults.update(variable_values)
+
+    has_oxygen_variable = bool(
+        re.search(r"O[xXzδ]|O\([^)]+\)|O\d+[+\-][xyzδ]", formula)
+    )
+    has_parameter = bool(
+        re.search(
+            r"[A-Z][a-z]?\([^)]*[xyz][^)]*\)[A-Z]|"
+            r"[A-Z][a-z]?[xyz][A-Z]|"
+            r"[A-BD-NP-Z][a-z]?\d+[+\-][xyz](?=[A-Z]|$)",
+            formula,
+        )
+    )
+    has_mixed_site = bool(re.search(r"\([A-Z][a-z]?,", formula))
+
+    normalized = formula
+    notes: list[str] = []
+
+    if has_oxygen_variable:
+        normalized = re.sub(
+            r"O([xXzδ])\b",
+            lambda m: f"O{oxygen_defaults.get(m.group(1), 1)}",
+            normalized,
+        )
+
+        def eval_oxygen_expr(expr: str) -> str | None:
+            for var, val in oxygen_defaults.items():
+                expr = re.sub(rf"\b{re.escape(var)}\b", str(val), expr)
+            try:
+                return str(eval(expr))
+            except Exception:
+                return None
+
+        def eval_oxygen_paren(match: re.Match) -> str | None:
+            expr = match.group(1)
+            result = eval_oxygen_expr(expr)
+            return f"O{result}" if result else match.group(0)
+
+        normalized = re.sub(r"O\(([^)]+)\)", eval_oxygen_paren, normalized)
+
+        def eval_oxygen_no_paren(match: re.Match) -> str | None:
+            expr = match.group(1)
+            result = eval_oxygen_expr(expr)
+            return f"O{result}" if result else match.group(0)
+
+        normalized = re.sub(r"O(\d+[+\-][xyzδ])", eval_oxygen_no_paren, normalized)
+
+        notes.append(f"Oxygen variable normalized with defaults: {oxygen_defaults}")
+
+    if has_mixed_site:
+
+        def split_mixed_site(match: re.Match) -> str:
+            elements_str = match.group(1)
+            total = float(match.group(2))
+            elements = [e.strip() for e in elements_str.split(",")]
+            per_element = total / len(elements)
+            return "".join([f"{elem}{per_element}" for elem in elements])
+
+        normalized = re.sub(
+            r"\(([A-Z][a-z]?(?:\s*,\s*[A-Z][a-z]?)+)\)(\d+(?:\.\d+)?)",
+            split_mixed_site,
+            normalized,
+        )
+        notes.append("Mixed site normalized with equal distribution")
+
+    if has_parameter and variable_values:
+
+        def eval_param_expr(expr: str) -> float | None:
+            for var, val in param_defaults.items():
+                expr = re.sub(rf"\b{re.escape(var)}\b", str(val), expr)
+            try:
+                return eval(expr)
+            except Exception:
+                return None
+
+        def eval_element_paren(match: re.Match) -> str | None:
+            element = match.group(1)
+            expr = match.group(2)
+            result = eval_param_expr(expr)
+            return f"{element}{result}" if result is not None else match.group(0)
+
+        normalized = re.sub(r"([A-Z][a-z]?)\(([^)]+)\)", eval_element_paren, normalized)
+
+        def eval_element_no_paren(match: re.Match) -> str | None:
+            element = match.group(1)
+            expr = match.group(2)
+            result = eval_param_expr(expr)
+            return f"{element}{result}" if result is not None else match.group(0)
+
+        normalized = re.sub(
+            r"([A-Z][a-z]?)(\d+[+\-][xyz])(?=[A-Z]|$)",
+            eval_element_no_paren,
+            normalized,
+        )
+
+        for var, val in param_defaults.items():
+            normalized = re.sub(
+                rf"([A-Z][a-z]?){re.escape(var)}(?![a-z])", rf"\g<1>{val}", normalized
+            )
+
+        notes.append(f"Compositional parameters substituted with: {variable_values}")
+
+    if has_parameter and "x" not in variable_values:
+        formula_type = "PARAMETER_FORMULA"
+        notes.append(
+            "WARNING: Contains compositional parameters - cannot fully normalize without specific x value"
+        )
+    elif re.search(r"[a-z]\)", normalized) or re.search(r"[δδ]", normalized):
+        formula_type = "PARTIAL_NORMALIZATION"
+        notes.append("Partially normalized - some expressions remain")
+    else:
+        try:
+            Composition(normalized)
+            formula_type = "STOICHIOMETRIC"
+        except Exception:
+            formula_type = "INVALID"
+            notes.append("Normalization produced invalid formula")
+
+    return normalized, formula_type, notes
 
 
-def _normalize_formula(formula: str) -> str | None:
-    """Convert a parsed formula into a canonical alphabetical string."""
-    comp = _parse_simple_formula(formula)
-    if comp is None:
-        return None
-    parts: list[str] = []
-    for element in sorted(comp.keys()):
-        count = comp[element]
-        if abs(count - 1.0) < 1e-12:
-            parts.append(element)
-        elif abs(count - round(count)) < 1e-12:
-            parts.append(f"{element}{int(round(count))}")
+#
+# Scorers (inlined from pbench_eval.utils)
+#
+def scorer_pymatgen(pred: str, answer: str) -> bool:
+    """Check if pred composition is close to answer composition."""
+    assert isinstance(pred, str), "pred must be a string"
+    assert isinstance(answer, str), "answer must be a string"
+
+    pred, pred_vars = strip_formula(pred)
+    answer, answer_vars = strip_formula(answer)
+
+    pred_formula, pred_formula_type, pred_notes = classify_and_normalize(
+        pred, pred_vars
+    )
+    answer_formula, answer_formula_type, answer_notes = classify_and_normalize(
+        answer, answer_vars
+    )
+
+    unparseable_types = {"INVALID", "PARAMETER_FORMULA", "PARTIAL_NORMALIZATION"}
+    if (
+        pred_formula_type in unparseable_types
+        or answer_formula_type in unparseable_types
+    ):
+        logger.warning(
+            f"Unparseable formula detected pred: '{pred}' ({pred_formula_type}, notes: {pred_notes}), "
+            f"answer: '{answer}' ({answer_formula_type}, notes: {answer_notes})"
+        )
+        return False
+
+    pred_comp = Composition(pred_formula)
+    answer_comp = Composition(answer_formula)
+    return pred_comp.almost_equals(answer_comp)
+
+
+def scorer_si(
+    pred_num: float,
+    pred_unit: str | None,
+    answer_num: float,
+    answer_unit: str | None,
+    rel_tol: float = 0.001,
+    conversion_df: pd.DataFrame | None = None,
+) -> bool:
+    """Check if pred is within rel_tol of answer, converting units via conversion_df when needed."""
+    logger.debug(
+        f"Scoring SI: pred={pred_num} {pred_unit}, answer={answer_num} {answer_unit}, rel_tol={rel_tol}"
+    )
+    pred_unit_norm = pred_unit.strip() if pred_unit else None
+    answer_unit_norm = answer_unit.strip() if answer_unit else None
+
+    if pred_unit_norm == answer_unit_norm:
+        if answer_num == 0:
+            return pred_num == 0
+        return abs(pred_num - answer_num) / abs(answer_num) <= rel_tol
+
+    if conversion_df is not None and pred_unit_norm and answer_unit_norm:
+        if "property_unit" in conversion_df.columns:
+            conversion_lookup = conversion_df.set_index("property_unit")
         else:
-            parts.append(f"{element}{count:g}")
-    return "".join(parts)
+            conversion_lookup = conversion_df
+
+        pred_factor = None
+        answer_factor = None
+        pred_comment = None
+        answer_comment = None
+
+        try:
+            if pred_unit_norm in conversion_lookup.index:
+                pred_factor = conversion_lookup.loc[pred_unit_norm, "conversion_factor"]
+                if "comments" in conversion_lookup.columns:
+                    pred_comment = conversion_lookup.loc[pred_unit_norm, "comments"]
+        except Exception:
+            pass
+
+        try:
+            if answer_unit_norm in conversion_lookup.index:
+                answer_factor = conversion_lookup.loc[
+                    answer_unit_norm, "conversion_factor"
+                ]
+                if "comments" in conversion_lookup.columns:
+                    answer_comment = conversion_lookup.loc[answer_unit_norm, "comments"]
+        except Exception:
+            pass
+
+        if pd.notna(pred_factor) and pd.notna(answer_factor):
+            pred_si = pred_num * float(pred_factor)
+            answer_si = answer_num * float(answer_factor)
+
+            if answer_si == 0:
+                return pred_si == 0
+            return abs(pred_si - answer_si) / abs(answer_si) <= rel_tol
+
+        if pd.isna(pred_factor) and pred_unit_norm in conversion_lookup.index:
+            comment = (
+                pred_comment
+                if pd.notna(pred_comment)
+                else "No conversion factor available"
+            )
+            logger.warning(f"Cannot convert unit '{pred_unit_norm}' to SI: {comment}")
+
+        if pd.isna(answer_factor) and answer_unit_norm in conversion_lookup.index:
+            comment = (
+                answer_comment
+                if pd.notna(answer_comment)
+                else "No conversion factor available"
+            )
+            logger.warning(f"Cannot convert unit '{answer_unit_norm}' to SI: {comment}")
+
+    if answer_num == 0:
+        return pred_num == 0
+    return abs(pred_num - answer_num) / abs(answer_num) <= rel_tol
 
 
-def _normalize_formula_set(value: str) -> set[str] | None:
-    """Normalize a single formula or a delimiter-separated list of formulas."""
-    raw = _normalize_unicode(_normalize_ws(value))
-    raw = _strip_purity_annotations(raw)
-    if not raw:
-        return None
+def scorer_exact_match(
+    pred: str, answer: str, mapping: dict[str, str] | None = None
+) -> bool:
+    """Exact / substring match after trim (case-insensitive for substring)."""
+    assert isinstance(pred, str), "pred must be a string"
+    assert isinstance(answer, str), "answer must be a string"
 
-    parts = [p.strip() for p in re.split(r"[;,]", raw) if p.strip()]
-    if not parts:
-        return None
+    pred_str = pred.strip()
+    answer_str = answer.strip()
 
-    normalized: set[str] = set()
-    for part in parts:
-        norm = _normalize_formula(part)
-        if norm is None:
-            return None
-        normalized.add(norm)
-    return normalized
+    if pred_str == answer_str:
+        return True
+
+    p_lower = pred_str.lower()
+    a_lower = answer_str.lower()
+
+    if p_lower in a_lower or a_lower in p_lower:
+        return True
+
+    return False
 
 
-def score_value(pred_value: str, answer_value: str, rubric: str | None) -> float:
-    """Score one predicted value against one ground-truth value using a rubric."""
-    if rubric == "0.1% SI":
-        answer_nums = parse_numeric_candidates(answer_value)
-        if not answer_nums:
+def score_value(
+    pred_value: str,
+    answer_value: str,
+    rubric: str,
+    mapping: dict[str, str] | None = None,
+    conversion_df: pd.DataFrame | None = None,
+) -> float:
+    """Master scoring function (0.0 to 1.0) routing by rubric."""
+    assert isinstance(pred_value, str), "pred_value must be a string"
+    assert isinstance(answer_value, str), "answer_value must be a string"
+    assert isinstance(rubric, str), "rubric must be a string"
+
+    logger.debug(
+        f"Scoring pred_value='{pred_value}' vs answer_value='{answer_value}' using rubric='{rubric}'"
+    )
+    match rubric:
+        case "0.1% SI":
+            answer_nums = parse_numeric_candidates(answer_value)
+            if not answer_nums:
+                return 0.0
+            if len(answer_nums) > 1:
+                logger.warning(
+                    f"Multiple numeric candidates found in answer_value '{answer_value}'. Using the first one: {answer_nums[0][0]}"
+                )
+            answer_num, answer_unit = answer_nums[0]
+            for pred_num, pred_unit in parse_numeric_candidates(pred_value):
+                if scorer_si(
+                    pred_num,
+                    pred_unit,
+                    answer_num,
+                    answer_unit,
+                    conversion_df=conversion_df,
+                ):
+                    return 1.0
             return 0.0
-        answer_num = answer_nums[0]
-        for num in parse_numeric_candidates(pred_value):
-            score, _ = _si_match(num, answer_num)
-            if score == 1.0:
-                return 1.0
+
+        case "pymatgen":
+            pv = normalize_unicode(pred_value).strip()
+            av = normalize_unicode(answer_value).strip()
+            return 1.0 if scorer_pymatgen(pv, av) else 0.0
+
+        case _:
+            return 1.0 if scorer_exact_match(pred_value, answer_value) else 0.0
+
+
+def score_evidence(
+    evidence_pred: str,
+    evidence_gt: str,
+    method: Literal["sequence_matcher"] = "sequence_matcher",
+) -> float:
+    """Score evidence similarity via difflib.SequenceMatcher."""
+    if pd.isna(evidence_pred) or pd.isna(evidence_gt):
         return 0.0
 
-    if rubric == "pymatgen":
-        pred_norm = _normalize_formula_set(pred_value)
-        ans_norm = _normalize_formula_set(answer_value)
-        if pred_norm is not None and ans_norm is not None:
-            return 1.0 if pred_norm == ans_norm else 0.0
-        return (
-            1.0
-            if _normalize_categorical(pred_value)
-            == _normalize_categorical(answer_value)
-            else 0.0
-        )
+    evidence_pred = str(evidence_pred).strip()
+    evidence_gt = str(evidence_gt).strip()
 
-    return (
-        1.0
-        if _normalize_categorical(pred_value) == _normalize_categorical(answer_value)
-        else 0.0
-    )
+    if not evidence_pred or not evidence_gt:
+        return 0.0
+
+    return difflib.SequenceMatcher(None, evidence_pred, evidence_gt).ratio()
 
 
-def _extract_first_json_array(text: str) -> list[dict[str, Any]] | None:
-    """Extract the first JSON array from mixed text (handles fenced blocks)."""
+#
+# Property-extraction scoring pipeline (from metrics.py)
+#
+def get_conditions_for_property(
+    property_name: str,
+    rubric_df: pd.DataFrame,
+    important_only: bool = True,
+) -> list[str]:
+    """Get the condition column names for a given property from the rubric."""
+    property_conditions = rubric_df[
+        (rubric_df["property_name"] == property_name)
+        & (rubric_df["condition_name"].notna())
+        & (rubric_df["condition_name"] != "")
+    ]
 
-    def looks_like_predictions_array(obj: Any) -> bool:
-        if not isinstance(obj, list) or not obj:
-            return False
-        first = obj[0]
-        if not isinstance(first, dict):
-            return False
-        return "property_name" in first and (
-            "material" in first or "material_or_system" in first
-        )
+    if important_only and "not_important" in rubric_df.columns:
+        property_conditions = property_conditions[
+            property_conditions["not_important"] != "not_important"
+        ]
 
-    fence_match = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if looks_like_predictions_array(obj):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\[", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-        except Exception:
-            continue
-        if looks_like_predictions_array(obj):
-            return obj
-    return None
+    return property_conditions["condition_name"].tolist()
 
 
-def _extract_first_json_object(text: str) -> dict[str, Any] | None:
-    """Extract the first JSON object from mixed text (handles fenced blocks)."""
-
-    def looks_like_properties_object(obj: Any) -> bool:
-        if not isinstance(obj, dict):
-            return False
-        props = obj.get("properties")
-        if not isinstance(props, list) or not props:
-            return False
-        first = props[0]
-        if not isinstance(first, dict):
-            return False
-        return "property_name" in first and (
-            "material_or_system" in first or "material" in first
-        )
-
-    fence_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
-    if fence_match:
-        try:
-            obj = json.loads(fence_match.group(1))
-            if looks_like_properties_object(obj):
-                return obj
-        except Exception:
-            pass
-
-    decoder = JSONDecoder()
-    for match in re.finditer(r"\{", text):
-        try:
-            obj, _ = decoder.raw_decode(text[match.start() :])
-        except Exception:
-            continue
-        if looks_like_properties_object(obj):
-            return obj
-    return None
-
-
-def _extract_text_from_jsonlines_log(text: str) -> str | None:
-    """Decode assistant output embedded in JSONL agent logs (e.g., Claude Code)."""
-    decoded_parts: list[str] = []
-    any_json = False
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if not line.startswith("{"):
-            return None
-        try:
-            obj = json.loads(line)
-        except Exception:
-            return None
-        any_json = True
-
-        if isinstance(obj, dict):
-            message = obj.get("message")
-            if isinstance(message, dict):
-                content = message.get("content")
-                if isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and isinstance(
-                            block.get("text"), str
-                        ):
-                            decoded_parts.append(block["text"])
-
-            result_text = obj.get("result")
-            if isinstance(result_text, str):
-                decoded_parts.append(result_text)
-
-    if not any_json:
-        return None
-
-    combined = "\n\n".join(
-        part.strip() for part in decoded_parts if part and part.strip()
-    )
-    return combined or None
-
-
-@dataclass(frozen=True)
-class Prediction:
-    """Normalized view of one predicted property record."""
-
-    material: str
-    property_name: str
-    pred_value: str
-    pred_unit: str
-    raw: dict[str, Any]
-
-
-def _coerce_predictions_payload(payload: Any) -> list[dict[str, Any]]:
-    """Coerce multiple supported prediction JSON shapes into a list[dict]."""
-    if isinstance(payload, dict) and isinstance(payload.get("properties"), list):
-        return [p for p in payload["properties"] if isinstance(p, dict)]
-    if isinstance(payload, list):
-        return [p for p in payload if isinstance(p, dict)]
-    if isinstance(payload, dict):
-        values = list(payload.values())
-        if values and all(isinstance(v, dict) for v in values):
-            return [v for v in values if isinstance(v, dict)]
-    raise ValueError("Unrecognized predictions JSON format")
-
-
-def _as_prediction(raw: dict[str, Any]) -> Prediction:
-    """Map a raw property dict to a normalized Prediction."""
-    material = raw.get("material")
-    if material is None:
-        material = (
-            raw.get("material_or_system")
-            or raw.get("material_system")
-            or raw.get("system")
-        )
-    property_name = raw.get("property_name") or raw.get("name")
-
-    pred_value = (
-        raw.get("pred_value")
-        or raw.get("value")
-        or raw.get("value_string")
-        or raw.get("property_value")
-        or ""
-    )
-    pred_unit = (
-        raw.get("pred_unit") or raw.get("unit") or raw.get("property_unit") or ""
-    )
-
-    return Prediction(
-        material=str(material or ""),
-        property_name=str(property_name or ""),
-        pred_value=str(pred_value or ""),
-        pred_unit=str(pred_unit or ""),
-        raw=raw,
-    )
-
-
-def load_predictions(predictions_path: Path) -> list[Prediction]:
-    """Load predictions from disk or fall back to parsing agent logs."""
-    if predictions_path.exists():
-        payload = _load_json(predictions_path)
-        return [_as_prediction(p) for p in _coerce_predictions_payload(payload)]
-
-    agent_logs_dir = Path("/logs/agent")
-    if agent_logs_dir.exists():
-        for log_path in sorted(agent_logs_dir.glob("*.txt")):
-            try:
-                content = log_path.read_text()
-            except Exception:
-                continue
-            decoded = _extract_text_from_jsonlines_log(content)
-            text = decoded or content
-
-            extracted_obj = _extract_first_json_object(text)
-            if extracted_obj is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_obj)
-                ]
-
-            extracted_arr = _extract_first_json_array(text)
-            if extracted_arr is not None:
-                return [
-                    _as_prediction(p)
-                    for p in _coerce_predictions_payload(extracted_arr)
-                ]
-
-    raise FileNotFoundError(
-        f"Missing predictions file at {predictions_path} and could not parse JSON from /logs/agent/*.txt"
-    )
-
-
-_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "as",
-    "at",
-    "by",
-    "for",
-    "from",
-    "in",
-    "is",
-    "of",
-    "on",
-    "or",
-    "sample",
-    "the",
-    "this",
-    "to",
-}
-
-
-def _tokens(text: str) -> set[str]:
-    """Tokenize text for fuzzy property-name matching."""
-    return {
-        t
-        for t in re.findall(r"[a-z0-9]+", _normalize_categorical(text))
-        if t not in _STOPWORDS
-    }
-
-
-def _is_tc_like_truth(truth_property_name: str, task_name: str | None) -> bool:
-    """Detect whether the ground-truth property is Tc-like (critical temperature)."""
-    if task_name and task_name.strip().lower() == "tc":
-        return True
-    toks = _tokens(truth_property_name)
-    return "tc" in toks or "t_c" in toks
-
-
-def _property_name_match(
-    *, truth_property_name: str, pred_property_name: str, task_name: str | None
+def check_conditions_match(
+    row: pd.Series,
+    condition_columns: list[str],
+    gt_suffix: str = "_gt",
+    pred_suffix: str = "_pred",
 ) -> bool:
-    """Return True if a prediction's property_name matches the ground-truth name."""
-    truth_norm = _normalize_categorical(truth_property_name)
-    pred_norm = _normalize_categorical(pred_property_name)
-    if not pred_norm:
-        return False
+    """Check if all condition columns match between ground truth and prediction."""
+    for cond in condition_columns:
+        gt_col = f"{cond}{gt_suffix}"
+        pred_col = f"{cond}{pred_suffix}"
 
-    if _is_tc_like_truth(truth_property_name, task_name):
-        if re.search(r"\btc\b", pred_norm) or re.search(
-            r"\bt\s*[_-]?\s*c\b", pred_norm
-        ):
-            return True
-        if "critical temperature" in pred_norm:
-            return True
-        if "transition temperature" in pred_norm:
-            return True
-        if "superconduct" in pred_norm and "temperature" in pred_norm:
-            return True
-        return False
+        if gt_col not in row.index or pred_col not in row.index:
+            continue
 
-    if truth_norm == pred_norm:
-        return True
-    if truth_norm and (truth_norm in pred_norm or pred_norm in truth_norm):
-        return True
+        gt_val = row.get(gt_col)
+        pred_val = row.get(pred_col)
 
-    truth_toks = _tokens(truth_property_name)
-    pred_toks = _tokens(pred_property_name)
-    if not truth_toks or not pred_toks:
-        return False
-    overlap = len(truth_toks & pred_toks) / max(1, len(truth_toks))
-    return overlap >= 0.6
+        if pd.isna(gt_val) and pd.isna(pred_val):
+            continue
+
+        if pd.isna(gt_val) or pd.isna(pred_val):
+            return False
+
+        if str(gt_val).strip().lower() != str(pred_val).strip().lower():
+            return False
+
+    return True
 
 
-def _normalize_material(material: str) -> str:
-    """Normalize a material/system string for loose matching."""
-    s = _normalize_unicode(_normalize_ws(material)).lower()
-    s = s.replace(" ", "")
-    s = re.sub(r"([a-z\)])1(?=([a-z\(\)\-]|$))", r"\1", s)
-    return s
+def construct_context(row: pd.Series) -> str:
+    """Construct the context from a ground-truth property row (value_unit only)."""
+    return json.dumps({k: v for k, v in row.items() if k == "value_unit"})
 
 
-def _is_generic_material(material: str) -> bool:
-    """Return True for generic/non-identifying material strings."""
-    norm = _normalize_material(material)
-    return norm in {
-        "",
-        "material",
-        "sample",
-        "specimen",
-        "film",
-        "thinfilm",
-        "thinfilms",
-        "crystal",
-        "singlecrystal",
-        "polycrystal",
-        "superconductor",
+def compute_recall_per_material_property(
+    df: pd.DataFrame,
+    conversion_df: pd.DataFrame | None = None,
+    matching_mode: Literal["material", "conditions"] = "material",
+    material_column: str = "material_or_system",
+    rubric_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Score recall for a dataframe of predicted-ground truth pairs.
+
+    Assumes df contains a single (refno, agent, model) combination — group
+    upstream if you need to aggregate across multiple.
+    """
+    if matching_mode == "conditions" and rubric_df is None:
+        raise ValueError("rubric_df is required when matching_mode='conditions'")
+
+    refno = df["refno"].iloc[0]
+    agent = df["agent"].iloc[0]
+    model = df["model"].iloc[0]
+
+    grouped = df.groupby("id_gt", dropna=False)
+    logger.info(f"Processing {len(grouped)} unique (material, property) pairs...")
+    results = []
+
+    gt_material_col = f"{material_column}_gt"
+    pred_material_col = f"{material_column}_pred"
+
+    for id_gt, group in grouped:
+        matching_rows = []
+        property_name = group["property_name_gt"].iloc[0]
+
+        for idx, row in group.iterrows():
+            if not row["is_match"]:
+                continue
+
+            if matching_mode == "material":
+                if pd.notna(row.get(gt_material_col)) and pd.notna(
+                    row.get(pred_material_col)
+                ):
+                    if scorer_pymatgen(
+                        str(row[gt_material_col]),
+                        str(row[pred_material_col]),
+                    ):
+                        matching_rows.append(row)
+            else:
+                condition_columns = get_conditions_for_property(
+                    property_name, rubric_df, important_only=True
+                )
+                if check_conditions_match(row, condition_columns, "_gt", "_pred"):
+                    matching_rows.append(row)
+
+        num_matches = len(matching_rows)
+
+        if num_matches == 0:
+            recall_score = 0.0
+            evidence_score_val = 0.0
+        else:
+            scores = []
+            evidence_scores = []
+
+            for row in matching_rows:
+                ev_score = score_evidence(
+                    evidence_pred=row.get("location.evidence_pred", ""),
+                    evidence_gt=row.get("location.evidence_gt", ""),
+                )
+                evidence_scores.append(ev_score)
+
+                if (
+                    pd.isna(row["value_string_pred"])
+                    or pd.isna(row["value_string_gt"])
+                    or pd.isna(row["rubric"])
+                ):
+                    continue
+
+                score = score_value(
+                    pred_value=row["value_string_pred"],
+                    answer_value=row["value_string_gt"],
+                    rubric=row["rubric"],
+                    conversion_df=conversion_df,
+                )
+                scores.append(score)
+
+            recall_score = max(scores) if scores else 0.0
+            evidence_score_val = max(evidence_scores) if evidence_scores else 0.0
+
+        result = {
+            "refno": refno,
+            "agent": agent,
+            "model": model,
+            "id_gt": id_gt,
+            "property_name_gt": property_name,
+            "value_string_gt": ", ".join(
+                list(set([str(row["value_string_gt"]) for _, row in group.iterrows()]))
+            ),
+            "num_property_matches": len(group),
+            "num_property_material_matches": num_matches,
+            "has_property_material_match": int(num_matches > 0),
+            "recall_score": recall_score,
+            "evidence_score": evidence_score_val,
+            "matches": ", ".join(
+                [
+                    f"{row['property_name_pred']}: {row['value_string_pred']}"
+                    for row in matching_rows
+                ]
+            ),
+            "answers": ", ".join(
+                [
+                    f"{row['value_string_pred']}"
+                    for _, row in group.iterrows()
+                    if row["is_match"]
+                ]
+            ),
+        }
+
+        if matching_mode == "material" and gt_material_col in group.columns:
+            result["material_or_system_gt"] = group[gt_material_col].iloc[0]
+            result["material_or_system_pred"] = ", ".join(
+                list(
+                    set(
+                        [
+                            str(row[pred_material_col])
+                            for _, row in group.iterrows()
+                            if pred_material_col in row.index
+                        ]
+                    )
+                )
+            )
+
+        results.append(result)
+
+    return pd.DataFrame(results)
+
+
+def compute_precision_per_material_property(
+    df: pd.DataFrame,
+    conversion_df: pd.DataFrame | None = None,
+    matching_mode: Literal["material", "conditions"] = "material",
+    material_column: str = "material_or_system",
+    rubric_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Score precision for a dataframe of predicted-ground truth pairs.
+
+    Assumes df contains a single (refno, agent, model) combination — group
+    upstream if you need to aggregate across multiple.
+    """
+    if matching_mode == "conditions" and rubric_df is None:
+        raise ValueError("rubric_df is required when matching_mode='conditions'")
+
+    refno = df["refno"].iloc[0]
+    agent = df["agent"].iloc[0]
+    model = df["model"].iloc[0]
+
+    grouped = df.groupby("id_pred", dropna=False)
+    logger.info(f"Processing {len(grouped)} unique predicted materials...")
+    results = []
+
+    gt_material_col = f"{material_column}_gt"
+    pred_material_col = f"{material_column}_pred"
+
+    for id_pred, group in grouped:
+        matching_rows = []
+        property_name = group["property_name_pred"].iloc[0]
+
+        for idx, row in group.iterrows():
+            if not row["is_match"]:
+                continue
+
+            if matching_mode == "material":
+                if pd.notna(row.get(pred_material_col)) and pd.notna(
+                    row.get(gt_material_col)
+                ):
+                    if scorer_pymatgen(
+                        str(row[pred_material_col]),
+                        str(row[gt_material_col]),
+                    ):
+                        matching_rows.append(row)
+            else:
+                condition_columns = get_conditions_for_property(
+                    property_name, rubric_df, important_only=True
+                )
+                if check_conditions_match(row, condition_columns, "_gt", "_pred"):
+                    matching_rows.append(row)
+
+        num_matches = len(matching_rows)
+
+        if num_matches == 0:
+            precision_score = 0.0
+            evidence_score_val = 0.0
+        else:
+            scores = []
+            evidence_scores = []
+
+            for row in matching_rows:
+                ev_score = score_evidence(
+                    evidence_pred=row.get("location.evidence_pred", ""),
+                    evidence_gt=row.get("location.evidence_gt", ""),
+                )
+                evidence_scores.append(ev_score)
+
+                if (
+                    pd.isna(row["value_string_pred"])
+                    or pd.isna(row["value_string_gt"])
+                    or pd.isna(row["rubric"])
+                ):
+                    continue
+
+                score = score_value(
+                    pred_value=row["value_string_pred"],
+                    answer_value=row["value_string_gt"],
+                    rubric=row["rubric"],
+                    conversion_df=conversion_df,
+                )
+                scores.append(score)
+
+            precision_score = max(scores) if scores else 0.0
+            evidence_score_val = max(evidence_scores) if evidence_scores else 0.0
+
+        result = {
+            "refno": refno,
+            "agent": agent,
+            "model": model,
+            "id_pred": id_pred,
+            "property_name_pred": property_name,
+            "value_string_pred": ", ".join(
+                list(
+                    set([str(row["value_string_pred"]) for _, row in group.iterrows()])
+                )
+            ),
+            "num_property_matches": len(group),
+            "num_property_material_matches": num_matches,
+            "has_property_material_match": int(num_matches > 0),
+            "precision_score": precision_score,
+            "evidence_score": evidence_score_val,
+            "matches": ", ".join(
+                [
+                    f"{row['property_name_gt']}: {row['value_string_gt']}"
+                    for row in matching_rows
+                ]
+            ),
+            "answers": ", ".join(
+                [
+                    f"{row['value_string_gt']}"
+                    for _, row in group.iterrows()
+                    if row["is_match"]
+                ]
+            ),
+        }
+
+        if matching_mode == "material" and pred_material_col in group.columns:
+            result["material_or_system_pred"] = group[pred_material_col].iloc[0]
+            result["material_or_system_gt"] = ", ".join(
+                list(
+                    set(
+                        [
+                            str(row[gt_material_col])
+                            for _, row in group.iterrows()
+                            if gt_material_col in row.index
+                        ]
+                    )
+                )
+            )
+
+        results.append(result)
+
+    return pd.DataFrame(results)
+
+
+def add_property_name_embeddings(df: pd.DataFrame) -> pd.DataFrame:
+    """Add Gemini embeddings for unique property names (requires GOOGLE_API_KEY)."""
+    unique_property_names = list(set(df["property_name"].tolist()))
+    embeddings = generate_embeddings(unique_property_names)
+    df_embeddings = pd.DataFrame(
+        {
+            "property_name": unique_property_names,
+            "embedding": embeddings,
+        }
+    )
+    return df.merge(df_embeddings, on="property_name", how="left")
+
+
+async def compute_mean_recall_precision(
+    df_pred: pd.DataFrame,
+    df_gt: pd.DataFrame,
+    conversion_df: pd.DataFrame | None,
+) -> tuple[float, float]:
+    """Calculate mean recall and precision for a single task (single refno)."""
+    assert len(df_pred["refno"].unique()) == 1, "Expected only one refno per file"
+    assert len(df_gt["refno"].unique()) == 1, "Expected only one refno per file"
+    assert "rubric" in df_gt.columns, (
+        "Ground truth dataframe must contain a 'rubric' column"
+    )
+
+    llm = get_llm(SERVER, MODEL_NAME)
+
+    inf_gen_config = InferenceGenerationConfig(
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+        output_format="json",
+    )
+
+    df_pred = add_property_name_embeddings(df_pred)
+    df_gt = add_property_name_embeddings(df_gt)
+    df_pred["context"] = df_pred["location.evidence"]
+    df_gt["context"] = df_gt.apply(construct_context, axis=1)
+
+    # Avoid column-name collisions in the merge inside
+    # generate_property_name_matches. Columns present on both sides get
+    # suffixed to `_pred`/`_gt`, but compute_recall/precision_per_material_property
+    # reads (refno, agent, model) and rubric unsuffixed. Keep refno/agent/model
+    # only on df_pred and rubric only on df_gt so each ends up unsuffixed.
+    df_gt_for_merge = df_gt.drop(columns=["refno", "agent", "model"], errors="ignore")
+    df_pred_for_merge = df_pred.drop(columns=["rubric"], errors="ignore")
+
+    df_pred_matches, _ = await generate_property_name_matches(
+        df_pred_for_merge,
+        df_gt_for_merge,
+        llm,
+        inf_gen_config,
+        left_on=["property_name", "context"],
+        right_on=["property_name", "context"],
+        left_suffix="_pred",
+        right_suffix="_gt",
+    )
+    df_recall = compute_recall_per_material_property(df_pred_matches, conversion_df)
+
+    df_gt_matches, _ = await generate_property_name_matches(
+        df_gt_for_merge,
+        df_pred_for_merge,
+        llm,
+        inf_gen_config,
+        left_on=["property_name", "context"],
+        right_on=["property_name", "context"],
+        left_suffix="_gt",
+        right_suffix="_pred",
+    )
+    df_precision = compute_precision_per_material_property(df_gt_matches, conversion_df)
+
+    mean_recall = df_recall["recall_score"].mean()
+    mean_precision = df_precision["precision_score"].mean()
+
+    return mean_recall, mean_precision
+
+
+#
+# Harbor verifier I/O helpers
+#
+# Number of condition slots to flatten into the row (mirrors zeroshot.py's
+# json_property_to_csv_row schema).
+MAX_CONDITIONS = 10
+
+
+def json_property_to_csv_row(prop: dict) -> pd.Series:
+    """Flatten one property dict into a pandas Series.
+
+    Mirrors the schema produced by ``zeroshot.py``'s ``json_property_to_csv_row``
+    so predictions written by the zeroshot agent and ground-truth entries share a
+    common shape.
+    """
+    conditions = prop.get("conditions") or {}
+
+    condition_cols: dict[str, str] = {}
+    for i in range(1, MAX_CONDITIONS + 1):
+        condition_cols[f"condition{i}_name"] = ""
+        condition_cols[f"condition{i}_value"] = ""
+
+    for idx, (cond_name, cond_value) in enumerate(conditions.items(), start=1):
+        if idx <= MAX_CONDITIONS:
+            condition_cols[f"condition{idx}_name"] = str(cond_name)
+            condition_cols[f"condition{idx}_value"] = str(cond_value)
+
+    location = prop.get("location") or {}
+
+    row_data = {
+        "material_or_system": prop.get("material_or_system") or "",
+        "sample_label": prop.get("sample_label") or "",
+        "property_name": prop.get("property_name") or "",
+        "category": prop.get("category") or "",
+        "value_string": prop.get("value_string") or "",
+        "value_unit": prop.get("value_unit") or "",
+        "method": prop.get("method") or "",
+        "notes": prop.get("notes") or "",
+        "rubric": prop.get("rubric") or "",
+        "location.page": location.get("page") or "",
+        "location.section": location.get("section") or "",
+        "location.source_type": location.get("source_type") or "",
+        "location.evidence": location.get("evidence") or "",
+        "location.figure_or_table": location.get("figure_or_table") or "",
     }
+    row_data.update(condition_cols)
+
+    return pd.Series(row_data)
 
 
-def _material_match(*, truth_material: str, pred_material: str) -> bool:
-    """Loose material match (substring match after normalization)."""
-    if _is_generic_material(pred_material):
-        return False
-    truth_norm = _normalize_material(truth_material)
-    pred_norm = _normalize_material(pred_material)
-    if not truth_norm or not pred_norm:
-        return False
-    return truth_norm in pred_norm or pred_norm in truth_norm
+def _properties_to_df(
+    properties: list[dict], *, refno: str, id_column: str
+) -> pd.DataFrame:
+    """Build a DataFrame from a list of property dicts using json_property_to_csv_row."""
+    rows: list[pd.Series] = []
+    for i, prop in enumerate(properties):
+        row = json_property_to_csv_row(prop)
+        row["refno"] = refno
+        row["agent"] = "verifier"
+        row["model"] = "verifier"
+        row[id_column] = prop.get("id") or i
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+#
+# Harbor verifier main
+#
+async def _async_main(args: argparse.Namespace) -> None:
+    """Async body of main — loads inputs, runs the pipeline, writes outputs."""
+    expected_path = Path(args.expected)
+    predictions_path = Path(args.predictions)
+    reward_path = Path(args.reward)
+    details_path = Path(args.details)
+
+    with expected_path.open() as f:
+        expected = json.load(f)
+    refno = str(expected.get("refno") or "")
+
+    df_gt = _properties_to_df(expected["ground_truth"], refno=refno, id_column="id_gt")
+
+    with predictions_path.open() as f:
+        predictions = json.load(f)["properties"]
+    df_pred = _properties_to_df(predictions, refno=refno, id_column="id_pred")
+
+    # Optional SI unit-conversion table (same format as
+    # score_precision_cli.py / score_recall_cli.py consume): CSV indexed
+    # by property_unit with a `conversion_factor` column. If the file
+    # isn't present the scorer falls back to same-unit comparison only.
+    conversion_df = None
+    if Path(args.conversion_factors_path).exists():
+        conversion_df = pd.read_csv(args.conversion_factors_path, index_col=0)
+
+    mean_recall, mean_precision = await compute_mean_recall_precision(
+        df_pred,
+        df_gt,
+        conversion_df=conversion_df,
+    )
+
+    reward = float(
+        2.0 * mean_recall * mean_precision / (mean_recall + mean_precision + 1e-8)
+    )
+
+    reward_path.parent.mkdir(parents=True, exist_ok=True)
+    reward_path.write_text(str(reward))
+
+    details_path.write_text(
+        json.dumps(
+            {
+                "reward": reward,
+                "mean_recall": float(mean_recall),
+                "mean_precision": float(mean_precision),
+                "task": expected.get("task"),
+                "refno": expected.get("refno"),
+                "n_predictions": len(df_pred),
+                "n_ground_truth": len(df_gt),
+            },
+            indent=2,
+        )
+    )
+
+    if reward < 1.0:
+        print(
+            f"Prediction check completed. reward={reward:.4f} "
+            f"(recall={mean_recall:.4f}, precision={mean_precision:.4f})"
+        )
+        sys.exit(1)
+
+    print("All predictions correct.")
 
 
 def main() -> None:
@@ -549,199 +1250,23 @@ def main() -> None:
     parser.add_argument("--predictions", type=str, default="/app/predictions.json")
     parser.add_argument("--reward", type=str, default="/logs/verifier/reward.txt")
     parser.add_argument("--details", type=str, default="/logs/verifier/details.json")
+    parser.add_argument(
+        "--conversion_factors_path",
+        type=str,
+        default="/tests/si_conversion_factors.csv",
+        help=(
+            "Optional CSV (indexed by property_unit, with a "
+            "`conversion_factor` column) used for SI unit conversion during "
+            "value scoring. Silently skipped if the file is missing."
+        ),
+    )
     args = parser.parse_args()
 
-    expected_path = Path(args.expected)
-    predictions_path = Path(args.predictions)
     reward_path = Path(args.reward)
     details_path = Path(args.details)
 
     try:
-        expected = _load_json(expected_path)
-        ground_truth = list(expected.get("ground_truth") or [])
-        if not isinstance(ground_truth, list):
-            raise TypeError("expected.json ground_truth must be a list")
-
-        task_name = str(expected.get("task") or "").strip().lower() or None
-        unique_truth_materials = sorted(
-            {str(t.get("material") or "") for t in ground_truth}
-        )
-        require_material_match = len([m for m in unique_truth_materials if m]) > 1
-
-        predictions = load_predictions(predictions_path)
-
-        grouped_truth: dict[RowKey, list[dict[str, Any]]] = {}
-        for truth in ground_truth:
-            key = RowKey.from_strings(truth.get("material"), truth.get("property_name"))
-            grouped_truth.setdefault(key, []).append(truth)
-
-        results: list[dict[str, Any]] = []
-        total = 0
-        correct = 0
-
-        for key, truths in grouped_truth.items():
-            truth_material = str(truths[0].get("material") or "")
-            truth_prop_name = str(truths[0].get("property_name") or "")
-            rubric = truths[0].get("rubric")
-
-            candidate_preds = [
-                pred
-                for pred in predictions
-                if _property_name_match(
-                    truth_property_name=truth_prop_name,
-                    pred_property_name=pred.property_name,
-                    task_name=task_name,
-                )
-                and (
-                    not require_material_match
-                    or _material_match(
-                        truth_material=truth_material, pred_material=pred.material
-                    )
-                )
-            ]
-
-            pool: list[dict[str, Any]] = []
-            if rubric == "0.1% SI":
-                for pred in candidate_preds:
-                    for num in parse_numeric_candidates(pred.pred_value):
-                        pool.append({"pred": pred, "num": num})
-            elif rubric == "pymatgen":
-                for pred in candidate_preds:
-                    pool.append(
-                        {"pred": pred, "norm": _normalize_formula_set(pred.pred_value)}
-                    )
-            else:
-                for pred in candidate_preds:
-                    pool.append(
-                        {"pred": pred, "norm": _normalize_categorical(pred.pred_value)}
-                    )
-
-            for truth in truths:
-                answer_value = str(truth.get("property_value") or "")
-                answer_unit = str(truth.get("property_unit") or "")
-                rubric_row = truth.get("rubric")
-
-                chosen_pred: Prediction | None = None
-                chosen_value: str = ""
-                chosen_score = 0.0
-
-                best_idx: int | None = None
-                best_score = -1.0
-                best_tie: float = float("inf")
-
-                if rubric_row == "0.1% SI":
-                    answer_nums = parse_numeric_candidates(answer_value)
-                    answer_num = answer_nums[0] if answer_nums else None
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_num = item.get("num")
-                        if answer_num is None or pred_num is None:
-                            continue
-                        score, tie = _si_match(float(pred_num), float(answer_num))
-                        if score > best_score or (
-                            score == best_score and tie < best_tie
-                        ):
-                            best_score = score
-                            best_tie = tie
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = str(pred_num)
-                            chosen_score = float(score)
-                            if best_score == 1.0 and best_tie == 0.0:
-                                break
-                elif rubric_row == "pymatgen":
-                    ans_norm = _normalize_formula_set(answer_value)
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_norm = item.get("norm")
-                        score = 0.0
-                        if pred_norm is not None and ans_norm is not None:
-                            score = 1.0 if pred_norm == ans_norm else 0.0
-                        else:
-                            score = (
-                                1.0
-                                if _normalize_categorical(pred.pred_value)
-                                == _normalize_categorical(answer_value)
-                                else 0.0
-                            )
-                        if score > best_score:
-                            best_score = score
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = pred.pred_value
-                            chosen_score = float(score)
-                            if best_score == 1.0:
-                                break
-                else:
-                    ans_norm = _normalize_categorical(answer_value)
-                    for idx, item in enumerate(pool):
-                        pred = item["pred"]
-                        pred_norm = item.get("norm")
-                        score = 1.0 if pred_norm == ans_norm else 0.0
-                        if score > best_score:
-                            best_score = score
-                            best_idx = idx
-                            chosen_pred = pred
-                            chosen_value = pred.pred_value
-                            chosen_score = float(score)
-                            if best_score == 1.0:
-                                break
-
-                if best_idx is not None and chosen_score == 1.0:
-                    pool.pop(best_idx)
-
-                results.append(
-                    {
-                        "material": truth_material,
-                        "property_name": truth_prop_name,
-                        "rubric": rubric_row,
-                        "answer_value": answer_value,
-                        "answer_unit": answer_unit,
-                        "pred_value": chosen_value,
-                        "pred_unit": chosen_pred.pred_unit if chosen_pred else "",
-                        "pred_property_name": chosen_pred.property_name
-                        if chosen_pred
-                        else "",
-                        "pred_material": chosen_pred.material if chosen_pred else "",
-                        "pred_raw": chosen_pred.raw if chosen_pred else None,
-                        "score": chosen_score,
-                    }
-                )
-
-                total += 1
-                correct += int(chosen_score == 1.0)
-
-        reward = (correct / total) if total else 0.0
-        reward_path.parent.mkdir(parents=True, exist_ok=True)
-        reward_path.write_text(str(reward))
-
-        details_path.write_text(
-            json.dumps(
-                {
-                    "reward": reward,
-                    "correct": correct,
-                    "total": total,
-                    "n_predictions": len(predictions),
-                    "task": expected.get("task"),
-                    "refno": expected.get("refno"),
-                    "require_material_match": require_material_match,
-                    "rows": results,
-                },
-                indent=2,
-            )
-        )
-
-        if reward < 1.0:
-            print("Prediction check completed with mismatches.")
-            for row in results:
-                if row["score"] != 1.0:
-                    print(
-                        f"- {row['material']} {row['property_name']}: "
-                        f"pred='{row['pred_value']}' answer='{row['answer_value']}' rubric='{row['rubric']}'"
-                    )
-            sys.exit(1)
-
-        print("All predictions correct.")
+        asyncio.run(_async_main(args))
     except Exception as exc:
         reward_path.parent.mkdir(parents=True, exist_ok=True)
         reward_path.write_text("0.0")
