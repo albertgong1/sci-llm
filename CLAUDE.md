@@ -31,6 +31,7 @@ parser = argparse.ArgumentParser(
 parser = pbench.add_base_args(parser)
 ```
 - Use a flat script structure for Python scripts within an examples/ subdirectory. Assume that the script will never be imported as a module, so do not use if __name__ == "__main__" to run the script.
+- For Python scripts under `examples/<task>/`, assume the script runs with CWD set to its top-level `examples/<task>/` directory. Hard-code asset paths as plain relative literals (e.g., `Path("rubric.csv")`, `Path("../other-task/data.json")`). Do NOT use `Path(__file__).parent` constructs to resolve paths.
 - Always add argument type annotations and return type annotations.
 
 For bash files:
