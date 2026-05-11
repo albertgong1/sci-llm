@@ -6,14 +6,14 @@ This script can:
 2. Load an existing CSV of scored results (Harbor mode) and generate analysis tables.
 
 Analysis outputs:
-- <output_dir>/<domain>/analysis/analysis_by_material.csv
-- <output_dir>/<domain>/analysis/analysis_by_property.csv
+- <output_dir>/precedent-search/analysis/analysis_by_material.csv
+- <output_dir>/precedent-search/analysis/analysis_by_property.csv
 
 Usage:
 ```bash
-python src/pbench_eval/score_task.py \
-    --domain precedent-search \
-    --input_csv out/harbor/precedent-search/results.csv \
+cd examples/tc-precedent-search
+uv run python score_task.py \
+    --input_csv ../harbor-workspace/out/harbor/precedent-search/results.csv \
     --analyze
 ```
 """
@@ -36,13 +36,13 @@ except ImportError:
     sys.path.append(str(repo_root / "src"))
     import pbench
 
-from pbench_eval.utils import score_value, ASSETS_DIR
+from pbench_eval.utils import score_value
 
 logger = logging.getLogger(__name__)
 
-# Updated path for property clusters
+# Path to property clusters (relative to CWD = examples/tc-precedent-search/)
 CLUSTER_FILE = Path(
-    "examples/supercon-extraction/scoring/property_clusters_gemini-3-pro-preview.json"
+    "../supercon-extraction/scoring/property_clusters_gemini-3-pro-preview.json"
 )
 
 CLUSTERS = {}
@@ -198,13 +198,13 @@ def load_json_predictions(json_path: Path) -> pd.DataFrame:
 def load_all_predictions(
     args: argparse.Namespace,
 ) -> pd.DataFrame:
-    """Load predictions from JSON files in <output_dir>/<domain>/preds/*.json."""
+    """Load predictions from JSON files in <output_dir>/precedent-search/preds/*.json."""
     if args.input_preds_dir:
         preds_dir = args.input_preds_dir
     else:
-        preds_dir = args.output_dir / args.domain / "preds"
+        preds_dir = args.output_dir / "precedent-search" / "preds"
 
-    combined_csv = args.output_dir / args.domain / "results.csv"
+    combined_csv = args.output_dir / "precedent-search" / "results.csv"
     if combined_csv.exists():
         logger.info(f"Loading pre-combined results from {combined_csv}")
         return pd.read_csv(combined_csv)
@@ -215,7 +215,7 @@ def load_all_predictions(
 
     # Load all JSON files (Harbor generates one per trial)
     json_files = sorted(preds_dir.glob(args.file_pattern))
-    
+
     if not json_files:
         raise ValueError(f"No JSON files found in {preds_dir}")
 
@@ -280,13 +280,6 @@ def main() -> None:
         description="Score and analyze extraction results."
     )
     parser = pbench.add_base_args(parser)
-    # Domain args
-    parser.add_argument(
-        "--domain",
-        type=str,
-        default="supercon",
-        help="Material science domain",
-    )
     parser.add_argument(
         "--dataset",
         type=str,
@@ -363,7 +356,7 @@ def main() -> None:
     else:
         logger.warning(f"Property clusters file not found at {cluster_path}")
 
-    analysis_dir = args.output_dir / args.domain / "analysis"
+    analysis_dir = args.output_dir / "precedent-search" / "analysis"
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
     # Helper to tag filenames
@@ -386,23 +379,21 @@ def main() -> None:
         try:
             df = load_all_predictions(args)
             logger.info(f"Loaded {len(df)} rows from JSONs")
-            
+
             # Setup Rubric
             if args.rubric_csv_filename:
                 rubric_path = Path(args.rubric_csv_filename)
-            elif args.domain == "precedent-search":
-                rubric_path = ASSETS_DIR / "hard" / "rubric.csv"
             else:
-                rubric_path = ASSETS_DIR / args.domain / "rubric.csv"
+                rubric_path = Path("rubric.csv")
 
-            scores_dir = args.output_dir / args.domain / "scores"
+            scores_dir = args.output_dir / "precedent-search" / "scores"
             scores_dir.mkdir(parents=True, exist_ok=True)
-            
+
             if args.output_tag:
                 output_csv = scores_dir / f"scored_results_{args.output_tag}.csv"
             else:
                 output_csv = scores_dir / "scored_results.csv"
-            
+
             logger.info("Scoring predictions...")
             df = score_predictions(df, rubric_path, output_csv)
 
@@ -416,7 +407,7 @@ def main() -> None:
         # Let's pass the output_csv path to analyze_scores instead of dir, or update analyze_scores signature?
         # Only analyze_scores was defined above. Let's update it to take file suffix or handle writing itself.
         # Actually, simpler to just re-implement the calls here with correct paths.
-        
+
         # Analysis by material
         material_stats = []
         if "material" in df.columns:
@@ -428,13 +419,17 @@ def main() -> None:
                         "mean": mean,
                         "se": se,
                         "n": n,
-                        "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                        "mean ± se": f"{mean:.3f} ± {se:.3f}"
+                        if not np.isnan(mean)
+                        else "N/A",
                     }
                 )
 
             material_df = pd.DataFrame(material_stats)
-            material_df = material_df.sort_values("mean", ascending=False, na_position="last")
-            
+            material_df = material_df.sort_values(
+                "mean", ascending=False, na_position="last"
+            )
+
             print("\n" + "=" * 60)
             print("ANALYSIS: Mean Score by Material")
             print("=" * 60)
@@ -461,12 +456,16 @@ def main() -> None:
                         "mean": mean,
                         "se": se,
                         "n": n,
-                        "mean ± se": f"{mean:.3f} ± {se:.3f}" if not np.isnan(mean) else "N/A",
+                        "mean ± se": f"{mean:.3f} ± {se:.3f}"
+                        if not np.isnan(mean)
+                        else "N/A",
                     }
                 )
 
             property_df = pd.DataFrame(property_stats)
-            property_df = property_df.sort_values("mean", ascending=False, na_position="last")
+            property_df = property_df.sort_values(
+                "mean", ascending=False, na_position="last"
+            )
 
             print("\n" + "=" * 60)
             print("ANALYSIS: Mean Score by Property")
